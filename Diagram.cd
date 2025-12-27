@@ -1,0 +1,6 @@
+﻿namespace ClassBook
+{
+    public class Diagram
+    {
+    }
+}

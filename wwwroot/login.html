@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClassBook — Вход</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f2f5;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 40px 30px;
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 10px; }
+        h2 { margin-bottom: 20px; text-align: center; }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover { background: #0056b3; }
+        .error { color: red; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>ClassBook</h1>
+    <h2>Вход</h2>
+    <input id="loginInput" placeholder="Логин" autocomplete="username">
+    <input id="passwordInput" type="password" placeholder="Пароль" autocomplete="current-password">
+    <button id="loginBtn">Войти</button>
+    <p id="loginError" class="error"></p>
+</div>
+
+<script>
+    const apiUrl = "https://localhost:7062/api";
+    
+    // Если уже авторизован, перенаправляем на соответствующую страницу
+    const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+    if (currentUser) {
+        console.log("Уже авторизован, роль:", currentUser.role);
+        if (currentUser.role === "Администратор") {
+            window.location.href = "index.html";
+        } else if (currentUser.role === "Учитель") {
+            window.location.href = "teacher.html";
+        } else {
+            localStorage.removeItem("currentUser");
+            console.log("Неизвестная роль, требуется повторный вход");
+        }
+    }
+
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+        const login = document.getElementById("loginInput").value.trim();
+        const password = document.getElementById("passwordInput").value.trim();
+        const errorEl = document.getElementById("loginError");
+
+        if (!login || !password) {
+            errorEl.textContent = "Заполните логин и пароль";
+            return;
+        }
+
+        try {
+            const res = await fetch(`${apiUrl}/auth/login`, {
+                method: "POST",
+                credentials: "include", 
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ login, password })
+            });
+
+            if (!res.ok) {
+                const msg = await res.text();
+                errorEl.textContent = msg || "Неверный логин или пароль";
+                return;
+            }
+
+            const data = await res.json();
+
+            // Сохраняем данные пользователя в localStorage
+            localStorage.setItem("currentUser", JSON.stringify(data));
+            
+            console.log("Вход выполнен:", data);
+
+            // Перенаправление в зависимости от роли
+            if (data.role === "Администратор") {
+                window.location.href = "index.html";
+            } else if (data.role === "Учитель") {
+                window.location.href = "teacher.html";
+            } else {
+                errorEl.textContent = "Неизвестная роль. Свяжитесь с администратором.";
+                localStorage.removeItem("currentUser");
+            }
+        } catch (err) {
+            errorEl.textContent = "Ошибка сети";
+        }
+    });
+</script>
+</body>
+</html>

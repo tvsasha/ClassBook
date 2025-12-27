@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClassBook — Админ-панель</title>
+    <style>
+        /* Твои стили без изменений */
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #74ebd5, #ACB6E5); margin:0; padding:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:50px; }
+        h1 { text-align:center; color:#333; margin-bottom:25px; }
+        .card { background:#fff; border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,0.12); padding:30px 40px; width:350px; position:relative; }
+        .card h2 { margin:15px 0 10px; font-size:1.2rem; color:#444; text-align:center; }
+        input, select { width:100%; padding:10px; margin:8px 0; border:1px solid #ccc; border-radius:8px; font-size:0.95rem; }
+        button { border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.95rem; transition:0.2s; }
+        button:hover { opacity:0.9; }
+        .create-btn { background:#28a745; color:white; padding:10px 20px; margin-bottom:15px; }
+        .edit-btn { background:#ffc107; color:black; }
+        .tabs { display:flex; gap:10px; margin-bottom:20px; }
+        .tab-btn { padding:10px 20px; background:#007bff; color:white; border:none; border-radius:4px 4px 0 0; cursor:pointer; }
+        .tab-btn.active { background:#0056b3; }
+        .tab-content { display:none; background:white; padding:20px; border-radius:0 8px 8px 8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+        .tab-content.active { display:block; }
+        ul { list-style:none; padding:0; }
+        li { background:#f8f9fa; padding:12px; margin:8px 0; border-radius:6px; display:flex; justify-content:space-between; align-items:center; }
+        .overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:999; display:none; }
+        #editModal { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:500px; background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:1000; display:none; }
+        .controls { display:flex; gap:10px; margin-bottom:20px; }
+        .hidden { display:none !important; }
+        .error { color:red; margin:10px 0; }
+    </style>
+</head>
+<body>
+
+<h1>ClassBook — Админ-панель</h1>
+
+<div class="controls">
+    <button id="logoutBtn" style="background:#dc3545;color:white;">Выйти</button>
+</div>
+
+    <div class="tabs">
+    <button class="tab-btn active" data-tab="users">Пользователи</button>
+    <button class="tab-btn" data-tab="students">Ученики</button>
+    <button class="tab-btn" data-tab="subjects">Предметы</button>
+    <button class="tab-btn" data-tab="lessons">Уроки</button>
+    <button class="tab-btn" data-tab="classes">Классы</button>
+</div>
+
+<div id="usersTab" class="tab-content active">
+    <button id="createUserBtn" class="create-btn">Добавить пользователя</button>
+    <ul id="usersList"></ul>
+</div>
+ 
+<div id="studentsTab" class="tab-content">
+    <button id="createStudentBtn" class="create-btn">Добавить ученика</button>
+    <label style="display:block;margin-bottom:8px;">Выберите класс:
+        <select id="classFilter" style="margin-top:6px;"></select>
+    </label>
+    <ul id="studentsList"></ul>
+</div>
+
+<div id="subjectsTab" class="tab-content">
+    <button id="createSubjectBtn" class="create-btn">Добавить предмет</button>
+    <ul id="subjectsList"></ul>
+</div>
+
+<div id="lessonsTab" class="tab-content">
+    <button id="createLessonBtn" class="create-btn">Добавить урок</button>
+    <ul id="lessonsList"></ul>
+</div>
+
+<div id="classesTab" class="tab-content">
+    <button id="createClassBtn" class="create-btn">Добавить класс</button>
+    <ul id="classesList"></ul>
+</div>
+
+<!-- Модалка -->
+<div class="overlay" id="overlay"></div>
+<div id="editModal">
+    <h2 id="modalTitle">Редактирование</h2>
+    <input id="modalFirstName" placeholder="Имя" class="modal-field hidden">
+    <input id="modalLastName" placeholder="Фамилия" class="modal-field hidden">
+    <input id="modalBirthDate" type="date" class="modal-field hidden">
+    <input id="modalName" placeholder="ФИО пользователя" class="modal-field hidden">
+    <input id="modalLogin" placeholder="Логин" class="modal-field hidden">
+    <select id="modalRole" class="modal-field hidden"></select>
+    <select id="modalTeacher" class="modal-field hidden"></select>
+    <select id="modalClass" class="modal-field hidden"></select>
+    <select id="modalSubject" class="modal-field hidden"></select>
+    <input id="modalTopic" placeholder="Тема урока" class="modal-field hidden">
+    <input id="modalLessonDate" type="date" class="modal-field hidden">
+    <textarea id="modalHomework" placeholder="Домашнее задание (опционально)" class="modal-field hidden" style="width:100%;height:80px;margin-top:6px;border-radius:8px;padding:8px;"></textarea>
+    <input id="modalPassword" type="password" placeholder="Пароль (опционально)" class="modal-field hidden">
+    <button id="saveModalBtn" class="create-btn">Сохранить</button>
+    <button id="cancelModalBtn" style="background:#6c757d;color:white;">Отмена</button>
+    <p id="modalError" class="error"></p>
+</div>
+
+<script>
+    const apiUrl = "https://localhost:7062/api";
+
+    let currentUser = JSON.parse(localStorage.getItem("currentUser"));
+    let currentTab = "users";
+    let editType = null;
+    let editId = null;
+
+    console.log("currentUser:", currentUser);
+
+    // Функция для создания заголовков
+    function getHeaders() {
+        return { "Content-Type": "application/json" };
+    }
+
+    // Проверка авторизации
+    if (!currentUser) {
+        console.log("Перенаправление на логин, т.к. нет авторизации");
+        window.location.href = "login.html";
+        throw new Error("Not authorized");
+    }
+    
+    // Проверка, что это администратор (проверяем role, который отправляет сервер)
+    const isAdmin = currentUser.role === "Администратор";
+    if (!isAdmin) {
+        console.log("Перенаправление на логин, т.к. не администратор. Роль:", currentUser.role);
+        window.location.href = "login.html";
+        throw new Error("Not admin");
+    }
+
+    // Переключение вкладок
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+            document.getElementById(btn.dataset.tab + "Tab").classList.add("active");
+            currentTab = btn.dataset.tab;
+            loadData();
+        });
+    });
+
+    // ВЫХОД
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.removeItem("currentUser");
+        window.location.href = "login.html";
+    });
+
+    // МОДАЛКА
+    const modal = document.getElementById("editModal");
+    const overlay = document.getElementById("overlay");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalFirstName = document.getElementById("modalFirstName");
+    const modalLastName = document.getElementById("modalLastName");
+    const modalBirthDate = document.getElementById("modalBirthDate");
+    const modalName = document.getElementById("modalName");
+    const modalLogin = document.getElementById("modalLogin");
+    const modalRole = document.getElementById("modalRole");
+    const modalTeacher = document.getElementById("modalTeacher");
+    const modalClass = document.getElementById("modalClass");
+    const modalSubject = document.getElementById("modalSubject");
+    const modalTopic = document.getElementById("modalTopic");
+    const modalLessonDate = document.getElementById("modalLessonDate");
+    const modalHomework = document.getElementById("modalHomework");
+    const modalPassword = document.getElementById("modalPassword");
+    const modalError = document.getElementById("modalError");
+
+    function resetModal() {
+        modalFirstName.value = "";
+        modalLastName.value = "";
+        modalBirthDate.value = "";
+        modalName.value = "";
+        modalLogin.value = "";
+        modalPassword.value = "";
+        modalRole.innerHTML = "";
+        modalTeacher.innerHTML = "";
+        modalClass.innerHTML = "";
+        modalFirstName.classList.add("hidden");
+        modalLastName.classList.add("hidden");
+        modalBirthDate.classList.add("hidden");
+        modalName.classList.add("hidden");
+        modalLogin.classList.add("hidden");
+        modalRole.classList.add("hidden");
+        modalTeacher.classList.add("hidden");
+        modalClass.classList.add("hidden");
+        modalSubject.classList.add("hidden");
+        modalTopic.classList.add("hidden");
+        modalLessonDate.classList.add("hidden");
+        modalHomework.classList.add("hidden");
+        modalPassword.classList.add("hidden");
+        modalError.textContent = "";
+    }
+
+    async function openModal(type, item = null) {
+        resetModal();
+        editType = type;
+        editId = item ? item.id : null;
+
+        modal.style.display = "block";
+        overlay.style.display = "block";
+
+        if (type === "user") {
+            modalTitle.textContent = item ? "Редактировать пользователя" : "Новый пользователь";
+            modalRole.classList.remove("hidden");
+            modalPassword.classList.remove("hidden");
+            modalLogin.classList.remove("hidden");
+            modalName.classList.remove("hidden");
+            modalName.placeholder = "ФИО *";
+            modalLogin.placeholder = "Логин *";
+            modalPassword.placeholder = item ? "Новый пароль (опционально)" : "Пароль *";
+            loadRoles();
+            if (item) {
+                modalName.value = item.fullName || item.login;
+                modalLogin.value = item.login;
+                modalRole.value = item.roleId || "";
+            }
+        } else if (type === "student") {
+            modalTitle.textContent = item ? "Редактировать ученика" : "Новый ученик";
+            modalFirstName.classList.remove("hidden");
+            modalLastName.classList.remove("hidden");
+            modalBirthDate.classList.remove("hidden");
+            modalClass.classList.remove("hidden");
+            modalFirstName.placeholder = "Имя *";
+            modalLastName.placeholder = "Фамилия *";
+            await loadClasses();
+            if (item) {
+                modalFirstName.value = item.firstName || "";
+                modalLastName.value = item.lastName || "";
+                modalBirthDate.value = item.birthDate ? item.birthDate.split('T')[0] : "";
+                // Убедимся, что опции уже загружены, затем установим значение
+                try { modalClass.value = item.classId || ""; } catch (e) { /* ignore */ }
+            }
+        } else if (type === "subject") {
+            modalTitle.textContent = item ? "Редактировать предмет" : "Новый предмет";
+            modalName.classList.remove("hidden");
+            modalName.placeholder = "Название предмета";
+            modalTeacher.classList.remove("hidden");
+            loadTeachers();
+            if (item) {
+                modalName.value = item.name;
+                modalTeacher.value = item.teacherId || "";
+            }
+        } else if (type === "class") {
+            modalTitle.textContent = item ? "Редактировать класс" : "Новый класс";
+            modalName.classList.remove("hidden");
+            modalName.placeholder = "Название класса (например, 10А)";
+            if (item) modalName.value = item.name;
+        } else if (type === "lesson") {
+            modalTitle.textContent = item ? "Редактировать урок" : "Новый урок";
+            modalSubject.classList.remove("hidden");
+            modalClass.classList.remove("hidden");
+            modalTeacher.classList.remove("hidden");
+            modalTopic.classList.remove("hidden");
+            modalLessonDate.classList.remove("hidden");
+            modalHomework.classList.remove("hidden");
+            await loadSubjects();
+            await loadClasses();
+            await loadTeachers();
+            if (item) {
+                modalSubject.value = item.subjectId || "";
+                modalClass.value = item.classId || "";
+                modalTeacher.value = item.teacherId || "";
+                modalTopic.value = item.topic || "";
+                modalLessonDate.value = item.date ? item.date.split('T')[0] : "";
+                modalHomework.value = item.homework || "";
+            }
+        }
+    }
+
+    function closeModal() {
+        modal.style.display = "none";
+        overlay.style.display = "none";
+        resetModal();
+    }
+
+    document.getElementById("cancelModalBtn").addEventListener("click", closeModal);
+
+    // СОХРАНЕНИЕ (с credentials: "include")
+    document.getElementById("saveModalBtn").addEventListener("click", async () => {
+        let body = {};
+        let url = "";
+        let method = editId ? "PUT" : "POST";
+
+        if (editType === "user") {
+            const name = modalName.value.trim();
+            if (!name) { modalError.textContent = "ФИО обязательно"; return; }
+            const login = modalLogin.value.trim();
+            const roleId = modalRole.value;
+            if (!login) { modalError.textContent = "Логин обязателен"; return; }
+            if (!roleId) { modalError.textContent = "Выберите роль"; return; }
+            body = { login: login, fullName: name, roleId: Number(roleId) };
+            const password = modalPassword.value.trim(); if (password) body.password = password;
+            if (!editId && !password) { modalError.textContent = "Пароль обязателен для нового пользователя"; return; }
+            url = editId ? `${apiUrl}/users/${editId}` : `${apiUrl}/users`;
+        } else if (editType === "student") {
+            const firstName = modalFirstName.value.trim();
+            const lastName = modalLastName.value.trim();
+            const birth = modalBirthDate.value;
+            const classId = modalClass.value;
+            if (!firstName || !lastName || !birth || !classId) { modalError.textContent = "Все поля обязательны"; return; }
+            body = { FirstName: firstName, LastName: lastName, BirthDate: birth, ClassId: Number(classId) };
+            url = editId ? `${apiUrl}/admin/students/${editId}` : `${apiUrl}/admin/students`;
+        } else if (editType === "subject") {
+            const name = modalName.value.trim();
+            const teacherId = modalTeacher.value;
+            if (!name) { modalError.textContent = "Название обязательно"; return; }
+            if (!teacherId) { modalError.textContent = "Выберите учителя"; return; }
+            body = { name: name, teacherId: Number(teacherId) };
+            url = editId ? `${apiUrl}/subjects/${editId}` : `${apiUrl}/subjects`;
+        } else if (editType === "class") {
+            const name = modalName.value.trim();
+            if (!name) { modalError.textContent = "Название обязательно"; return; }
+            body = { name: name };
+            url = editId ? `${apiUrl}/classes/${editId}` : `${apiUrl}/classes`;
+        } else if (editType === "lesson") {
+            const subjectId = modalSubject.value;
+            const classId = modalClass.value;
+            const teacherId = modalTeacher.value;
+            const topic = modalTopic.value.trim();
+            const date = modalLessonDate.value;
+            const homework = modalHomework.value.trim();
+            if (!subjectId || !classId || !teacherId || !topic || !date) { modalError.textContent = "Заполните все обязательные поля"; return; }
+            body = { SubjectId: Number(subjectId), ClassId: Number(classId), TeacherId: Number(teacherId), Topic: topic, Date: date, Homework: homework || null };
+            url = editId ? `${apiUrl}/lessons/${editId}` : `${apiUrl}/lessons`;
+        }
+
+        try {
+            const res = await fetch(url, {
+                method,
+                credentials: "include",
+                headers: getHeaders(),
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                const txt = await res.text(); throw new Error(txt || "Ошибка сервера");
+            }
+            closeModal();
+            loadData();
+        } catch (err) {
+            modalError.textContent = err.message || "Ошибка сохранения";
+        }
+    });
+
+    // Загрузка классов (для фильтра и модалки)
+    async function loadClasses() {
+        try {
+            const res = await fetch(`${apiUrl}/classes`, { credentials: "include", headers: getHeaders() });
+            if (!res.ok) throw new Error();
+            const classes = await res.json();
+            const filter = document.getElementById('classFilter');
+            if (filter) {
+                filter.innerHTML = '<option value="">Выберите класс</option>';
+                classes.forEach(c => {
+                    const opt = document.createElement('option'); opt.value = c.classId || c.id; opt.textContent = c.name; filter.appendChild(opt);
+                });
+            }
+            if (modalClass) {
+                modalClass.innerHTML = '<option value="">Выберите класс</option>';
+                classes.forEach(c => {
+                    const opt = document.createElement('option'); opt.value = c.classId || c.id; opt.textContent = c.name; modalClass.appendChild(opt);
+                });
+            }
+        } catch (e) { modalError.textContent = "Не удалось загрузить классы"; }
+    }
+
+    // Загрузка учеников по классу
+    async function loadStudentsByClass(classId) {
+        try {
+            const res = await fetch(`${apiUrl}/admin/students/${classId}`, { credentials: "include", headers: getHeaders() });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            const list = document.getElementById('studentsList');
+            list.innerHTML = '';
+            data.forEach(s => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${s.lastName} ${s.firstName} (${new Date(s.birthDate).toLocaleDateString()})</span> <button class="edit-btn">Редактировать</button>`;
+                const editBtn = li.querySelector('.edit-btn');
+                editBtn.addEventListener('click', () => openModal('student', { id: s.studentId, firstName: s.firstName, lastName: s.lastName, birthDate: s.birthDate, classId: s.classId }));
+                list.appendChild(li);
+            });
+        } catch (e) {
+            document.getElementById('studentsList').innerHTML = "<p style='color:red'>Ошибка загрузки учеников</p>";
+        }
+    }
+
+    // Загрузка ролей (с авторизацией)
+    async function loadRoles() {
+        try {
+            const res = await fetch(`${apiUrl}/roles`, { credentials: "include", headers: getHeaders() });
+            if (!res.ok) throw new Error();
+            const roles = await res.json();
+            modalRole.innerHTML = '<option value="">Выберите роль</option>';
+            roles.forEach(r => {
+                const opt = document.createElement("option");
+                opt.value = r.roleId;
+                opt.textContent = r.roleName;
+                modalRole.appendChild(opt);
+            });
+        } catch (e) {
+            modalError.textContent = "Не удалось загрузить роли";
+        }
+    }
+
+    // Загрузка учителей (с авторизацией)
+    async function loadTeachers() {
+        try {
+            const res = await fetch(`${apiUrl}/users/teachers`, { credentials: "include", headers: getHeaders() });
+            if (!res.ok) throw new Error();
+            const teachers = await res.json();
+            modalTeacher.innerHTML = '<option value="">Выберите учителя</option>';
+            teachers.forEach(t => {
+                const opt = document.createElement("option");
+                opt.value = t.id;
+                opt.textContent = t.fullName || t.login;
+                modalTeacher.appendChild(opt);
+            });
+        } catch (e) {
+            modalError.textContent = "Не удалось загрузить учителей";
+        }
+    }
+
+    // Загрузка предметов
+    async function loadSubjects() {
+        try {
+            const res = await fetch(`${apiUrl}/subjects`, { credentials: "include", headers: getHeaders() });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            if (modalSubject) {
+                modalSubject.innerHTML = '<option value="">Выберите предмет</option>';
+                data.forEach(s => {
+                    const opt = document.createElement('option'); opt.value = s.subjectId || s.id; opt.textContent = s.name; modalSubject.appendChild(opt);
+                });
+            }
+        } catch (e) { modalError.textContent = 'Не удалось загрузить предметы'; }
+    }
+
+    // Загрузка уроков
+    async function loadLessons() {
+        try {
+            let url = `${apiUrl}/lessons`;
+            // если текущий пользователь учитель — загрузим его уроки
+            if (currentUser && currentUser.role === 'Учитель') url = `${apiUrl}/teacher/lessons?teacherId=${currentUser.id}`;
+            const res = await fetch(url, { credentials: "include", headers: getHeaders() });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            const list = document.getElementById('lessonsList'); list.innerHTML = '';
+            data.forEach(l => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${l.subjectName || l.name} — ${l.className || l.class} — ${l.topic} (${new Date(l.date).toLocaleDateString()})</span> <button class="edit-btn">Редактировать</button>`;
+                const editBtn = li.querySelector('.edit-btn');
+                editBtn.addEventListener('click', () => openModal('lesson', { id: l.lessonId || l.id, subjectId: l.subjectId, classId: l.classId, teacherId: l.teacherId, topic: l.topic, date: l.date, homework: l.homework }));
+
+                const delBtn = document.createElement('button');
+                delBtn.textContent = 'Удалить';
+                delBtn.style.background = '#dc3545';
+                delBtn.style.color = 'white';
+                delBtn.style.marginLeft = '8px';
+                delBtn.addEventListener('click', async () => {
+                    if (!confirm('Удалить урок?')) return;
+                    try {
+                        const res = await fetch(`${apiUrl}/lessons/${l.lessonId || l.id}`, {
+                            method: 'DELETE',
+                            credentials: 'include',
+                            headers: getHeaders()
+                        });
+                        if (res.status === 204) {
+                            li.remove();
+                        } else {
+                            const txt = await res.text();
+                            alert(txt || 'Ошибка при удалении');
+                        }
+                    } catch (e) {
+                        alert('Ошибка сети');
+                    }
+                });
+
+                li.appendChild(delBtn);
+                list.appendChild(li);
+            });
+        } catch (e) {
+            document.getElementById('lessonsList').innerHTML = "<p style='color:red'>Ошибка загрузки уроков</p>";
+        }
+    }
+
+    // Загрузка данных (с авторизацией)
+    async function loadData() {
+        if (currentTab === "users") {
+            try {
+                const res = await fetch(`${apiUrl}/users`, { credentials: "include", headers: getHeaders() });
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                const list = document.getElementById("usersList");
+                list.innerHTML = "";
+                data.forEach(u => {
+                    const li = document.createElement("li");
+                    li.innerHTML = `<span>${u.fullName || u.login} (${u.roleName})</span>
+                        <button class="edit-btn">Редактировать</button>`;
+                    const editBtn = li.querySelector(".edit-btn");
+                    editBtn.addEventListener("click", () => openModal('user', {id: u.id, login: u.login, fullName: u.fullName, roleId: u.roleId}));
+                    list.appendChild(li);
+                });
+            } catch (e) {
+                document.getElementById("usersList").innerHTML = "<p style='color:red'>Ошибка загрузки</p>";
+            }
+        } else if (currentTab === "students") {
+            try {
+                await loadClasses();
+                const filter = document.getElementById('classFilter');
+                if (filter && filter.value) {
+                    await loadStudentsByClass(filter.value);
+                } else if (filter && filter.options.length > 1) {
+                    filter.selectedIndex = 1; // выбрать первый реальный класс
+                    await loadStudentsByClass(filter.value);
+                } else {
+                    document.getElementById('studentsList').innerHTML = "<p>Класс не выбран</p>";
+                }
+            } catch (e) {
+                document.getElementById('studentsList').innerHTML = "<p style='color:red'>Ошибка загрузки</p>";
+            }
+        } else if (currentTab === "subjects") {
+            try {
+                const res = await fetch(`${apiUrl}/subjects`, { credentials: "include", headers: getHeaders() });
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                const list = document.getElementById("subjectsList");
+                list.innerHTML = "";
+                data.forEach(s => {
+                    const li = document.createElement("li");
+                    li.innerHTML = `<span>${s.name} (Учитель: ${s.teacherName || 'не назначен'})</span>
+                        <button class="edit-btn">Редактировать</button>`;
+                    const editBtn = li.querySelector(".edit-btn");
+                    editBtn.addEventListener("click", () => openModal('subject', {id: s.subjectId, name: s.name, teacherId: s.teacherId || ''}));
+                    list.appendChild(li);
+                });
+            } catch (e) {
+                document.getElementById("subjectsList").innerHTML = "<p style='color:red'>Ошибка загрузки</p>";
+            }
+        } else if (currentTab === "classes") {
+            try {
+                const res = await fetch(`${apiUrl}/classes`, { credentials: "include", headers: getHeaders() });
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                const list = document.getElementById("classesList");
+                list.innerHTML = "";
+                data.forEach(c => {
+                    const li = document.createElement("li");
+                    li.innerHTML = `<span>${c.name}</span>
+                        <button class="edit-btn">Редактировать</button>`;
+                    const editBtn = li.querySelector(".edit-btn");
+                    editBtn.addEventListener("click", () => openModal('class', {id: c.classId, name: c.name}));
+                    list.appendChild(li);
+                });
+            } catch (e) {
+                document.getElementById("classesList").innerHTML = "<p style='color:red'>Ошибка загрузки</p>";
+            }
+        } else if (currentTab === "lessons") {
+            try {
+                await loadLessons();
+            } catch (e) {
+                document.getElementById('lessonsList').innerHTML = "<p style='color:red'>Ошибка загрузки уроков</p>";
+            }
+        }
+    }
+
+    // Кнопки создания
+    document.getElementById("createUserBtn").addEventListener("click", () => openModal("user"));
+    document.getElementById("createSubjectBtn").addEventListener("click", () => openModal("subject"));
+    document.getElementById("createClassBtn").addEventListener("click", () => openModal("class"));
+    const createStudentBtn = document.getElementById("createStudentBtn");
+    if (createStudentBtn) createStudentBtn.addEventListener("click", () => openModal("student"));
+    const createLessonBtn = document.getElementById("createLessonBtn");
+    if (createLessonBtn) createLessonBtn.addEventListener("click", () => openModal("lesson"));
+
+    // Слушатель фильтра по классам
+    const classFilterEl = document.getElementById('classFilter');
+    if (classFilterEl) {
+        classFilterEl.addEventListener('change', (e) => {
+            const v = e.target.value;
+            if (v) loadStudentsByClass(v);
+            else document.getElementById('studentsList').innerHTML = '';
+        });
+    }
+
+    // Начальная загрузка
+    loadData();
+</script>
+</body>
+</html>

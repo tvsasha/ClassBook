@@ -1,0 +1,48 @@
+body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+    margin:0; padding:0; min-height:100vh;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    padding-top:50px;
+}
+h1 { text-align:center; color:#333; margin-bottom:25px; }
+
+.card {
+    background:#fff; border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,0.12);
+    padding:30px 40px; width:350px; position:relative;
+}
+.card h2 { margin:15px 0 10px; font-size:1.2rem; color:#444; text-align:center; }
+
+input, select { width:100%; padding:10px; margin:8px 0; border:1px solid #ccc; border-radius:8px; font-size:0.95rem; }
+button { border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.95rem; transition:0.2s; }
+button:hover { opacity:0.9; }
+
+.login-btn { width:100%; padding:10px; background:#4A90E2; color:#fff; margin-top:10px; }
+.reg-btn { width:100%; padding:10px; background:#50C878; color:#fff; margin-top:10px; }
+.action-btn { width:auto; padding:12px 25px; background:#50C878; color:#fff; margin-top:0; }
+.cancel-btn { background:#FF6B6B; color:#fff; width:auto; padding:12px 25px; margin-top:0; }
+
+.switch-link { text-align:center; margin-top:10px; font-size:0.9rem; }
+.switch-link a { color:#4A90E2; cursor:pointer; text-decoration:none; }
+
+#userControls {
+    width: 90%; max-width: 1000px; display:none;
+    justify-content:center; align-items:center; gap:15px; margin-top:20px;
+}
+
+#usersList {
+    display:none; flex-wrap:wrap; justify-content:center; gap:20px; list-style:none; padding:0; margin-top:20px; width:90%; max-width:1000px;
+}
+.user-card { background:#fff; border-radius:15px; box-shadow:0 8px 20px rgba(0,0,0,0.15); padding:20px; width:220px; text-align:center; position:relative; cursor:pointer; }
+.user-name { font-size:1.2rem; font-weight:600; margin-bottom:10px; }
+.role-name { font-size:1rem; color:#777; background:#f0f0f0; padding:5px 10px; border-radius:12px; }
+
+.context-menu {
+    position:absolute; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);
+    display:none; z-index:1000; min-width:120px;
+}
+.context-menu button { width:100%; border:none; background:none; padding:10px; text-align:left; cursor:pointer; font-size:0.95rem; }
+.context-menu button:hover { background:#f0f0f0; }
+
+#editCard { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:1001; display:none; }
+.overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); z-index:1000; display:none; }
