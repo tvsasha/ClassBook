@@ -4,6 +4,8 @@ using ClassBook.Infrastructure.Data;
 using ClassBook.Application.Facades;
 using ClassBook.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using System.IO;
 
 namespace ClassBook
 {
@@ -28,9 +30,17 @@ namespace ClassBook
                     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;  
                 });
 
+            builder.Services.AddDataProtection()
+                .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys")))
+                .SetApplicationName("ClassBook");
+
             builder.Services.AddAuthorization(options =>
             {
                 options.AddPolicy("AdminOnly", policy => policy.RequireRole("Администратор"));
+                options.AddPolicy("ScheduleManagerOnly", policy => policy.RequireRole("Менеджер расписания", "Администратор"));
+                options.AddPolicy("DirectorOnly", policy => policy.RequireRole("Директор", "Администратор"));
+                options.AddPolicy("TeacherOrAdmin", policy => policy.RequireRole("Учитель", "Администратор"));
+                options.AddPolicy("StudentOrParent", policy => policy.RequireRole("Ученик", "Родитель"));
             });
 
             builder.Services.AddScoped<IPasswordHasher, Sha256PasswordHasherAdapter>();
@@ -47,6 +57,10 @@ namespace ClassBook
             builder.Services.AddScoped<SubjectFacade>();
             builder.Services.AddScoped<LessonFacade>();
             builder.Services.AddScoped<StudentFacade>();
+            builder.Services.AddScoped<AuditFacade>();
+            builder.Services.AddScoped<ScheduleFacade>();
+            builder.Services.AddScoped<ParentFacade>();
+            builder.Services.AddScoped<AnalyticsFacade>();
 
             builder.Services.AddCors(options =>
             {

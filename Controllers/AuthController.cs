@@ -1,7 +1,8 @@
 ﻿using ClassBook.Application.Facades;
 using ClassBook.Domain.Entities;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -36,6 +37,7 @@ namespace ClassBook.Controllers
         /// <response code="200">Успешный вход</response>
         /// <response code="400">Некорректные данные</response>
         /// <response code="401">Неверный логин или пароль</response>
+        [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {

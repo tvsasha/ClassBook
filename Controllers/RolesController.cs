@@ -25,15 +25,15 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить список всех ролей
         /// </summary>
-        /// <returns>Список ролей (Id, Name)</returns>
+        /// <returns>Список ролей (id, name)</returns>
         [HttpGet]
         public async Task<IActionResult> GetRoles()
         {
             var roles = await _db.Roles
                 .Select(r => new
                 {
-                    roleId = r.Id,
-                    roleName = r.Name
+                    id = r.Id,
+                    name = r.Name
                 })
                 .ToListAsync();
 

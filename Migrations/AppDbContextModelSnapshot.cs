@@ -17,7 +17,7 @@ namespace ClassBook.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.11")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -47,6 +47,50 @@ namespace ClassBook.Migrations
                         .IsUnique();
 
                     b.ToTable("Attendances");
+                });
+
+            modelBuilder.Entity("ClassBook.Domain.Entities.AuditLog", b =>
+                {
+                    b.Property<int>("AuditLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AuditLogId"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("EntityId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("NewValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("AuditLogId");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("ClassBook.Domain.Entities.Class", b =>
@@ -110,6 +154,9 @@ namespace ClassBook.Migrations
                     b.Property<string>("Homework")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("ScheduleId")
+                        .HasColumnType("int");
+
                     b.Property<int>("SubjectId")
                         .HasColumnType("int");
 
@@ -124,6 +171,8 @@ namespace ClassBook.Migrations
                     b.HasKey("LessonId");
 
                     b.HasIndex("ClassId");
+
+                    b.HasIndex("ScheduleId");
 
                     b.HasIndex("SubjectId");
 
@@ -168,7 +217,78 @@ namespace ClassBook.Migrations
                         {
                             Id = 4,
                             Name = "Родитель"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Менеджер расписания"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Директор"
                         });
+                });
+
+            modelBuilder.Entity("ClassBook.Domain.Entities.Schedule", b =>
+                {
+                    b.Property<int>("ScheduleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ScheduleId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("int");
+
+                    b.Property<TimeSpan>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("LessonNumber")
+                        .HasColumnType("int");
+
+                    b.Property<TimeSpan>("StartTime")
+                        .HasColumnType("time");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ScheduleId");
+
+                    b.HasIndex("DayOfWeek", "LessonNumber")
+                        .IsUnique();
+
+                    b.ToTable("Schedules");
+                });
+
+            modelBuilder.Entity("ClassBook.Domain.Entities.StudentParent", b =>
+                {
+                    b.Property<int>("StudentParentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("StudentParentId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ParentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("StudentParentId");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("StudentId", "ParentId")
+                        .IsUnique();
+
+                    b.ToTable("StudentParents");
                 });
 
             modelBuilder.Entity("ClassBook.Domain.Entities.Subject", b =>
@@ -282,6 +402,17 @@ namespace ClassBook.Migrations
                     b.Navigation("Student");
                 });
 
+            modelBuilder.Entity("ClassBook.Domain.Entities.AuditLog", b =>
+                {
+                    b.HasOne("ClassBook.Domain.Entities.User", "User")
+                        .WithMany("AuditLogs")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("ClassBook.Domain.Entities.Grade", b =>
                 {
                     b.HasOne("ClassBook.Domain.Entities.Lesson", "Lesson")
@@ -309,6 +440,11 @@ namespace ClassBook.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("ClassBook.Domain.Entities.Schedule", "Schedule")
+                        .WithMany("Lessons")
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ClassBook.Domain.Entities.Subject", "Subject")
                         .WithMany("Lessons")
                         .HasForeignKey("SubjectId")
@@ -323,9 +459,30 @@ namespace ClassBook.Migrations
 
                     b.Navigation("Class");
 
+                    b.Navigation("Schedule");
+
                     b.Navigation("Subject");
 
                     b.Navigation("Teacher");
+                });
+
+            modelBuilder.Entity("ClassBook.Domain.Entities.StudentParent", b =>
+                {
+                    b.HasOne("ClassBook.Domain.Entities.User", "Parent")
+                        .WithMany("StudentParents")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Student", "Student")
+                        .WithMany("Parents")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Parent");
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("ClassBook.Domain.Entities.Subject", b =>
@@ -380,6 +537,11 @@ namespace ClassBook.Migrations
                     b.Navigation("Users");
                 });
 
+            modelBuilder.Entity("ClassBook.Domain.Entities.Schedule", b =>
+                {
+                    b.Navigation("Lessons");
+                });
+
             modelBuilder.Entity("ClassBook.Domain.Entities.Subject", b =>
                 {
                     b.Navigation("Lessons");
@@ -387,7 +549,11 @@ namespace ClassBook.Migrations
 
             modelBuilder.Entity("ClassBook.Domain.Entities.User", b =>
                 {
+                    b.Navigation("AuditLogs");
+
                     b.Navigation("Lessons");
+
+                    b.Navigation("StudentParents");
 
                     b.Navigation("Subjects");
                 });
@@ -397,6 +563,8 @@ namespace ClassBook.Migrations
                     b.Navigation("Attendances");
 
                     b.Navigation("Grades");
+
+                    b.Navigation("Parents");
                 });
 #pragma warning restore 612, 618
         }

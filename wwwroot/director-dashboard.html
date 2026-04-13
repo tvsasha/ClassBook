@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дашборд директора</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        h1 { color: #333; margin-bottom: 10px; }
+        .subtitle { color: #666; font-size: 0.9rem; }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .tab-btn:hover { border-color: #667eea; }
+
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .filters {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        input[type="date"], select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        button:hover { background: #764ba2; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .stat-value { font-size: 2.5rem; font-weight: 600; }
+        .stat-label { font-size: 0.9rem; opacity: 0.9; margin-top: 10px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        tbody tr:hover { background: #f8f9fa; }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .badge-ok { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+
+        .card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .loader {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .percentage {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        @media (max-width: 1024px) {
+            .filters { flex-direction: column; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            table { font-size: 0.9rem; }
+        }
+
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; }
+            .tab-btn { width: 100%; }
+            .stat-card { padding: 15px; }
+            .stat-value { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>📊 Дашборд директора</h1>
+        <div class="subtitle">Мониторинг учебного процесса и отчетность</div>
+    </header>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('daily')">📅 Ежедневный отчет</button>
+        <button class="tab-btn" onclick="switchTab('attendance')">✓ Посещаемость</button>
+        <button class="tab-btn" onclick="switchTab('problematic')">⚠️ Проблемные ученики</button>
+        <button class="tab-btn" onclick="switchTab('teachers')">👨‍🏫 Прогресс учителей</button>
+        <button class="tab-btn" onclick="switchTab('audit')">📋 Аудит лог</button>
+    </div>
+
+    <div class="content">
+        <!-- Ежедневный отчет -->
+        <div id="daily" class="tab-content active">
+            <h2>📅 Ежедневный отчет заполнений</h2>
+
+            <div class="filters">
+                <input type="date" id="dailyDate">
+                <button onclick="loadDailyReport()">🔄 Загрузить</button>
+            </div>
+
+            <div class="stats-grid" id="dailyStats"></div>
+            <div id="dailyContent" class="loader">Выберите дату и загрузите отчет</div>
+        </div>
+
+        <!-- Посещаемость -->
+        <div id="attendance" class="tab-content">
+            <h2>✓ Статистика посещаемости</h2>
+
+            <div class="filters">
+                <input type="date" id="attendStartDate">
+                <span>-</span>
+                <input type="date" id="attendEndDate">
+                <button onclick="loadAttendanceStats()">🔄 Загрузить</button>
+            </div>
+
+            <div id="attendanceContent" class="loader">Загрузка...</div>
+        </div>
+
+        <!-- Проблемные ученики -->
+        <div id="problematic" class="tab-content">
+            <h2>⚠️ Проблемные ученики</h2>
+
+            <div class="filters">
+                <input type="date" id="probStartDate">
+                <span>-</span>
+                <input type="date" id="probEndDate">
+                <select id="probClassId">
+                    <option value="">Все классы</option>
+                </select>
+                <button onclick="loadProblematicStudents()">🔄 Загрузить</button>
+            </div>
+
+            <div id="problematicContent" class="loader">Загрузка...</div>
+        </div>
+
+        <!-- Прогресс учителей -->
+        <div id="teachers" class="tab-content">
+            <h2>👨‍🏫 Прогресс учителей</h2>
+
+            <div class="filters">
+                <select id="teacherSelect">
+                    <option value="">Выберите учителя</option>
+                </select>
+                <input type="date" id="teachStartDate">
+                <span>-</span>
+                <input type="date" id="teachEndDate">
+                <button onclick="loadTeacherProgress()">🔄 Загрузить</button>
+            </div>
+
+            <div id="teachersContent" class="loader">Выберите учителя и загрузите отчет</div>
+        </div>
+
+        <!-- Аудит лог -->
+        <div id="audit" class="tab-content">
+            <h2>📋 История изменений (Аудит лог)</h2>
+
+            <div class="filters">
+                <select id="auditEntityType">
+                    <option value="">Все типы</option>
+                    <option value="Lesson">Уроки</option>
+                    <option value="Grade">Оценки</option>
+                    <option value="Attendance">Посещаемость</option>
+                    <option value="Schedule">Расписание</option>
+                </select>
+                <input type="date" id="auditStartDate">
+                <span>-</span>
+                <input type="date" id="auditEndDate">
+                <button onclick="loadAuditLog()">🔄 Загрузить</button>
+            </div>
+
+            <div id="auditContent" class="loader">Загрузка...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_BASE = 'https://localhost:7062/api';
+
+// Проверка авторизации при загрузке
+(function checkAuthOnLoad() {
+    if (window.location.pathname.includes('login.html')) {
+        console.log('director-dashboard.html: уже на странице входа, пропускаем редирект');
+        return;
+    }
+    
+    try {
+        const currentUserStr = sessionStorage.getItem('currentUser');
+        console.log('director-dashboard.html: currentUserStr =', currentUserStr);
+        
+        if (!currentUserStr || currentUserStr === 'null' || currentUserStr === 'undefined') {
+            console.log('director-dashboard.html: нет currentUser, редирект на login.html');
+            sessionStorage.setItem("isRedirecting", "true");
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 100);
+            return;
+        }
+        
+        let currentUser;
+        try {
+            currentUser = JSON.parse(currentUserStr);
+        } catch (e) {
+            console.error('director-dashboard.html: не удалось распарсить JSON:', currentUserStr);
+            throw new Error('JSON parse error');
+        }
+        
+        console.log('director-dashboard.html: parsed currentUser =', JSON.stringify(currentUser, null, 2));
+        
+        if (!currentUser) {
+            console.log('director-dashboard.html: currentUser is null/undefined');
+            throw new Error('Невалидные данные пользователя');
+        }
+        
+        const userRole = currentUser.role || currentUser.roleName;
+        console.log('director-dashboard.html: userRole =', userRole);
+        
+        if (!userRole) {
+            console.log('director-dashboard.html: ни role, ни roleName не найдены');
+            throw new Error('Отсутствует свойство role/roleName');
+        }
+        
+        // Проверяем, что роль соответствует странице
+        if (userRole !== 'Директор') {
+            console.log('director-dashboard.html: роль "' + userRole + '" не совпадает с "Директор", перенаправляем');
+            
+            sessionStorage.setItem("isRedirecting", "true");
+            
+            setTimeout(() => {
+                if (userRole === 'Администратор') {
+                    window.location.href = 'index.html';
+                } else if (userRole === 'Учитель') {
+                    window.location.href = 'teacher.html';
+                } else if (userRole === 'Ученик') {
+                    window.location.href = 'student-portal.html';
+                } else if (userRole === 'Родитель') {
+                    window.location.href = 'parent-portal.html';
+                } else if (userRole === 'Менеджер расписания') {
+                    window.location.href = 'raspisanie.html';
+                } else {
+                    console.log('director-dashboard.html: неизвестная роль: ' + userRole);
+                    throw new Error('Неизвестная роль: ' + userRole);
+                }
+            }, 100);
+            return;
+        }
+        
+        console.log('director-dashboard.html: ✓ авторизация успешна, роль:', userRole);
+        sessionStorage.removeItem("isRedirecting");
+        
+    } catch (error) {
+        console.error('director-dashboard.html: Ошибка проверки авторизации:', error);
+        sessionStorage.removeItem('currentUser');
+        sessionStorage.setItem("isRedirecting", "true");
+        
+        if (!window.location.pathname.includes('login.html')) {
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 100);
+        }
+    }
+})();
+
+// Установка дат по умолчанию
+function setDefaultDates() {
+    const today = new Date();
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+
+    document.getElementById('dailyDate').valueAsDate = today;
+    document.getElementById('attendStartDate').valueAsDate = lastMonth;
+    document.getElementById('attendEndDate').valueAsDate = today;
+    document.getElementById('probStartDate').valueAsDate = lastMonth;
+    document.getElementById('probEndDate').valueAsDate = today;
+    document.getElementById('teachStartDate').valueAsDate = lastMonth;
+    document.getElementById('teachEndDate').valueAsDate = today;
+    document.getElementById('auditStartDate').valueAsDate = lastMonth;
+    document.getElementById('auditEndDate').valueAsDate = today;
+}
+
+// Ежедневный отчет
+async function loadDailyReport() {
+    const date = document.getElementById('dailyDate').value;
+    try {
+        const res = await fetch(`${API_BASE}/director/report/daily?date=${date}`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки');
+
+        const report = await res.json();
+        let statsHtml = `
+            <div class="stat-card">
+                <div class="stat-value">${report.totalLessons}</div>
+                <div class="stat-label">Уроков</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${report.lessonsWithCompleteGrades}</div>
+                <div class="stat-label">С оценками</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${report.lessonsWithCompleteAttendance}</div>
+                <div class="stat-label">С посещаемостью</div>
+            </div>
+        `;
+
+        document.getElementById('dailyStats').innerHTML = statsHtml;
+
+        let html = '<table><thead><tr><th>Предмет</th><th>Класс</th><th>Учитель</th><th>Оценки %</th><th>Посещаемость %</th></tr></thead><tbody>';
+        report.report.forEach(r => {
+            html += `<tr>
+                <td>${r.subject}</td>
+                <td>${r.class}</td>
+                <td>${r.teacher}</td>
+                <td><span class="percentage">${r.gradesPercentage}%</span></td>
+                <td><span class="percentage">${r.attendancePercentage}%</span></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+
+        document.getElementById('dailyContent').innerHTML = html;
+    } catch (error) {
+        document.getElementById('dailyContent').innerHTML = `<div class="error">${error.message}</div>`;
+    }
+}
+
+// Статистика посещаемости
+async function loadAttendanceStats() {
+    const startDate = document.getElementById('attendStartDate').value;
+    const endDate = document.getElementById('attendEndDate').value;
+
+    try {
+        const res = await fetch(`${API_BASE}/director/report/attendance?startDate=${startDate}&endDate=${endDate}`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки');
+
+        const stats = await res.json();
+        let html = '<table><thead><tr><th>Класс</th><th>Учеников</th><th>Присутст</th><th>Отсутст</th><th>Процент</th><th>Статус</th></tr></thead><tbody>';
+
+        stats.statistics.forEach(s => {
+            const badge = s.presentPercentage >= 90 ? 'badge-ok' : (s.presentPercentage >= 75 ? 'badge-warning' : 'badge-danger');
+            html += `<tr>
+                <td>${s.className}</td>
+                <td>${s.totalStudents}</td>
+                <td>${s.present}</td>
+                <td>${s.absent}</td>
+                <td><span class="percentage">${s.presentPercentage}%</span></td>
+                <td><span class="badge ${badge}">${s.presentPercentage >= 90 ? 'Хорошо' : (s.presentPercentage >= 75 ? 'Норм' : 'Плохо')}</span></td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('attendanceContent').innerHTML = html;
+    } catch (error) {
+        document.getElementById('attendanceContent').innerHTML = `<div class="error">${error.message}</div>`;
+    }
+}
+
+// Проблемные ученики
+async function loadProblematicStudents() {
+    const startDate = document.getElementById('probStartDate').value;
+    const endDate = document.getElementById('probEndDate').value;
+    const classId = document.getElementById('probClassId').value || null;
+
+    try {
+        let url = `${API_BASE}/director/report/problematic?startDate=${startDate}&endDate=${endDate}`;
+        if (classId) url += `&classId=${classId}`;
+
+        const res = await fetch(url, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки');
+
+        const data = await res.json();
+        let html = '';
+
+        if (data.problematicStudents.length === 0) {
+            html = '<p>Проблемных учеников не найдено 👍</p>';
+        } else {
+            html = '<table><thead><tr><th>Ученик</th><th>Класс</th><th>Пропуски</th><th>%</th><th>Средняя оценка</th><th>Низких оценок</th></tr></thead><tbody>';
+            data.problematicStudents.forEach(s => {
+                html += `<tr>
+                    <td>${s.firstName} ${s.lastName}</td>
+                    <td>${s.class}</td>
+                    <td>${s.absences}</td>
+                    <td><span class="percentage">${s.absencePercentage}%</span></td>
+                    <td>${s.averageGrade}</td>
+                    <td><span class="badge badge-danger">${s.lowGrades}</span></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+        }
+
+        document.getElementById('problematicContent').innerHTML = html;
+    } catch (error) {
+        document.getElementById('problematicContent').innerHTML = `<div class="error">${error.message}</div>`;
+    }
+}
+
+// Прогресс учителей
+async function loadTeacherProgress() {
+    const teacherId = document.getElementById('teacherSelect').value;
+    if (!teacherId) {
+        document.getElementById('teachersContent').innerHTML = '<div class="error">Выберите учителя</div>';
+        return;
+    }
+
+    const startDate = document.getElementById('teachStartDate').value;
+    const endDate = document.getElementById('teachEndDate').value;
+
+    try {
+        const res = await fetch(`${API_BASE}/director/report/teacher-progress/${teacherId}?startDate=${startDate}&endDate=${endDate}`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки');
+
+        const report = await res.json();
+
+        let html = `
+            <div class="card">
+                <h3>${report.teacher}</h3>
+                <p><strong>Периода:</strong> ${report.startDate} - ${report.endDate}</p>
+                <p><strong>Уроков проведено:</strong> ${report.totalLessons}</p>
+                <p><strong>Оценки заполнены:</strong> ${report.lessonsWithCompleteGrades}/${report.totalLessons} (<span class="percentage">${report.completionRateGrades}%</span>)</p>
+                <p><strong>Посещаемость заполнена:</strong> ${report.lessonsWithCompleteAttendance}/${report.totalLessons} (<span class="percentage">${report.completionRateAttendance}%</span>)</p>
+            </div>
+
+            <h3>По предметам:</h3>
+            <table>
+                <thead><tr><th>Предмет</th><th>Уроков</th><th>Оценки</th><th>Посещаемость</th></tr></thead>
+                <tbody>
+        `;
+
+        report.subjectStatistics.forEach(s => {
+            html += `<tr>
+                <td>${s.subject}</td>
+                <td>${s.lessonCount}</td>
+                <td>${s.gradesEntered}</td>
+                <td>${s.attendanceRecorded}</td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('teachersContent').innerHTML = html;
+    } catch (error) {
+        document.getElementById('teachersContent').innerHTML = `<div class="error">${error.message}</div>`;
+    }
+}
+
+// Аудит лог
+async function loadAuditLog() {
+    const entityType = document.getElementById('auditEntityType').value || null;
+    const startDate = document.getElementById('auditStartDate').value;
+    const endDate = document.getElementById('auditEndDate').value;
+
+    try {
+        let url = `${API_BASE}/director/audit-log?startDate=${startDate}&endDate=${endDate}`;
+        if (entityType) url += `&entityType=${entityType}`;
+
+        const res = await fetch(url, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки');
+
+        const logs = await res.json();
+        let html = '';
+
+        if (logs.length === 0) {
+            html = '<p>Записей в логе не найдено</p>';
+        } else {
+            html = '<table><thead><tr><th>Пользователь</th><th>Тип</th><th>Действие</th><th>Время</th></tr></thead><tbody>';
+            logs.forEach(log => {
+                const time = new Date(log.timestamp).toLocaleString('ru-RU');
+                html += `<tr>
+                    <td>${log.user.fullName}</td>
+                    <td>${log.entityType}</td>
+                    <td>${log.action}</td>
+                    <td>${time}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+        }
+
+        document.getElementById('auditContent').innerHTML = html;
+    } catch (error) {
+        document.getElementById('auditContent').innerHTML = `<div class="error">${error.message}</div>`;
+    }
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    event.target.classList.add('active');
+}
+
+// Инициализация
+setDefaultDates();
+</script>
+
+</body>
+</html>

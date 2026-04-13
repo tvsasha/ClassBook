@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой портал - Ученик</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        h1 { color: #333; margin-bottom: 10px; }
+        .subtitle { color: #666; font-size: 0.9rem; }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .tab-btn:hover { border-color: #667eea; }
+        .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 6px; }
+        .filter-btn {
+            padding: 8px 14px;
+            border: 1px solid #cfd8dc;
+            border-radius: 999px;
+            background: #f5f7fa;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .filter-btn.active {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        tbody tr:hover { background: #f8f9fa; }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .badge-present { background: #d4edda; color: #155724; }
+        .badge-absent { background: #f8d7da; color: #721c24; }
+        .badge-excused { background: #fff3cd; color: #856404; }
+
+        .grade-badge {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            border-radius: 50%;
+            text-align: center;
+            font-weight: 600;
+            color: white;
+        }
+
+        .grade-5 { background: #27ae60; }
+        .grade-4 { background: #3498db; }
+        .grade-3 { background: #f39c12; }
+        .grade-2 { background: #e74c3c; }
+
+        .loader {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value { font-size: 2rem; font-weight: 600; }
+        .stat-label { font-size: 0.9rem; opacity: 0.9; }
+
+        .info-box {
+            background: #e3f0ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .info-box b { color: #667eea; }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s;
+            margin-top: 10px;
+            display: inline-block;
+        }
+        .logout-btn:hover {
+            background: #c82333;
+        }
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; }
+            .tab-btn { width: 100%; }
+            table { font-size: 0.9rem; }
+            .header-controls { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="header-controls">
+            <div>
+                <h1 id="studentName">📚 Мой портал</h1>
+                <div class="subtitle" id="studentClass">Загрузка информации...</div>
+            </div>
+            <button id="logoutBtn" class="logout-btn">Выйти</button>
+        </div>
+    </header>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('schedule')">📅 Расписание</button>
+        <button class="tab-btn" onclick="switchTab('grades')">📊 Оценки</button>
+        <button class="tab-btn" onclick="switchTab('homework')">📝 Домашние работы</button>
+        <button class="tab-btn" onclick="switchTab('attendance')">✓ Посещаемость</button>
+    </div>
+
+    <div class="content">
+        <div id="errorMsg"></div>
+
+        <!-- Расписание -->
+        <div id="schedule" class="tab-content active">
+            <h2>📅 Мое расписание</h2>
+            <div class="filter-bar" id="scheduleFilters">
+                <button class="filter-btn active" data-filter="upcoming" onclick="setScheduleFilter('upcoming', event)">Сегодня и дальше</button>
+                <button class="filter-btn" data-filter="all" onclick="setScheduleFilter('all', event)">Все</button>
+                <button class="filter-btn" data-filter="past" onclick="setScheduleFilter('past', event)">Прошедшие</button>
+            </div>
+            <div id="scheduleContent" class="loader">Загрузка...</div>
+        </div>
+
+        <!-- Оценки -->
+        <div id="grades" class="tab-content">
+            <h2>📊 Мои оценки</h2>
+            <div class="stats" id="gradeStats"></div>
+            <div id="gradesContent" class="loader">Загрузка...</div>
+        </div>
+
+        <!-- Домашние работы -->
+        <div id="homework" class="tab-content">
+            <h2>📝 Мои домашние работы</h2>
+            <div id="homeworkContent" class="loader">Загрузка...</div>
+        </div>
+
+        <!-- Посещаемость -->
+        <div id="attendance" class="tab-content">
+            <h2>✓ Моя посещаемость</h2>
+            <div class="stats" id="attendanceStats"></div>
+            <div id="attendanceContent" class="loader">Загрузка...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_BASE = 'https://localhost:7062/api';
+let scheduleFilter = 'upcoming';
+
+function getTodayStart() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+}
+
+function applyScheduleFilter(lessons) {
+    const today = getTodayStart();
+    return lessons.filter(lesson => {
+        const lessonDate = new Date(lesson.date);
+        lessonDate.setHours(0, 0, 0, 0);
+
+        if (scheduleFilter === 'past') return lessonDate < today;
+        if (scheduleFilter === 'upcoming') return lessonDate >= today;
+        return true;
+    });
+}
+
+function setScheduleFilter(filter, event) {
+    scheduleFilter = filter;
+    document.querySelectorAll('#scheduleFilters .filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+    loadSchedule();
+}
+
+function getStoredCurrentUser() {
+    const currentUserStr = sessionStorage.getItem('currentUser');
+    if (!currentUserStr || currentUserStr === 'null' || currentUserStr === 'undefined') {
+        return null;
+    }
+
+    try {
+        return JSON.parse(currentUserStr);
+    } catch (e) {
+        console.error('student-portal.html: не удалось распарсить currentUser:', e);
+        sessionStorage.removeItem('currentUser');
+        return null;
+    }
+}
+
+// Проверка авторизации при загрузке
+(function checkAuthOnLoad() {
+    if (window.location.pathname.includes('login.html')) {
+        console.log('student-portal.html: уже на странице входа, пропускаем редирект');
+        return;
+    }
+    
+    try {
+        const currentUser = getStoredCurrentUser();
+        console.log('student-portal.html: currentUser =', currentUser);
+        
+        if (!currentUser) {
+            console.log('student-portal.html: нет currentUser, редирект на login.html');
+            sessionStorage.setItem("isRedirecting", "true");
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 100);
+            return;
+        }
+
+        console.log('student-portal.html: parsed currentUser =', JSON.stringify(currentUser, null, 2));
+        
+        const userRole = currentUser.role || currentUser.roleName;
+        console.log('student-portal.html: userRole =', userRole);
+        
+        if (!userRole) {
+            console.log('student-portal.html: ни role, ни roleName не найдены');
+            throw new Error('Отсутствует свойство role/roleName');
+        }
+        
+        // Проверяем, что роль соответствует странице
+        if (userRole !== 'Ученик') {
+            console.log('student-portal.html: роль "' + userRole + '" не совпадает с "Ученик", перенаправляем');
+            
+            sessionStorage.setItem("isRedirecting", "true");
+            
+            setTimeout(() => {
+                if (userRole === 'Администратор') {
+                    window.location.href = 'index.html';
+                } else if (userRole === 'Учитель') {
+                    window.location.href = 'teacher.html';
+                } else if (userRole === 'Родитель') {
+                    window.location.href = 'parent-portal.html';
+                } else if (userRole === 'Менеджер расписания') {
+                    window.location.href = 'raspisanie.html';
+                } else if (userRole === 'Директор') {
+                    window.location.href = 'director-dashboard.html';
+                } else {
+                    console.log('student-portal.html: неизвестная роль: ' + userRole);
+                    throw new Error('Неизвестная роль: ' + userRole);
+                }
+            }, 100);
+            return;
+        }
+        
+        console.log('student-portal.html: ✓ авторизация успешна, роль:', userRole);
+        sessionStorage.removeItem("isRedirecting");
+        
+    } catch (error) {
+        console.error('student-portal.html: Ошибка проверки авторизации:', error);
+        sessionStorage.removeItem('currentUser');
+        sessionStorage.setItem("isRedirecting", "true");
+        
+        if (!window.location.pathname.includes('login.html')) {
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 100);
+        }
+    }
+})();
+
+async function loadStudentInfo() {
+    try {
+        const res = await fetch(`${API_BASE}/student/me/class`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) {
+            throw new Error('Ошибка загрузки информации');
+        }
+
+        const student = await res.json();
+        document.getElementById('studentName').textContent = `📚 ${student.name}`;
+        document.getElementById('studentClass').textContent = `Класс: ${student.class}`;
+    } catch (error) {
+        console.error('loadStudentInfo ошибка:', error);
+        showError(error.message);
+    }
+}
+
+async function loadSchedule() {
+    try {
+        const res = await fetch(`${API_BASE}/student/me/schedule`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки расписания');
+
+        const lessons = applyScheduleFilter(await res.json());
+        let html = '';
+
+        if (lessons.length === 0) {
+            html = scheduleFilter === 'past'
+                ? '<p>Прошедших уроков не найдено</p>'
+                : scheduleFilter === 'upcoming'
+                    ? '<p>Предстоящих уроков не найдено</p>'
+                    : '<p>Расписание не найдено</p>';
+        } else {
+            html = '<table><thead><tr><th>Дата</th><th>№</th><th>Время</th><th>Предмет</th><th>Учитель</th><th>Тема</th></tr></thead><tbody>';
+            lessons.forEach(l => {
+                const date = new Date(l.date).toLocaleDateString('ru-RU');
+                const timeRange = l.startTime && l.endTime ? `${l.startTime} - ${l.endTime}` : '—';
+                html += `<tr>
+                    <td>${date}</td>
+                    <td>${l.lessonNumber ?? '—'}</td>
+                    <td>${timeRange}</td>
+                    <td>${l.subject || 'N/A'}</td>
+                    <td>${l.teacher || 'N/A'}</td>
+                    <td>${l.topic || 'N/A'}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+        }
+
+        document.getElementById('scheduleContent').innerHTML = html;
+    } catch (error) {
+        document.getElementById('scheduleContent').innerHTML = `<div class="error">${error.message}</div>`;
+    }
+}
+
+async function loadGrades() {
+    try {
+        const res = await fetch(`${API_BASE}/student/me/grades`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки оценок');
+
+        const grades = await res.json();
+
+        // Статистика
+        if (grades.length > 0) {
+            const avg = (grades.reduce((sum, g) => sum + g.value, 0) / grades.length).toFixed(2);
+            const maxGrade = Math.max(...grades.map(g => g.value));
+            const minGrade = Math.min(...grades.map(g => g.value));
+
+            document.getElementById('gradeStats').innerHTML = `
+                <div class="stat-box">
+                    <div class="stat-value">${avg}</div>
+                    <div class="stat-label">Средний балл</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${maxGrade}</div>
+                    <div class="stat-label">Максимальная оценка</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${minGrade}</div>
+                    <div class="stat-label">Минимальная оценка</div>
+                </div>
+            `;
+        }
+
+        // Таблица оценок
+        let html = '';
+        if (grades.length === 0) {
+            html = '<p>Оценок нет</p>';
+        } else {
+            html = '<table><thead><tr><th>Предмет</th><th>Учитель</th><th>Оценка</th><th>Дата</th><th>Тема</th></tr></thead><tbody>';
+            grades.forEach(g => {
+                const date = new Date(g.date).toLocaleDateString('ru-RU');
+                html += `<tr>
+                    <td>${g.subject || 'N/A'}</td>
+                    <td>${g.teacher || 'N/A'}</td>
+                    <td><span class="grade-badge grade-${g.value}">${g.value}</span></td>
+                    <td>${date}</td>
+                    <td>${g.topic || 'N/A'}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+        }
+
+        document.getElementById('gradesContent').innerHTML = html;
+    } catch (error) {
+        document.getElementById('gradesContent').innerHTML = `<div class="error">${error.message}</div>`;
+    }
+}
+
+async function loadHomework() {
+    try {
+        const res = await fetch(`${API_BASE}/student/me/homework`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки ДЗ');
+
+        const homework = await res.json();
+        let html = '';
+
+        if (homework.length === 0) {
+            html = '<p>Домашних работ не назначено</p>';
+        } else {
+            homework.forEach(h => {
+                const date = new Date(h.date).toLocaleDateString('ru-RU');
+                html += `<div class="card">
+                    <h3>${h.subject} - ${h.teacher}</h3>
+                    <p><strong>Дата:</strong> ${date}</p>
+                    <p><strong>Тема урока:</strong> ${h.topic}</p>
+                    <p><strong>Задание:</strong></p>
+                    <p style="white-space: pre-wrap; background: #f5f5f5; padding: 10px; border-radius: 4px;">${h.homework}</p>
+                </div>`;
+            });
+        }
+
+        document.getElementById('homeworkContent').innerHTML = html;
+    } catch (error) {
+        document.getElementById('homeworkContent').innerHTML = `<div class="error">${error.message}</div>`;
+    }
+}
+
+async function loadAttendance() {
+    try {
+        const res = await fetch(`${API_BASE}/student/me/attendance`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки посещаемости');
+
+        const attendance = await res.json();
+
+        // Статистика
+        const present = attendance.filter(a => a.status === 1).length;
+        const absent = attendance.filter(a => a.status === 0).length;
+        const excused = attendance.filter(a => a.status === 2).length;
+        const percentage = attendance.length > 0 ? ((present / attendance.length) * 100).toFixed(1) : 0;
+
+        document.getElementById('attendanceStats').innerHTML = `
+            <div class="stat-box">
+                <div class="stat-value">${percentage}%</div>
+                <div class="stat-label">Посещаемость</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">${present}</div>
+                <div class="stat-label">Присутствий</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">${absent}</div>
+                <div class="stat-label">Отсутствий</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">${excused}</div>
+                <div class="stat-label">По уважительной причине</div>
+            </div>
+        `;
+
+        // Таблица посещаемости
+        let html = '';
+        if (attendance.length === 0) {
+            html = '<p>Данных о посещаемости нет</p>';
+        } else {
+            html = '<table><thead><tr><th>Предмет</th><th>Статус</th><th>Дата</th><th>Тема</th></tr></thead><tbody>';
+            attendance.forEach(a => {
+                const date = new Date(a.date).toLocaleDateString('ru-RU');
+                const badgeClass = a.status === 1 ? 'badge-present' : (a.status === 0 ? 'badge-absent' : 'badge-excused');
+                html += `<tr>
+                    <td>${a.subject || 'N/A'}</td>
+                    <td><span class="badge ${badgeClass}">${a.statusLabel}</span></td>
+                    <td>${date}</td>
+                    <td>${a.topic || 'N/A'}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+        }
+
+        document.getElementById('attendanceContent').innerHTML = html;
+    } catch (error) {
+        document.getElementById('attendanceContent').innerHTML = `<div class="error">${error.message}</div>`;
+    }
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    event.target.classList.add('active');
+}
+
+function showError(message) {
+    const el = document.getElementById('errorMsg');
+    el.classList.add('error');
+    el.textContent = message;
+}
+
+// Обработчик выхода
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    try {
+        const res = await fetch('https://localhost:7062/api/auth/logout', {
+            method: 'POST',
+            credentials: 'include'
+        });
+        console.log('Выход выполнен', res.status);
+    } catch (err) {
+        console.warn('Ошибка при выходе с сервера:', err);
+    }
+    
+    // Очищаем данные авторизации
+    sessionStorage.removeItem('currentUser');
+    sessionStorage.removeItem('isRedirecting');
+    
+    // Перенаправление на страницу входа
+    window.location.href = 'login.html';
+});
+
+// Инициализация
+async function init() {
+    await loadStudentInfo();
+    await loadSchedule();
+    await loadGrades();
+    await loadHomework();
+    await loadAttendance();
+}
+
+init();
+</script>
+
+</body>
+</html>

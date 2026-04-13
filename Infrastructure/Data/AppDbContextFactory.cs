@@ -11,7 +11,7 @@ namespace ClassBook.Infrastructure.Data
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
 
             optionsBuilder.UseSqlServer(
-                "Server=DESKTOP-GPL6FO9\\SQLEXPRESS;Database=ClassBookDb;Trusted_Connection=True;TrustServerCertificate=True"
+                "Data Source=DESKTOP-B7HA073;Initial Catalog=ClassBookDb;Integrated Security=True;Encrypt=False;"
             );
 
             return new AppDbContext(optionsBuilder.Options);

@@ -20,9 +20,17 @@ namespace ClassBook.Domain.Entities
         [Required]
         public int TeacherId { get; set; }
         public User Teacher { get; set; } = null!;
+        /// <summary>
+        /// Ссылка на фиксированный слот расписания (день недели и время)
+        /// </summary>
+        public int? ScheduleId { get; set; }
+        public Schedule? Schedule { get; set; }
         [Required]
         [MaxLength(100)]
         public string Topic { get; set; } = null!;
+        /// <summary>
+        /// Конкретная дата проведения урока
+        /// </summary>
         public DateTime Date { get; set; }
         public string? Homework { get; set; }
         public ICollection<Grade>? Grades { get; set; }

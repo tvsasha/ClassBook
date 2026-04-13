@@ -10,4 +10,8 @@ public class Student
     public Class Class { get; set; } = null!;
     public ICollection<Grade>? Grades { get; set; }
     public ICollection<Attendance>? Attendances { get; set; }
+    /// <summary>
+    /// Навигация: родители этого ученика
+    /// </summary>
+    public ICollection<StudentParent>? Parents { get; set; }
 }

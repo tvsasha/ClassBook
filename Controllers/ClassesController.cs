@@ -9,6 +9,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/classes")]
+    [Authorize(Policy = "AdminOnly")]
     public class ClassesController : ControllerBase
     {
         private readonly AppDbContext _db;
@@ -40,6 +41,27 @@ namespace ClassBook.Controllers
             await _db.SaveChangesAsync();
 
             return Ok(new { classEntity.ClassId, classEntity.Name });
+        }
+
+        // DELETE: api/classes/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteClass(int id)
+        {
+            var classEntity = await _db.Classes.FindAsync(id);
+            if (classEntity == null)
+                return NotFound("Класс не найден");
+
+            // Проверка на связанные данные
+            if (await _db.Students.AnyAsync(s => s.ClassId == id) ||
+                await _db.Lessons.AnyAsync(l => l.ClassId == id))
+            {
+                return BadRequest("Нельзя удалить класс с привязанными учениками или уроками");
+            }
+
+            _db.Classes.Remove(classEntity);
+            await _db.SaveChangesAsync();
+
+            return NoContent();
         }
     }
 

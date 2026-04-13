@@ -8,11 +8,11 @@ namespace ClassBook.Controllers
     [ApiController]
     [Route("api/admin/students")]
     [Authorize(Policy = "AdminOnly")]
-    public class StudentController : ControllerBase
+    public class AdminStudentController : ControllerBase
     {
         private readonly StudentFacade _facade;
 
-        public StudentController(StudentFacade facade)
+        public AdminStudentController(StudentFacade facade)
         {
             _facade = facade;
         }
@@ -24,6 +24,41 @@ namespace ClassBook.Controllers
             {
                 var student = await _facade.CreateStudentAsync(dto.FirstName, dto.LastName, dto.BirthDate, dto.ClassId);
                 return Ok(student);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAllStudents()
+        {
+            try
+            {
+                var students = await _facade.GetAllStudentsAsync();
+                return Ok(students);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("parent-students")]
+        public async Task<IActionResult> AttachStudentToParent([FromBody] AttachStudentToParentDto dto)
+        {
+            try
+            {
+                if (dto.ParentId <= 0 || dto.StudentId <= 0)
+                    return BadRequest("ParentId и StudentId обязательны и должны быть больше 0");
+
+                await _facade.AttachStudentToParentAsync(dto.ParentId, dto.StudentId);
+                return Ok(new { message = "Ученик успешно привязан к родителю" });
             }
             catch (ArgumentException ex)
             {
@@ -66,6 +101,20 @@ namespace ClassBook.Controllers
                 return NotFound(ex.Message);
             }
         }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteStudent(int id)
+        {
+            try
+            {
+                await _facade.DeleteStudentAsync(id);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
     }
 
     public class CreateStudentDto
@@ -74,5 +123,11 @@ namespace ClassBook.Controllers
         public string LastName { get; set; } = null!;
         public DateTime BirthDate { get; set; }
         public int? ClassId { get; set; }
+    }
+
+    public class AttachStudentToParentDto
+    {
+        public int ParentId { get; set; }
+        public int StudentId { get; set; }
     }
 }

@@ -88,7 +88,8 @@ namespace ClassBook.Application.Facades
             if (!string.IsNullOrEmpty(fullName)) user.FullName = fullName;
             if (roleId.HasValue && roleId != user.RoleId)
             {
-                if (roleId != 1 && roleId != 2)
+                // Проверяем что роль существует в БД (1-6)
+                if (roleId < 1 || roleId > 6)
                     throw new InvalidOperationException("Недопустимая роль");
                 user.RoleId = roleId.Value;
             }

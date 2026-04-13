@@ -2,6 +2,7 @@
 using ClassBook.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace ClassBook.Controllers
@@ -18,12 +19,18 @@ namespace ClassBook.Controllers
             _facade = facade;
         }
 
+        private int GetUserId()
+        {
+            return int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId) ? userId : 0;
+        }
+
         [HttpPost]
         public async Task<IActionResult> AddGrade([FromBody] AddGradeRequest dto)
         {
             try
             {
-                var grade = await _facade.AddGradeAsync(dto.LessonId, dto.StudentId, dto.Value);
+                var userId = GetUserId();
+                var grade = await _facade.AddGradeAsync(dto.LessonId, dto.StudentId, dto.Value, userId > 0 ? userId : null);
                 var result = new GradeDto
                 {
                     GradeId = grade.GradeId,
@@ -73,6 +80,62 @@ namespace ClassBook.Controllers
             catch (KeyNotFoundException ex)
             {
                 return NotFound(ex.Message);
+            }
+        }
+
+        [HttpGet("all")]
+        public async Task<IActionResult> GetAllGrades(int teacherId)
+        {
+            try
+            {
+                var grades = await _facade.GetAllGradesByTeacherAsync(teacherId);
+
+                var result = grades.Select(g => new
+                {
+                    lessonId = g.LessonId,
+                    studentId = g.StudentId,
+                    value = g.Value,
+                    student = g.Student != null ? new
+                    {
+                        fullName = $"{g.Student.FirstName} {g.Student.LastName}"
+                    } : null,
+                    lesson = g.Lesson != null ? new
+                    {
+                        id = g.Lesson.LessonId,
+                        date = g.Lesson.Date
+                    } : null
+                });
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+        [HttpGet("lesson/{lessonId}/students")]
+        public async Task<IActionResult> GetStudentsWithGrades(int lessonId)
+        {
+            var result = await _facade.GetStudentsWithGradesAsync(lessonId);
+            return Ok(result);
+        }
+
+        [HttpDelete("{gradeId}")]
+        public async Task<IActionResult> DeleteGrade(int gradeId)
+        {
+            try
+            {
+                var userId = GetUserId();
+                await _facade.DeleteGradeAsync(gradeId, userId > 0 ? userId : null);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
             }
         }
     }

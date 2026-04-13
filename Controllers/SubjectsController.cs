@@ -9,6 +9,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/subjects")]
+    [Authorize(Policy = "AdminOnly")]
     public class SubjectsController : ControllerBase
     {
         private readonly AppDbContext _db;
@@ -124,6 +125,25 @@ namespace ClassBook.Controllers
             {
                 return BadRequest(ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Удаляет предмет.
+        /// </summary>
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteSubject(int id)
+        {
+            var subject = await _db.Subjects.FindAsync(id);
+            if (subject == null)
+                return NotFound("Предмет не найден");
+
+            if (await _db.Lessons.AnyAsync(l => l.SubjectId == id))
+                return BadRequest("Нельзя удалить предмет, к которому привязаны уроки");
+
+            _db.Subjects.Remove(subject);
+            await _db.SaveChangesAsync();
+
+            return NoContent();
         }
     }
 

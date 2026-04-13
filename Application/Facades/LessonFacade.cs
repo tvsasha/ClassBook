@@ -4,6 +4,7 @@ using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace ClassBook.Application.Facades
@@ -11,10 +12,12 @@ namespace ClassBook.Application.Facades
     public class LessonFacade
     {
         private readonly AppDbContext _db;
+        private readonly AuditFacade _auditFacade;
 
-        public LessonFacade(AppDbContext db)
+        public LessonFacade(AppDbContext db, AuditFacade auditFacade)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
+            _auditFacade = auditFacade ?? throw new ArgumentNullException(nameof(auditFacade));
         }
 
         public async Task<IEnumerable<LessonResponse>> GetAllLessonsAsync()
@@ -39,7 +42,7 @@ namespace ClassBook.Application.Facades
                 .ToListAsync();
         }
 
-        public async Task<Lesson> UpdateLessonAsync(int id, int subjectId, int classId, int teacherId, string topic, DateTime date, string? homework = null)
+        public async Task<Lesson> UpdateLessonAsync(int id, int subjectId, int classId, int teacherId, string topic, DateTime date, string? homework = null, int? userId = null)
         {
             var lesson = await _db.Lessons.FindAsync(id);
             if (lesson == null) throw new KeyNotFoundException("Урок не найден");
@@ -55,6 +58,8 @@ namespace ClassBook.Application.Facades
             var teacher = await _db.Users.FindAsync(teacherId);
             if (teacher == null || teacher.RoleId != 2) throw new InvalidOperationException("Учитель не найден или это не учитель");
 
+            var oldValues = new { lesson.SubjectId, lesson.ClassId, lesson.TeacherId, lesson.Topic, lesson.Date, lesson.Homework };
+
             lesson.SubjectId = subjectId;
             lesson.ClassId = classId;
             lesson.TeacherId = teacherId;
@@ -63,22 +68,38 @@ namespace ClassBook.Application.Facades
             lesson.Homework = homework;
 
             await _db.SaveChangesAsync();
+
+            if (userId.HasValue)
+            {
+                await _auditFacade.LogActionAsync(userId.Value, "Lesson", id, "Update", oldValues, new { lesson.SubjectId, lesson.ClassId, lesson.TeacherId, lesson.Topic, lesson.Date, lesson.Homework });
+            }
+
             return lesson;
         }
-        // Application/Facades/LessonFacade.cs
+
         /// <summary>
         /// Удаляет урок по ID.
         /// </summary>
-        public async Task DeleteLessonAsync(int lessonId)
+        public async Task DeleteLessonAsync(int lessonId, int? userId = null)
         {
             var lesson = await _db.Lessons.FindAsync(lessonId);
             if (lesson == null)
                 throw new KeyNotFoundException("Урок не найден");
 
-            // Опционально: проверить права (учитель/админ)
+            var oldValues = new { lesson.LessonId, lesson.SubjectId, lesson.ClassId, lesson.TeacherId, lesson.Topic, lesson.Date, lesson.Homework };
 
             _db.Lessons.Remove(lesson);
             await _db.SaveChangesAsync();
+
+            if (userId.HasValue)
+            {
+                await _auditFacade.LogActionAsync(userId.Value, "Lesson", lessonId, "Delete", oldValues, null);
+            }
+        }
+
+        public async Task<Lesson?> GetLessonByIdAsync(int lessonId)
+        {
+            return await _db.Lessons.FindAsync(lessonId);
         }
 
         public async Task<IEnumerable<object>> GetLessonsForTeacherAsync(int teacherId)
@@ -100,7 +121,7 @@ namespace ClassBook.Application.Facades
                 .ToListAsync();
         }
 
-        public async Task<Lesson> CreateLessonAsync(int subjectId, int classId, int teacherId, string topic, DateTime date, string? homework = null)
+        public async Task<Lesson> CreateLessonAsync(int subjectId, int classId, int teacherId, string topic, DateTime date, string? homework = null, int? userId = null)
         {
             if (string.IsNullOrWhiteSpace(topic))
                 throw new ArgumentException("Тема урока обязательна");
@@ -129,6 +150,12 @@ namespace ClassBook.Application.Facades
 
             _db.Lessons.Add(lesson);
             await _db.SaveChangesAsync();
+
+            if (userId.HasValue)
+            {
+                await _auditFacade.LogActionAsync(userId.Value, "Lesson", lesson.LessonId, "Create", null, new { lesson.SubjectId, lesson.ClassId, lesson.TeacherId, lesson.Topic, lesson.Date, lesson.Homework });
+            }
+
             return lesson;
         }
     }

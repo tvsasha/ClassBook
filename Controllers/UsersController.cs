@@ -18,6 +18,7 @@ namespace ClassBook.Controllers
     [Authorize(Policy = "AdminOnly")] // Только администратор может работать с пользователями
     public class UsersController : ControllerBase
     {
+        
         private readonly AppDbContext _db;
         private readonly IPasswordHasher _hasher;
 
@@ -120,8 +121,9 @@ namespace ClassBook.Controllers
             if (await _db.Users.AnyAsync(u => u.Login == dto.Login))
                 return BadRequest("Логин уже занят");
 
-            if (dto.RoleId != 1 && dto.RoleId != 2)
-                return BadRequest("Недопустимая роль (только Администратор или Учитель)");
+            // Проверяем что роль существует в БД (1-6)
+            if (dto.RoleId < 1 || dto.RoleId > 6)
+                return BadRequest("Недопустимая роль");
 
             var user = new User
             {
@@ -170,7 +172,8 @@ namespace ClassBook.Controllers
 
             if (dto.RoleId.HasValue && dto.RoleId != user.RoleId)
             {
-                if (dto.RoleId != 1 && dto.RoleId != 2)
+                // Проверяем что роль существует в БД (1-6)
+                if (dto.RoleId < 1 || dto.RoleId > 6)
                     return BadRequest("Недопустимая роль");
                 user.RoleId = dto.RoleId.Value;
             }
@@ -183,6 +186,44 @@ namespace ClassBook.Controllers
 
             await _db.SaveChangesAsync();
             return Ok(new { message = "Пользователь обновлён" });
+        }
+
+        /// <summary>
+        /// Получает студентов конкретного родителя (для админа).
+        /// </summary>
+        /// <param name="parentId">ID родителя</param>
+        /// <returns>Список студентов родителя</returns>
+        [HttpGet("{parentId}/students")]
+        public async Task<IActionResult> GetParentStudents(int parentId)
+        {
+            // Проверяем что пользователь существует и является родителем
+            var parent = await _db.Users
+                .Include(u => u.Role)
+                .Include(u => u.StudentParents)
+                .ThenInclude(sp => sp.Student)
+                .ThenInclude(s => s.Class)
+                .FirstOrDefaultAsync(u => u.Id == parentId);
+            
+            if (parent == null)
+                return NotFound("Родитель не найден");
+
+            if (parent.Role.Name != "Родитель")
+                return BadRequest("Пользователь не является родителем");
+
+            // Получаем всех студентов этого родителя через навигационное свойство
+            var students = (parent.StudentParents ?? new List<StudentParent>())
+                .Select(sp => new
+                {
+                    sp.Student.StudentId,
+                    sp.Student.FirstName,
+                    sp.Student.LastName,
+                    sp.Student.BirthDate,
+                    sp.Student.ClassId,
+                    ClassName = sp.Student.Class?.Name ?? "не определен"
+                })
+                .ToList();
+
+            return Ok(students);
         }
 
         /// <summary>

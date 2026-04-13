@@ -6,6 +6,32 @@ body {
     padding-top:50px;
 }
 h1 { text-align:center; color:#333; margin-bottom:25px; }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: #fff;
+}
+
+th, td {
+    border: 1px solid #000;
+    padding: 8px;
+    text-align: center;
+}
+
+th {
+    background: #e9ecef;
+    font-weight: bold;
+}
+
+input.grade-input {
+    width: 50px;
+    text-align: center;
+    border: 1px solid #333;
+}
+
+.bad { background: #f8d7da; }
+.good { background: #d4edda; }
 
 .card {
     background:#fff; border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,0.12);

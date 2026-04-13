@@ -46,6 +46,20 @@
         }
         button:hover { background: #0056b3; }
         .error { color: red; text-align: center; margin-top: 10px; }
+        .consent-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 12px;
+            color: #444;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .consent-row input {
+            width: auto;
+            margin: 2px 0 0;
+            flex: 0 0 auto;
+        }
     </style>
 </head>
 <body>
@@ -53,36 +67,111 @@
 <div class="card">
     <h1>ClassBook</h1>
     <h2>Вход</h2>
-    <input id="loginInput" placeholder="Логин" autocomplete="username">
-    <input id="passwordInput" type="password" placeholder="Пароль" autocomplete="current-password">
-    <button id="loginBtn">Войти</button>
-    <p id="loginError" class="error"></p>
+    <form id="loginForm">
+        <input id="loginInput" placeholder="Логин" autocomplete="username" autofocus>
+        <input id="passwordInput" type="password" placeholder="Пароль" autocomplete="current-password">
+        <label class="consent-row">
+            <input id="consentCheckbox" type="checkbox" checked required>
+            <span>Я соглашаюсь на обработку персональных данных в рамках работы системы ClassBook.</span>
+        </label>
+        <button id="loginBtn" type="submit">Войти</button>
+        <p id="loginError" class="error"></p>
+    </form>
 </div>
 
 <script>
     const apiUrl = "https://localhost:7062/api";
-    
-    // Если уже авторизован, перенаправляем на соответствующую страницу
-    const currentUser = JSON.parse(localStorage.getItem("currentUser"));
-    if (currentUser) {
-        console.log("Уже авторизован, роль:", currentUser.role);
-        if (currentUser.role === "Администратор") {
-            window.location.href = "index.html";
-        } else if (currentUser.role === "Учитель") {
-            window.location.href = "teacher.html";
-        } else {
-            localStorage.removeItem("currentUser");
-            console.log("Неизвестная роль, требуется повторный вход");
+
+    function getStoredCurrentUser() {
+        const currentUserStr = sessionStorage.getItem("currentUser");
+        if (!currentUserStr || currentUserStr === "null" || currentUserStr === "undefined") {
+            return null;
+        }
+
+        try {
+            return JSON.parse(currentUserStr);
+        } catch (error) {
+            console.error("Ошибка при чтении currentUser:", error);
+            sessionStorage.removeItem("currentUser");
+            return null;
         }
     }
+    
+    // Если уже авторизован, перенаправляем на соответствующую страницу
+    (function checkAuthOnLoad() {
+        // Используем флаг для предотвращения бесконечных редиректов
+        const redirectInProgress = sessionStorage.getItem("redirectInProgress");
+        if (redirectInProgress) {
+            console.log("login.html: редирект уже в процессе, пропускаем проверку");
+            return;
+        }
+        
+        try {
+            const currentUser = getStoredCurrentUser();
+            console.log("login.html: currentUser:", currentUser);
+            if (currentUser) {
+                console.log("login.html: parsed currentUser:", JSON.stringify(currentUser, null, 2));
+                if (currentUser && (currentUser.role || currentUser.roleName)) {
+                    const userRole = currentUser.role || currentUser.roleName;
+                    console.log("Уже авторизован, роль:", userRole);
+                    // Проверяем, не пытаемся ли мы уже уйти со страницы входа
+                    if (window.location.pathname.includes('login.html')) {
+                        // Устанавливаем флаг для предотвращения повторных редиректов
+                        sessionStorage.setItem("redirectInProgress", "true");
+                        
+                        // Только если мы на странице входа, делаем редирект
+                        if (userRole === "Администратор") {
+                            console.log("Редирект на index.html");
+                            window.location.href = "index.html";
+                        } else if (userRole === "Учитель") {
+                            console.log("Редирект на teacher.html");
+                            window.location.href = "teacher.html";
+                        } else if (userRole === "Ученик") {
+                            console.log("Редирект на student-portal.html");
+                            window.location.href = "student-portal.html";
+                        } else if (userRole === "Родитель") {
+                            console.log("Редирект на parent-portal.html");
+                            window.location.href = "parent-portal.html";
+                        } else if (userRole === "Менеджер расписания") {
+                            console.log("Редирект на raspisanie.html");
+                            window.location.href = "raspisanie.html";
+                        } else if (userRole === "Директор") {
+                            console.log("Редирект на director-dashboard.html");
+                            window.location.href = "director-dashboard.html";
+                        } else {
+                            console.log("Неизвестная роль:", userRole);
+                            sessionStorage.removeItem("currentUser");
+                            sessionStorage.removeItem("redirectInProgress");
+                        }
+                        return;
+                    }
+                } else {
+                    // Данные есть, но нет роли - очищаем
+                    console.log("login.html: нет role/roleName, очищаем");
+                    sessionStorage.removeItem("currentUser");
+                }
+            } else {
+                console.log("login.html: нет currentUser в sessionStorage");
+            }
+        } catch (error) {
+            console.error("Ошибка при чтении данных пользователя:", error);
+            sessionStorage.removeItem("currentUser");
+        }
+    })();
 
-    document.getElementById("loginBtn").addEventListener("click", async () => {
+    async function submitLogin() {
         const login = document.getElementById("loginInput").value.trim();
         const password = document.getElementById("passwordInput").value.trim();
+        const consentAccepted = document.getElementById("consentCheckbox").checked;
         const errorEl = document.getElementById("loginError");
 
         if (!login || !password) {
             errorEl.textContent = "Заполните логин и пароль";
+            return;
+        }
+
+        if (!consentAccepted) {
+            errorEl.textContent = "Подтвердите согласие на обработку персональных данных";
             return;
         }
 
@@ -101,25 +190,70 @@
             }
 
             const data = await res.json();
+            
+            console.log("API ответ:", JSON.stringify(data, null, 2));
 
-            // Сохраняем данные пользователя в localStorage
-            localStorage.setItem("currentUser", JSON.stringify(data));
+            // Сохраняем данные пользователя только для текущей вкладки
+            const userDataStr = JSON.stringify(data);
+            sessionStorage.setItem("currentUser", userDataStr);
+            console.log("Сохранено в sessionStorage:", sessionStorage.getItem("currentUser"));
             
             console.log("Вход выполнен:", data);
+            console.log("Роль пользователя:", data.role || data.roleName);
 
             // Перенаправление в зависимости от роли
-            if (data.role === "Администратор") {
-                window.location.href = "index.html";
-            } else if (data.role === "Учитель") {
-                window.location.href = "teacher.html";
-            } else {
-                errorEl.textContent = "Неизвестная роль. Свяжитесь с администратором.";
-                localStorage.removeItem("currentUser");
-            }
+            const userRole = data.role || data.roleName;
+            console.log("Определённая роль:", userRole);
+            
+            // Устанавливаем флаг для предотвращения повторных проверок
+            sessionStorage.setItem("isRedirecting", "true");
+            
+            // Используем более длительную задержку, чтобы данные успели синхронизироваться
+            setTimeout(() => {
+                if (userRole === "Администратор") {
+                    console.log("→ Переход на index.html");
+                    window.location.href = "index.html";
+                } else if (userRole === "Учитель") {
+                    console.log("→ Переход на teacher.html");
+                    window.location.href = "teacher.html";
+                } else if (userRole === "Ученик") {
+                    console.log("→ Переход на student-portal.html");
+                    window.location.href = "student-portal.html";
+                } else if (userRole === "Родитель") {
+                    console.log("→ Переход на parent-portal.html");
+                    window.location.href = "parent-portal.html";
+                } else if (userRole === "Менеджер расписания") {
+                    console.log("→ Переход на raspisanie.html для роли:", userRole);
+                    window.location.href = "raspisanie.html";
+                } else if (userRole === "Директор") {
+                    console.log("→ Переход на director-dashboard.html");
+                    window.location.href = "director-dashboard.html";
+                } else {
+                    errorEl.textContent = "Неизвестная роль: " + (userRole || "не определена") + ". Свяжитесь с администратором.";
+                    console.error("Неизвестная роль:", userRole);
+                    sessionStorage.removeItem("currentUser");
+                    sessionStorage.removeItem("isRedirecting");
+                }
+            }, 500); // Увеличена задержка с 0 до 500ms
         } catch (err) {
             errorEl.textContent = "Ошибка сети";
+            console.error("Ошибка входа:", err);
+            sessionStorage.removeItem("isRedirecting");
         }
+    }
+
+    document.getElementById("loginForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await submitLogin();
     });
+
+    (function showAuthError() {
+        const authError = sessionStorage.getItem("authError");
+        if (authError) {
+            document.getElementById("loginError").textContent = authError;
+            sessionStorage.removeItem("authError");
+        }
+    })();
 </script>
 </body>
 </html>

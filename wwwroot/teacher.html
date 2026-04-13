@@ -5,31 +5,138 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ClassBook — Панель учителя</title>
     <style>
-        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #74ebd5, #ACB6E5); margin:0; padding:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:50px; }
-        h1 { text-align:center; color:#333; margin-bottom:25px; }
-        .controls { display:flex; gap:10px; margin-bottom:20px; }
-        button { border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.95rem; transition:0.2s; padding:10px 20px; }
-        button:hover { opacity:0.9; }
-        .logout-btn { background:#dc3545; color:white; }
-        .tabs { display:flex; gap:10px; margin-bottom:20px; }
-        .tab-btn { padding:10px 20px; background:#007bff; color:white; border:none; border-radius:4px 4px 0 0; cursor:pointer; }
-        .tab-btn.active { background:#0056b3; }
-        .tab-content { display:none; background:white; padding:20px; border-radius:0 8px 8px 8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); width:90%; max-width:900px; }
-        .tab-content.active { display:block; }
-        ul { list-style:none; padding:0; }
-        li { background:#f8f9fa; padding:12px; margin:8px 0; border-radius:6px; display:flex; justify-content:space-between; align-items:center; }
-        .error { color:red; margin:10px 0; }
-        .success { color:green; margin:10px 0; }
-        input, select, textarea { width:100%; padding:10px; margin:8px 0; border:1px solid #ccc; border-radius:8px; font-size:0.95rem; box-sizing:border-box; }
-        .modal { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:500px; background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:1000; display:none; }
-        .overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:999; display:none; }
-        .modal-btn { background:#28a745; color:white; }
-        .cancel-btn { background:#6c757d; color:white; }
-        .hidden { display:none !important; }
+        :root {
+            --body-bg: linear-gradient(135deg, #74ebd5, #ACB6E5);
+            --panel-bg: #ffffff;
+            --text-color: #222;
+            --muted-color: #555;
+            --primary: #007bff;
+            --primary-dark: #0056b3;
+            --success: #28a745;
+            --danger: #dc3545;
+            --border: #d1d5db;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', 'Segoe UI', Roboto, Arial, sans-serif;
+            background: var(--body-bg);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 30px;
+        }
+        .container {
+            width: min(1200px, 95%);
+            margin: 0 auto;
+            background: var(--panel-bg);
+            border-radius: 14px;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+            padding: 24px;
+            border: 1px solid rgba(255,255,255,0.25);
+        }
+        h1 {
+            text-align: center;
+            color: #1f2937;
+            margin-bottom: 22px;
+            font-size: 2rem;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 16px;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button {
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            padding: 9px 16px;
+            background: #f3f4f6;
+            color: #111827;
+            box-shadow: 0 2px 6px rgba(0,0,0,.08);
+        }
+        button:hover { opacity: 0.95; transform: translateY(-1px); }
+        .logout-btn { background: var(--danger); color: white; box-shadow: 0 2px 6px rgba(220,53,69,.4); }
+        .tabs { display: flex; gap: 8px; margin-bottom: 0; border-bottom: 1px solid var(--border); }
+        .tab-btn {
+            padding: 10px 18px;
+            background: #e5e7eb;
+            color: #374151;
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        .tab-btn.active { background: white; border-color: var(--border); color: var(--text-color); }
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 18px;
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            min-height: 420px;
+        }
+        .tab-content.active { display: block; }
+        ul { list-style: none; padding: 0; margin: 0; }
+        li { background: #f9fafb; padding: 12px; margin: 6px 0; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .error { color: #b91c1c; margin: 10px 0; }
+        .success { color: #065f46; margin: 10px 0; }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            color: #111827;
+            background: #f8fafc;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        table th, table td { border: 1px solid #e5e7eb; padding: 8px; text-align: center; }
+        table th { background: #f9fafb; font-weight: 700; color: #1f2937; }
+        table td { background: #fff; color: #111827; }
+        .student-name { text-align: left; font-weight: 600; }
+        .grade-cell:hover, .attendance-cell:hover { background: #f3f4f6; }
+        .present { background: #dcfce7; }
+        .absent { background: #fee2e2; }
+        .late { background: #fefce8; }
+        .lesson-delete-btn { background: #fde2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .lesson-edit-btn { background: #fef9c3; color: #92400e; border: 1px solid #fcd34d; }
+        .context-menu {
+            position: absolute; background: white; border: 1px solid #d1d5db;
+            padding: 6px; z-index: 1000; display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            user-select: none;
+            cursor: default;
+        }
+        .context-menu div {
+            user-select: none;
+            cursor: pointer;
+        }
+        .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 90%; max-width: 520px; background: white; padding: 24px;
+            border: 1px solid #e5e7eb; border-radius: 12px;
+            box-shadow: 0 8px 22px rgba(0,0,0,0.16); z-index: 1000; display: none; }
+        .overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(15,23,42,0.40); z-index: 999; display: none; }
+        .modal-btn { background: var(--success); color:white; border:1px solid var(--success); }
+        .cancel-btn { background:#6b7280; color:white; border:1px solid #6b7280; }
+        .stats { display:flex; gap:20px; margin-top:20px; }
+        .stats div { flex: 1; padding: 12px; border: 1px solid #e5e7eb; background: #f8fafc; border-radius: 10px; box-shadow: 0 1px 3px rgba(15,23,42,0.08); }
+        .stats h4 { margin-top: 0; margin-bottom: 8px; color: #1f2937; font-size: 1rem; }
     </style>
 </head>
 <body>
-
+<div class="container">
 <h1>ClassBook — Панель учителя</h1>
 
 <div class="controls">
@@ -38,8 +145,7 @@
 
 <div class="tabs">
     <button class="tab-btn active" data-tab="lessons">Мои уроки</button>
-    <button class="tab-btn" data-tab="grades">Оценки</button>
-    <button class="tab-btn" data-tab="attendance">Посещаемость</button>
+    <button class="tab-btn" data-tab="journal">Журнал класса</button>
 </div>
 
 <!-- Вкладка: Мои уроки -->
@@ -49,57 +155,97 @@
     <ul id="lessonsList"></ul>
 </div>
 
-<!-- Вкладка: Оценки -->
-<div id="gradesTab" class="tab-content">
-    <h2>Выставление оценок</h2>
-    <button id="addGradeBtn" style="background:#28a745;color:white;margin-bottom:15px;">Добавить оценку</button>
-        <label>Выберите урок для просмотра оценок:</label>
-        <select id="viewGradeLessonSelect" style="margin-bottom:15px;">
-            <option value="">Выберите урок</option>
+<!-- Вкладка: Журнал класса -->
+<div id="journalTab" class="tab-content">
+    <h2>Журнал класса</h2>
+    <div class="controls">
+        <select id="classSelect">
+            <option value="">Выберите класс</option>
         </select>
-        <ul id="gradesList"></ul> 
-</div> <div id="attendanceTab" class="tab-content">
-    <h2>Отметить посещаемость</h2>
-    <button id="addAttendanceBtn" style="background:#28a745;color:white;margin-bottom:15px;">Добавить посещение</button>
-    <label>Выберите урок для просмотра посещаемости:</label>
-    <select id="viewAttendanceLessonSelect" style="margin-bottom:15px;">
-        <option value="">Выберите урок</option>
-    </select>
-    <ul id="attendanceList"></ul>
+        <select id="subjectSelect" style="margin-left: 10px;" disabled>
+            <option value="">Выберите предмет</option>
+        </select>
+        <select id="lessonFilterSelect" style="margin-left: 10px;" disabled>
+            <option value="">Все уроки предмета</option>
+        </select>
+        <label style="margin-left: 10px;">От: <input type="date" id="dateFrom"></label>
+        <label style="margin-left: 5px;">До: <input type="date" id="dateTo"></label>
+        <button id="clearDateFilterBtn" style="margin-left: 10px;">Сброс дат</button>
+        <button id="addLessonToClassBtn" style="background:#28a745;color:white;margin-left:10px;" disabled>Добавить урок</button>
+    </div>
+    <div id="journalContainer">
+        <div id="statsContainer" class="stats">
+            <div>
+                <h4>Лучшие ученики класса</h4>
+                <ul id="bestStudentsClass"></ul>
+            </div>
+            <div>
+                <h4>Худшие ученики класса</h4>
+                <ul id="worstStudentsClass"></ul>
+            </div>
+            <div>
+                <h4>Статистика посещаемости</h4>
+                <p id="attendanceStats">Загрузите класс для просмотра</p>
+            </div>
+        </div>
+        <div id="journalTableContainer" style="overflow-x: auto; margin-top: 20px;"></div>
+    </div>
 </div>
 
-<!-- Модалка для оценок -->
+<!-- Контекстное меню -->
+<div id="contextMenu" class="context-menu">
+    <div data-action="add-grade">Добавить оценку</div>
+    <div data-action="edit-grade">Редактировать оценку</div>
+    <div data-action="delete-grade">Удалить оценку</div>
+    <div data-action="change-attendance">Изменить посещаемость</div>
+    <div data-action="set-late">Поставить опоздание</div>
+    <div data-action="set-absent">Поставить отсутствие</div>
+</div>
+
+<!-- Модалка для оценки -->
 <div class="overlay" id="overlay"></div>
 <div class="modal" id="gradeModal">
-    <h2>Добавить оценку</h2>
-    <select id="gradeLessonSelect"></select>
-    <select id="gradeStudentSelect"></select>
+    <h2>Управление оценкой</h2>
+    <p id="gradeModalInfo"></p>
+    <select id="gradeSelect">
+        <option value="new">Добавить новую оценку</option>
+    </select>
     <select id="gradeValue">
         <option value="">Выберите оценку</option>
-        <option value="2">2 (неудовлетворительно)</option>
-        <option value="3">3 (удовлетворительно)</option>
-        <option value="4">4 (хорошо)</option>
-        <option value="5">5 (отлично)</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
     </select>
     <button id="saveGradeBtn" class="modal-btn">Сохранить</button>
-    <button id="cancelGradeBtn" class="cancel-btn" style="margin-top:10px;width:100%;">Отмена</button>
+    <button id="cancelGradeBtn" class="cancel-btn">Отмена</button>
     <p id="gradeError" class="error"></p>
 </div>
 
 <!-- Модалка для посещаемости -->
 <div class="modal" id="attendanceModal">
-    <h2>Отметить посещение</h2>
-    <select id="attendanceLessonSelect"></select>
-    <select id="attendanceStudentSelect"></select>
+    <h2>Управление посещаемостью</h2>
+    <p id="attendanceModalInfo"></p>
     <select id="attendanceStatus">
-        <option value="">Выберите статус</option>
         <option value="1">Присутствовал(а)</option>
         <option value="0">Отсутствовал(а)</option>
         <option value="2">Опоздал(а)</option>
     </select>
     <button id="saveAttendanceBtn" class="modal-btn">Сохранить</button>
-    <button id="cancelAttendanceBtn" class="cancel-btn" style="margin-top:10px;width:100%;">Отмена</button>
+    <button id="cancelAttendanceBtn" class="cancel-btn">Отмена</button>
     <p id="attendanceError" class="error"></p>
+</div>
+
+<!-- Модалка для выбора оценки к удалению -->
+<div class="modal" id="deleteGradeModal">
+    <h2>Выберите оценку для удаления</h2>
+    <p id="deleteGradeModalInfo"></p>
+    <select id="deleteGradeSelect">
+        <option value="">Выберите оценку</option>
+    </select>
+    <button id="confirmDeleteGradeBtn" class="modal-btn">Удалить</button>
+    <button id="cancelDeleteGradeBtn" class="cancel-btn">Отмена</button>
+    <p id="deleteGradeError" class="error"></p>
 </div>
 
 <!-- Модалка для создания урока -->
@@ -121,16 +267,48 @@
 
 <script>
     const apiUrl = "https://localhost:7062/api";
-    let currentUser = JSON.parse(localStorage.getItem("currentUser"));
+    let currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "null");
     let currentTab = "lessons";
     let editingLessonId = null;
+    let currentClassId = null;
+    let currentClassName = null;
+    let currentSubject = null;
+    let teacherClasses = {}; // Map: classId -> className
+    let journalData = { students: [], lessons: [], grades: [], attendance: [] };
 
     // Проверка авторизации и роли
-    if (!currentUser || currentUser.role !== "Учитель") {
-        console.log("Доступ запрещён. Требуется роль учителя.");
-        window.location.href = "login.html";
-        throw new Error("Access denied");
-    }
+    (function checkAuth() {
+        if (!currentUser) {
+            console.log("Доступ запрещён. Требуется авторизация.");
+            sessionStorage.setItem("isRedirecting", "true");
+            window.location.href = "login.html";
+            return;
+        }
+        
+        const userRole = currentUser.role || currentUser.roleName;
+        if (userRole !== "Учитель") {
+            console.log("Доступ запрещён. Требуется роль учителя. Текущая роль:", userRole);
+            sessionStorage.setItem("isRedirecting", "true");
+            
+            if (userRole === "Администратор") {
+                window.location.href = "index.html";
+            } else if (userRole === "Ученик") {
+                window.location.href = "student-portal.html";
+            } else if (userRole === "Родитель") {
+                window.location.href = "parent-portal.html";
+            } else if (userRole === "Менеджер расписания") {
+                window.location.href = "raspisanie.html";
+            } else if (userRole === "Директор") {
+                window.location.href = "director-dashboard.html";
+            } else {
+                window.location.href = "login.html";
+            }
+            return;
+        }
+        
+        console.log("teacher.html: ✓ авторизация успешна, роль:", userRole);
+        sessionStorage.removeItem("isRedirecting");
+    })();
 
     function getHeaders() {
         return { "Content-Type": "application/json" };
@@ -138,7 +316,8 @@
 
     // Выход
     document.getElementById("logoutBtn").addEventListener("click", () => {
-        localStorage.removeItem("currentUser");
+        sessionStorage.removeItem("currentUser");
+        sessionStorage.removeItem("isRedirecting");
         window.location.href = "login.html";
     });
 
@@ -154,6 +333,15 @@
         });
     });
 
+    // Загрузка данных в зависимости от вкладки
+    async function loadData() {
+        if (currentTab === "lessons") {
+            await loadLessons();
+        } else if (currentTab === "journal") {
+            await loadTeacherClasses();
+        }
+    }
+
     // Загрузка уроков учителя
     async function loadLessons() {
         try {
@@ -165,109 +353,792 @@
             list.innerHTML = "";
             data.forEach(l => {
                 const li = document.createElement("li");
-                const btnEdit = document.createElement("button");
-                btnEdit.textContent = "Редактировать";
-                btnEdit.style.background = "#ffc107";
-                btnEdit.style.color = "black";
-                li.innerHTML = `<span>${l.subjectName} — ${l.className} — ${l.topic} (${new Date(l.date).toLocaleDateString()})</span>`;
-                // привязываем id урока к кнопке и добавляем обработчик
-                btnEdit.dataset.lessonId = l.lessonId || l.id;
-                btnEdit.addEventListener('click', async () => {
-                    editingLessonId = btnEdit.dataset.lessonId;
-                    // заполняем поля модалки
-                    await loadTeacherSubjects();
-                    await loadTeacherClasses();
-                    // устанавливаем subject
-                    try { document.getElementById('lessonSubjectSelect').value = l.subjectId || l.subjectId || ''; } catch(e){}
-                    // пытаемся найти id класса в загруженных опциях по имени
-                    const classSelect = document.getElementById('lessonClassSelect');
-                    for (const opt of classSelect.options) {
-                        if (opt.textContent === l.className || opt.value == (l.classId || l.classId)) {
-                            classSelect.value = opt.value;
-                            break;
-                        }
+            const left = document.createElement("span");
+            left.textContent = `${l.subjectName} — ${l.className} — ${l.topic} (${new Date(l.date).toLocaleDateString()})`;
+
+            const btnEdit = document.createElement("button");
+            btnEdit.textContent = "Редактировать";
+            btnEdit.className = "lesson-edit-btn";
+            btnEdit.dataset.lessonId = l.lessonId || l.id;
+            btnEdit.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                editingLessonId = btnEdit.dataset.lessonId;
+                await loadTeacherSubjects();
+                await loadTeacherClassesForLesson();
+                try { document.getElementById('lessonSubjectSelect').value = l.subjectId || l.subjectId || ''; } catch (e) {}
+                const classSelect = document.getElementById('lessonClassSelect');
+                for (const opt of classSelect.options) {
+                    if (opt.textContent === l.className || opt.value == (l.classId || l.classId)) {
+                        classSelect.value = opt.value;
+                        break;
                     }
-                    document.getElementById('lessonTopic').value = l.topic || '';
-                    if (l.date) document.getElementById('lessonDate').value = new Date(l.date).toISOString().slice(0,10);
-                    document.getElementById('lessonHomework').value = l.homework || '';
-                    document.getElementById('lessonModal').style.display = 'block';
-                    document.getElementById('overlay').style.display = 'block';
-                });
-                li.appendChild(btnEdit);
-                list.appendChild(li);
+                }
+                document.getElementById('lessonTopic').value = l.topic || '';
+                if (l.date) document.getElementById('lessonDate').value = new Date(l.date).toISOString().slice(0, 10);
+                document.getElementById('lessonHomework').value = l.homework || '';
+                document.getElementById('lessonModal').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+            });
+
+            const btnDelete = document.createElement("button");
+            btnDelete.textContent = "Удалить";
+            btnDelete.className = "lesson-delete-btn";
+            btnDelete.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                if (confirm('Удалить урок?')) {
+                    await deleteLesson(l.lessonId);
+                }
+            });
+
+            const right = document.createElement('div');
+            right.className = 'lesson-buttons';
+            right.appendChild(btnEdit);
+            right.appendChild(btnDelete);
+
+            li.appendChild(left);
+            li.appendChild(right);
+            list.appendChild(li);
             });
         } catch (e) {
             document.getElementById("lessonsList").innerHTML = "<p style='color:red'>Ошибка загрузки уроков</p>";
         }
     }
 
-    // Загрузка оценок
-    async function loadGrades(lessonId = null) {
-        const gradesList = document.getElementById("gradesList");
-        if (!gradesList) return; // Элемент может быть недоступен если не на вкладке Оценки
-        
+    // Загрузка классов учителя
+    async function loadTeacherClasses() {
         try {
-            if (!lessonId) {
-                gradesList.innerHTML = "<p style='color:#666'>Выберите урок из селектора выше</p>";
-                return;
-            }
-            const res = await fetch(`https://localhost:7062/api/teacher/grades/${lessonId}`, {
-                credentials: "include"
+            const res = await fetch(`${apiUrl}/teacher/classes?teacherId=${currentUser.id}`, 
+                { credentials: "include", headers: getHeaders() });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            const select = document.getElementById("classSelect");
+            select.innerHTML = '<option value="">Выберите класс</option>';
+            teacherClasses = {}; // Очистить карту
+            data.forEach(c => {
+                const classId = c.classId || c.id;
+                const className = c.name;
+                teacherClasses[classId] = className; // Сохранить в карту
+                const opt = document.createElement('option');
+                opt.value = classId;
+                opt.textContent = className;
+                select.appendChild(opt);
             });
-            if (!res.ok) throw new Error(`Ошибка ${res.status}`);
-            const grades = await res.json();
-            
-            if (!Array.isArray(grades) || grades.length === 0) {
-                gradesList.innerHTML = "<p style='color:#666'>Оценок нет</p>";
-                return;
-            }
-            
-            let html = "";
-            grades.forEach(g => {
-                html += `<li><strong>${g.student?.fullName || 'Неизвестный ученик'}</strong> - Оценка: <strong>${g.value}</strong></li>`;
-            });
-            gradesList.innerHTML = html;
+            console.log("Классы загружены, карта:", teacherClasses);
+            // Отключаем кнопку добавления урока
+            document.getElementById("addLessonToClassBtn").disabled = true;
         } catch (e) {
-            console.error("Ошибка при загрузке оценок:", e);
-            gradesList.innerHTML = `<p style='color:red'>Ошибка загрузки оценок: ${e.message}</p>`;
+            console.error("Ошибка загрузки классов:", e);
         }
     }
 
-    // Загрузка посещаемости
-    async function loadAttendance(lessonId = null) {
-    const attendanceList = document.getElementById("attendanceList");
-    if (!attendanceList) return;
-    
-    try {
-        if (!lessonId) {
-            attendanceList.innerHTML = "<p style='color:#666'>Выберите урок</p>";
-            return;
+    // Загрузка журнала класса
+    async function loadJournal(classId) {
+        currentClassId = classId;
+        currentClassName = teacherClasses[classId]; // Получить имя класса по ID
+        console.log("Получено имя класса:", currentClassName, "для ID:", classId);
+        document.getElementById("addLessonToClassBtn").disabled = !classId;
+        try {
+            console.log("Загрузка журнала для класса:", classId);
+
+            // Загрузка учеников
+            const studentsRes = await fetch(`${apiUrl}/teacher/classes/${classId}/students`, { credentials: "include" });
+            console.log("Ответ учеников:", studentsRes.status, studentsRes.statusText);
+            journalData.students = studentsRes.ok ? await studentsRes.json() : [];
+            console.log("Ученики загружены:", journalData.students.length);
+
+            // Загрузка уроков для класса
+            const lessonsRes = await fetch(`${apiUrl}/teacher/lessons?teacherId=${currentUser.id}`, { credentials: "include" });
+            console.log("Ответ уроков:", lessonsRes.status, lessonsRes.statusText);
+            const allLessons = lessonsRes.ok ? await lessonsRes.json() : [];
+            console.log("Все уроки учителя:", allLessons.length);
+            console.log("Примеры уроков:", allLessons.slice(0, 3));
+            if (allLessons.length > 0) {
+                console.log("Полная структура первого урока:", JSON.stringify(allLessons[0], null, 2));
+                console.log("Доступные поля:", Object.keys(allLessons[0]));
+            }
+            console.log("Фильтруем по className:", currentClassName);
+            journalData.lessons = allLessons.filter(l => {
+                const match = l.className === currentClassName;
+                if (match) console.log("Найден урок для класса:", l);
+                return match;
+            }).sort((a, b) => new Date(a.date) - new Date(b.date));
+            console.log("Уроки для класса:", journalData.lessons.length, journalData.lessons);
+
+            // Заполняем селектор уроков
+            const lessonSelect = document.getElementById("lessonFilterSelect");
+            lessonSelect.innerHTML = '<option value="">Все уроки</option>';
+            journalData.lessons.forEach(l => {
+                const opt = document.createElement('option');
+                opt.value = l.lessonId;
+                opt.textContent = `${new Date(l.date).toLocaleDateString()} - ${l.topic}`;
+                lessonSelect.appendChild(opt);
+            });
+
+            // Загрузка оценок и посещаемости для всех уроков
+            journalData.grades = [];
+            journalData.attendance = [];
+            for (const lesson of journalData.lessons) {
+                const gradesRes = await fetch(`${apiUrl}/teacher/grades/${lesson.lessonId}`, { credentials: "include" });
+                if (gradesRes.ok) {
+                    const grades = await gradesRes.json();
+                    console.log(`Оценки для урока ${lesson.lessonId}:`, grades.length);
+                    if (grades.length > 0) {
+                        console.log("Структура оценки (первая):", Object.keys(grades[0]), grades[0]);
+                    }
+                    journalData.grades.push(...grades);
+                }
+
+                const attendanceRes = await fetch(`${apiUrl}/teacher/attendance/${lesson.lessonId}`, { credentials: "include" });
+                if (attendanceRes.ok) {
+                    const att = await attendanceRes.json();
+                    console.log(`Посещаемость для урока ${lesson.lessonId}:`, att.length);
+                    // По умолчанию присутствовал
+                    journalData.students.forEach(s => {
+                        if (!att.find(a => a.studentId === s.studentId)) {
+                            att.push({ studentId: s.studentId, status: 1, lessonId: lesson.lessonId });
+                        }
+                    });
+                    journalData.attendance.push(...att);
+                }
+            }
+
+            console.log("Всего оценок:", journalData.grades.length);
+            console.log("Всего записей посещаемости:", journalData.attendance.length);
+            
+            // После загрузки данных заполняем селекты и отображаем таблицу
+            populateSubjects();
+            populateLessons();
+            renderJournal();
+            renderStats();
+
+        } catch (e) {
+            console.error("Ошибка загрузки журнала:", e);
+            document.getElementById("journalTableContainer").innerHTML = "<p style='color:red'>Ошибка загрузки журнала</p>";
         }
-        const res = await fetch(`${apiUrl}/teacher/attendance/${lessonId}`, {
-            credentials: "include"
-        });
-        if (!res.ok) throw new Error(`Ошибка ${res.status}`);
-        const attendance = await res.json();
-        
-        if (!Array.isArray(attendance) || attendance.length === 0) {
-            attendanceList.innerHTML = "<p style='color:#666'>Посещаемость не отмечена</p>";
-            return;
-        }
-        
-        const statusMap = {1: "Присутствовал(а)", 0: "Отсутствовал(а)", 2: "Опоздал(а)"};
-        let html = "";
-        attendance.forEach(a => {
-            // ВАЖНО: используем a.studentName, как в C# фасаде
-            const name = a.studentName || "Неизвестный ученик";
-            const status = statusMap[a.status] || "Неизвестный статус";
-            html += `<li><strong>${name}</strong> — Статус: <strong>${status}</strong></li>`;
-        });
-        attendanceList.innerHTML = html;
-    } catch (e) {
-        console.error("Ошибка:", e);
-        attendanceList.innerHTML = `<p style='color:red'>Ошибка загрузки: ${e.message}</p>`;
     }
-}
+
+    // Наполнение выбора предметов
+    function populateSubjects() {
+        const subjectSelect = document.getElementById("subjectSelect");
+        const subjects = [...new Set(journalData.lessons.map(l => l.subjectName))];
+        console.log("Найдено предметов:", subjects.length, subjects);
+        subjectSelect.innerHTML = '<option value="">Выберите предмет</option>';
+        subjects.forEach(subject => {
+            const opt = document.createElement('option');
+            opt.value = subject;
+            opt.textContent = subject;
+            subjectSelect.appendChild(opt);
+        });
+        subjectSelect.disabled = subjects.length === 0;
+        console.log("Селект предметов обновлён, элементов:", subjectSelect.options.length);
+    }
+
+    // Наполнение выбора уроков для выбранного предмета
+    function populateLessons() {
+        const lessonSelect = document.getElementById("lessonFilterSelect");
+        let lessonsForSubject = journalData.lessons;
+        
+        if (currentSubject) {
+            lessonsForSubject = journalData.lessons.filter(l => l.subjectName === currentSubject);
+        }
+        
+        console.log("Загрузка уроков для предмета:", currentSubject, "найдено:", lessonsForSubject.length);
+        lessonSelect.innerHTML = '<option value="">Все уроки</option>';
+        lessonsForSubject.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = l.lessonId;
+            opt.textContent = `${new Date(l.date).toLocaleDateString()} - ${l.topic}`;
+            lessonSelect.appendChild(opt);
+        });
+    }
+
+    // Рендер таблицы журнала
+    function renderJournal() {
+        const container = document.getElementById("journalTableContainer");
+        const selectedLessonId = document.getElementById("lessonFilterSelect").value;
+        const dateFrom = document.getElementById("dateFrom").value;
+        const dateTo = document.getElementById("dateTo").value;
+        
+        // Фильтрация уроков по классу + предмету + период
+        let lessonsToShow = [...journalData.lessons];
+        if (currentSubject) {
+            lessonsToShow = lessonsToShow.filter(l => l.subjectName === currentSubject);
+        }
+        if (selectedLessonId) {
+            lessonsToShow = lessonsToShow.filter(l => l.lessonId == selectedLessonId);
+        }
+        if (dateFrom) {
+            lessonsToShow = lessonsToShow.filter(l => new Date(l.date) >= new Date(dateFrom));
+        }
+        if (dateTo) {
+            lessonsToShow = lessonsToShow.filter(l => new Date(l.date) <= new Date(dateTo));
+        }
+
+        console.log("Рендер таблицы. Ученики:", journalData.students.length, "Уроки:", lessonsToShow.length, "Предмет:", currentSubject, "период:", dateFrom, dateTo);
+
+        // Если предмет не выбран, таблицу не показываем
+        if (!currentSubject) {
+            container.innerHTML = "<p style='text-align:center;font-size:1.1rem;color:#666;'>Выберите предмет для просмотра журнала класса.</p>";
+            return;
+        }
+
+        if (!journalData.students.length || !lessonsToShow.length) {
+            container.innerHTML = "<p>Нет данных для отображения. Добавьте уроки для этого класса или расширьте фильтр.</p>";
+            return;
+        }
+
+        console.log("Создаем таблицу...");
+        let html = `<h3>Класс: ${currentClassName}${currentSubject ? ', Предмет: ' + currentSubject : ''}</h3>`;
+        html += "<div style='font-size: 0.85rem; margin-bottom: 10px; color: #666;'>";
+        html += "<strong>Легенда цветов:</strong> ";
+        html += "<span style='background: #d4edda; padding: 2px 6px; border-radius: 3px;'>🟢 Присутствовал</span> ";
+        html += "<span style='background: #f8d7da; padding: 2px 6px; border-radius: 3px; margin: 0 2px;'>🔴 Отсутствовал</span> ";
+        html += "<span style='background: #fff3cd; padding: 2px 6px; border-radius: 3px;'>🟡 Опоздал</span>";
+        html += "</div>";
+        html += "<table><tr><th>Ученик</th>";
+        lessonsToShow.forEach(l => {
+            html += `<th>${new Date(l.date).toLocaleDateString()}<br>${l.topic}<br><button class='lesson-edit-btn-header' data-lesson='${l.lessonId}' style='margin-top:5px;padding:2px 4px;font-size:0.7rem;'>Редактировать</button> <button class='lesson-delete-btn-header' data-lesson='${l.lessonId}' style='margin-top:5px;padding:2px 4px;font-size:0.7rem;'>Удалить</button></th>`;
+        });
+        html += "<th>Средняя</th><th>Медиана</th></tr>";
+
+        journalData.students.forEach(s => {
+            const fullName = `${s.lastName} ${s.firstName}`;
+            const studentGrades = [];
+            html += `<tr><td class="student-name">${fullName}</td>`;
+            lessonsToShow.forEach(l => {
+                const grades = journalData.grades.filter(g => g.studentId === s.studentId && g.lessonId === l.lessonId);
+                const attendance = journalData.attendance.find(a => a.studentId === s.studentId && a.lessonId === l.lessonId);
+                const attClass = attendance ? (attendance.status === 1 ? 'present' : attendance.status === 0 ? 'absent' : 'late') : 'present';
+                html += `<td class="grade-cell ${attClass}" data-student="${s.studentId}" data-lesson="${l.lessonId}">`;
+                if (grades.length) {
+                    const values = grades.map(g => g.value);
+                    studentGrades.push(...values);
+                    html += values.join(', ');
+                } else {
+                    html += '—';
+                }
+                html += "</td>";
+            });
+
+            // Среднее + медиана по строке
+            const avg = studentGrades.length ? (studentGrades.reduce((sum,v)=>sum+v,0)/studentGrades.length).toFixed(2) : '—';
+            let median = '—';
+            if (studentGrades.length) {
+                const sorted = [...studentGrades].sort((a,b)=>a-b);
+                const mid = Math.floor(sorted.length/2);
+                median = sorted.length % 2 === 0 ? ((sorted[mid-1] + sorted[mid])/2).toFixed(2) : sorted[mid].toFixed(2);
+            }
+            html += `<td>${avg}</td><td>${median}</td>`;
+            html += `</tr>`;
+        });
+        html += "</table>";
+        container.innerHTML = html;
+        console.log("Таблица создана и вставлена в контейнер");
+
+        // Обработчики для ячеек: правый клик - меню, левый клик - модалка оценки, двойной клик - посещаемость
+        document.querySelectorAll('.grade-cell').forEach(cell => {
+            cell.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                showContextMenu(e, cell.dataset.student, cell.dataset.lesson);
+            });
+            cell.addEventListener('click', () => {
+                showGradeModal(cell.dataset.student, cell.dataset.lesson, 'add');
+            });
+            cell.addEventListener('dblclick', () => {
+                showAttendanceModal(cell.dataset.student, cell.dataset.lesson);
+            });
+        });
+
+        document.querySelectorAll('.lesson-edit-btn-header').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openLessonModalForEdit(btn.dataset.lesson);
+            });
+        });
+
+        document.querySelectorAll('.lesson-delete-btn-header').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm('Удалить урок?')) {
+                    await deleteLesson(btn.dataset.lesson);
+                }
+            });
+        });
+    }
+
+    // Показ контекстного меню
+    function showContextMenu(e, studentId, lessonId) {
+        const menu = document.getElementById('contextMenu');
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+        menu.style.display = 'block';
+        menu.dataset.student = studentId;
+        menu.dataset.lesson = lessonId;
+
+        // Скрытие меню при клике вне
+        document.addEventListener('click', hideContextMenu);
+    }
+
+    function hideContextMenu() {
+        document.getElementById('contextMenu').style.display = 'none';
+        document.removeEventListener('click', hideContextMenu);
+    }
+
+    // Обработчики контекстного меню
+    document.querySelectorAll('#contextMenu div').forEach(item => {
+        item.addEventListener('click', async () => {
+            const action = item.dataset.action;
+            const studentId = document.getElementById('contextMenu').dataset.student;
+            const lessonId = document.getElementById('contextMenu').dataset.lesson;
+            hideContextMenu();
+
+            if (action === 'add-grade') {
+                showGradeModal(studentId, lessonId, 'add');
+            } else if (action === 'edit-grade') {
+                const existingGrades = journalData.grades.filter(g => g.studentId == studentId && g.lessonId == lessonId);
+                if (existingGrades.length > 0) {
+                    showGradeModal(studentId, lessonId, 'edit');
+                } else {
+                    alert("Нет оценок для редактирования");
+                }
+            } else if (action === 'change-attendance') {
+                showAttendanceModal(studentId, lessonId);
+            } else if (action === 'set-late') {
+                await saveAttendance(lessonId, studentId, 2);
+                await loadJournal(currentClassId);
+            } else if (action === 'set-absent') {
+                await saveAttendance(lessonId, studentId, 0);
+                await loadJournal(currentClassId);
+            } else if (action === 'delete-grade') {
+                await deleteGrade(studentId, lessonId);
+            }
+        });
+    });
+
+    // Модалка для оценки
+    function showGradeModal(studentId, lessonId, mode = 'add') {
+        const student = journalData.students.find(s => s.studentId == studentId);
+        const lesson = journalData.lessons.find(l => l.lessonId == lessonId);
+        const studentName = `${student.lastName} ${student.firstName}`;
+        const existingGrades = journalData.grades.filter(g => g.studentId == studentId && g.lessonId == lessonId);
+        
+        document.getElementById('gradeModalInfo').textContent = `${studentName} - ${lesson.topic}`;
+        document.getElementById('gradeModal').dataset.student = studentId;
+        document.getElementById('gradeModal').dataset.lesson = lessonId;
+        document.getElementById('gradeError').textContent = ''; // Очистить ошибки
+        
+        const gradeSelect = document.getElementById('gradeSelect');
+        gradeSelect.innerHTML = '<option value="new">Добавить новую оценку</option>';
+        existingGrades.forEach((g, index) => {
+            const opt = document.createElement('option');
+            opt.value = g.gradeId;
+            opt.textContent = `Редактировать оценку: ${g.value}`;
+            gradeSelect.appendChild(opt);
+        });
+        
+        if (mode === 'add') {
+            gradeSelect.value = 'new';
+            document.getElementById('gradeValue').value = '';
+        } else if (mode === 'edit' && existingGrades.length > 0) {
+            gradeSelect.value = existingGrades[0].gradeId;
+            document.getElementById('gradeValue').value = existingGrades[0].value;
+        }
+        
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('gradeModal').style.display = 'block';
+        
+        // Обработчик изменения выбора оценки
+        gradeSelect.addEventListener('change', function() {
+            const selectedValue = this.value;
+            if (selectedValue === 'new') {
+                document.getElementById('gradeValue').value = '';
+            } else {
+                const selectedGrade = existingGrades.find(g => g.gradeId == selectedValue);
+                if (selectedGrade) {
+                    document.getElementById('gradeValue').value = selectedGrade.value;
+                }
+            }
+        });
+    }
+
+    // Модалка для посещаемости
+    function showAttendanceModal(studentId, lessonId) {
+        const student = journalData.students.find(s => s.studentId == studentId);
+        const lesson = journalData.lessons.find(l => l.lessonId == lessonId);
+        const studentName = `${student.lastName} ${student.firstName}`;
+        document.getElementById('attendanceModalInfo').textContent = `${studentName} - ${lesson.topic}`;
+        document.getElementById('attendanceModal').dataset.student = studentId;
+        document.getElementById('attendanceModal').dataset.lesson = lessonId;
+        
+        // Найти текущую посещаемость
+        const currentAttendance = journalData.attendance.find(a => a.studentId == studentId && a.lessonId == lessonId);
+        const currentStatus = currentAttendance ? currentAttendance.status : 1; // По умолчанию присутствовал
+        document.getElementById('attendanceStatus').value = currentStatus;
+        
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('attendanceModal').style.display = 'block';
+    }
+
+    // Модалка для выбора оценки к удалению
+    function showDeleteGradeModal(studentId, lessonId) {
+        const student = journalData.students.find(s => s.studentId == studentId);
+        const lesson = journalData.lessons.find(l => l.lessonId == lessonId);
+        const studentName = `${student.lastName} ${student.firstName}`;
+        const grades = journalData.grades.filter(g => g.studentId == studentId && g.lessonId == lessonId);
+        
+        document.getElementById('deleteGradeModalInfo').textContent = `${studentName} - ${lesson.topic}`;
+        document.getElementById('deleteGradeModal').dataset.student = studentId;
+        document.getElementById('deleteGradeModal').dataset.lesson = lessonId;
+        document.getElementById('deleteGradeError').textContent = ''; // Очистить ошибки
+        
+        const select = document.getElementById('deleteGradeSelect');
+        select.innerHTML = '<option value="">Выберите оценку</option>';
+        grades.forEach((g, index) => {
+            const opt = document.createElement('option');
+            opt.value = g.gradeId;
+            opt.textContent = `Оценка: ${g.value}`;
+            select.appendChild(opt);
+        });
+        
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('deleteGradeModal').style.display = 'block';
+    }
+
+    // Сохранение оценки
+    document.getElementById('saveGradeBtn').addEventListener('click', async () => {
+        const studentId = document.getElementById('gradeModal').dataset.student;
+        const lessonId = document.getElementById('gradeModal').dataset.lesson;
+        const selectedGradeId = document.getElementById('gradeSelect').value;
+        const value = document.getElementById('gradeValue').value;
+        
+        if (!value) {
+            document.getElementById('gradeError').textContent = 'Пожалуйста, выберите оценку';
+            return;
+        }
+        
+        if (selectedGradeId === 'new') {
+            // Добавить новую оценку
+            await addNewGrade(lessonId, studentId, value);
+        } else {
+            // Заменить существующую оценку
+            await replaceGrade(selectedGradeId, value);
+        }
+        
+        document.getElementById('gradeModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+        await loadJournal(currentClassId);
+    });
+
+    // Сохранение посещаемости
+    document.getElementById('saveAttendanceBtn').addEventListener('click', async () => {
+        const studentId = document.getElementById('attendanceModal').dataset.student;
+        const lessonId = document.getElementById('attendanceModal').dataset.lesson;
+        const status = document.getElementById('attendanceStatus').value;
+        await saveAttendance(lessonId, studentId, status);
+        document.getElementById('attendanceModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+        await loadJournal(currentClassId);
+    });
+
+    // Отмена модалок
+    document.getElementById('cancelGradeBtn').addEventListener('click', () => {
+        document.getElementById('gradeModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    });
+    document.getElementById('cancelAttendanceBtn').addEventListener('click', () => {
+        document.getElementById('attendanceModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    });
+    document.getElementById('cancelDeleteGradeBtn').addEventListener('click', () => {
+        document.getElementById('deleteGradeModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    });
+
+    // Подтверждение удаления выбранной оценки
+    document.getElementById('confirmDeleteGradeBtn').addEventListener('click', async () => {
+        const gradeId = document.getElementById('deleteGradeSelect').value;
+        
+        if (!gradeId) {
+            document.getElementById('deleteGradeError').textContent = 'Пожалуйста, выберите оценку для удаления';
+            return;
+        }
+        
+        document.getElementById('deleteGradeModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+        await performDeleteGrade(gradeId);
+    });
+
+    // Удаление оценки
+    async function deleteGrade(studentId, lessonId) {
+        const grades = journalData.grades.filter(g => g.studentId == studentId && g.lessonId == lessonId);
+        console.log("Удаление оценок для студента:", studentId, "урока:", lessonId);
+        console.log("Найдено оценок:", grades.length, grades);
+        
+        if (!grades.length) {
+            alert("Нет оценок для удаления");
+            return;
+        }
+        
+        if (grades.length > 1) {
+            // Показать модал для выбора оценки
+            showDeleteGradeModal(studentId, lessonId);
+            return;
+        }
+        
+        // Удаляем единственную оценку
+        if (!confirm("Удалить оценку?")) {
+            return;
+        }
+        
+        await performDeleteGrade(grades[0].gradeId);
+    }
+
+    // Функция для выполнения удаления оценки
+    async function performDeleteGrade(gradeId) {
+        try {
+            console.log("Удаление оценки с ID:", gradeId);
+            
+            if (!gradeId) {
+                console.error("Ошибка: нет ID оценки");
+                alert("Ошибка: не удаётся найти ID оценки");
+                return;
+            }
+            
+            const res = await fetch(`${apiUrl}/teacher/grades/${gradeId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            console.log(`Удаление оценки ${gradeId}: ${res.status} ${res.statusText}`);
+            
+            if (!res.ok) {
+                const error = await res.text();
+                console.error(`Ошибка удаления оценки ${gradeId}:`, res.status, error);
+                alert(`Ошибка удаления: ${res.status} ${error}`);
+                return;
+            }
+            
+            console.log("Оценка успешно удалена");
+            // Перезагружаем данные и сохраняем текущий предмет
+            const selectedSubject = currentSubject;
+            const selectedLesson = document.getElementById("lessonFilterSelect").value;
+            await loadJournal(currentClassId);
+            currentSubject = selectedSubject;
+            if (selectedSubject) {
+                document.getElementById("subjectSelect").value = selectedSubject;
+                populateLessons();
+            }
+            if (selectedLesson) {
+                document.getElementById("lessonFilterSelect").value = selectedLesson;
+            }
+            renderJournal();
+            renderStats();
+        } catch (e) {
+            console.error("Ошибка при удалении оценки:", e);
+            alert("Ошибка удаления оценки: " + e.message);
+        }
+    }
+
+    // Удаление посещаемости
+    async function deleteAttendance(studentId, lessonId) {
+        // Сбросить на присутствовал
+        await saveAttendance(lessonId, studentId, 1);
+    }
+
+    // Сохранение оценки (добавление)
+    async function addNewGrade(lessonId, studentId, value) {
+        try {
+            console.log("Добавление новой оценки для студента:", studentId, "урока:", lessonId, "значение:", value);
+            
+            const res = await fetch(`${apiUrl}/teacher/grades`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    lessonId: Number(lessonId),
+                    studentId: Number(studentId),
+                    value: Number(value)
+                })
+            });
+            
+            console.log("Ответ добавления оценки:", res.status, res.statusText);
+            if (!res.ok) {
+                const error = await res.text();
+                console.error("Ошибка добавления оценки:", error);
+                alert("Ошибка добавления оценки: " + error);
+            }
+        } catch (e) {
+            console.error("Ошибка при добавлении оценки:", e);
+            alert("Ошибка добавления оценки: " + e.message);
+        }
+    }
+
+    // Замена существующей оценки
+    async function replaceGrade(gradeId, newValue) {
+        try {
+            console.log("Замена оценки с ID:", gradeId, "на значение:", newValue);
+            
+            // Удалить старую оценку
+            const deleteRes = await fetch(`${apiUrl}/teacher/grades/${gradeId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            
+            if (!deleteRes.ok) {
+                const error = await deleteRes.text();
+                console.error(`Ошибка удаления оценки ${gradeId}:`, error);
+                alert("Ошибка замены оценки: " + error);
+                return;
+            }
+            
+            // Найти lessonId и studentId из удаленной оценки
+            const deletedGrade = journalData.grades.find(g => g.gradeId == gradeId);
+            if (!deletedGrade) {
+                console.error("Не найдена удаленная оценка в локальных данных");
+                alert("Ошибка: не найдена оценка в данных");
+                return;
+            }
+            
+            // Добавить новую оценку
+            const addRes = await fetch(`${apiUrl}/teacher/grades`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    lessonId: Number(deletedGrade.lessonId),
+                    studentId: Number(deletedGrade.studentId),
+                    value: Number(newValue)
+                })
+            });
+            
+            if (!addRes.ok) {
+                const error = await addRes.text();
+                console.error("Ошибка добавления новой оценки:", error);
+                alert("Ошибка замены оценки: " + error);
+            }
+        } catch (e) {
+            console.error("Ошибка при замене оценки:", e);
+            alert("Ошибка замены оценки: " + e.message);
+        }
+    }
+
+    // Удаление урока
+    async function deleteLesson(lessonId) {
+        try {
+            let res = await fetch(`${apiUrl}/teacher/lessons/${lessonId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            if (res.status === 404 || res.status === 403) {
+                res = await fetch(`${apiUrl}/lessons/${lessonId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+            }
+            if (!res.ok) {
+                const error = await res.text();
+                console.error('Ошибка удаления урока:', error);
+                alert('Ошибка удаления урока: ' + error);
+                return;
+            }
+            await loadLessons();
+            if (currentClassId) {
+                await loadJournal(currentClassId);
+            }
+        } catch (e) {
+            console.error('Ошибка удаления урока:', e);
+            alert('Ошибка удаления урока: ' + e.message);
+        }
+    }
+
+    // Сохранение посещаемости
+    async function saveAttendance(lessonId, studentId, status) {
+        try {
+            await fetch(`${apiUrl}/teacher/attendance`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    lessonId: Number(lessonId),
+                    studentId: Number(studentId),
+                    status: Number(status)
+                })
+            });
+        } catch {
+            alert("Ошибка сохранения посещаемости");
+        }
+    }
+
+    // Рендер статистики
+    function renderStats() {
+        const selectedLessonId = document.getElementById("lessonFilterSelect").value;
+        const dateFrom = document.getElementById("dateFrom").value;
+        const dateTo = document.getElementById("dateTo").value;
+
+        let lessonsToAnalyze = [...journalData.lessons];
+        if (currentSubject) {
+            lessonsToAnalyze = lessonsToAnalyze.filter(l => l.subjectName === currentSubject);
+        }
+        if (selectedLessonId) {
+            lessonsToAnalyze = lessonsToAnalyze.filter(l => l.lessonId == selectedLessonId);
+        }
+        if (dateFrom) {
+            lessonsToAnalyze = lessonsToAnalyze.filter(l => new Date(l.date) >= new Date(dateFrom));
+        }
+        if (dateTo) {
+            lessonsToAnalyze = lessonsToAnalyze.filter(l => new Date(l.date) <= new Date(dateTo));
+        }
+
+        const studentStats = {};
+        journalData.students.forEach(s => {
+            const grades = journalData.grades
+                .filter(g => g.studentId === s.studentId && lessonsToAnalyze.some(l => l.lessonId === g.lessonId))
+                .map(g => g.value);
+            const avg = grades.length ? grades.reduce((sum, v) => sum + v, 0) / grades.length : 0;
+            studentStats[s.studentId] = { name: `${s.lastName} ${s.firstName}`, avg, grades };
+        });
+
+        const sorted = Object.values(studentStats).sort((a, b) => b.avg - a.avg);
+        const best = sorted.slice(0, 5);
+        const worst = sorted.slice(-5).reverse();
+
+        document.getElementById('bestStudentsClass').innerHTML = best.map(s => `<li>${s.name}: ${s.avg.toFixed(2)}</li>`).join('');
+        document.getElementById('worstStudentsClass').innerHTML = worst.map(s => `<li>${s.name}: ${s.avg.toFixed(2)}</li>`).join('');
+
+        // Общее среднее и медиана для всех оценок в фильтре
+        const allGrades = Object.values(studentStats).flatMap(s => s.grades);
+        const avgAll = allGrades.length ? allGrades.reduce((sum, v) => sum + v, 0) / allGrades.length : 0;
+        const medianAll = allGrades.length ? (() => {
+            const sortedGrades = [...allGrades].sort((a, b) => a - b);
+            const middle = Math.floor(sortedGrades.length / 2);
+            if (sortedGrades.length % 2 === 0) {
+                return ((sortedGrades[middle - 1] + sortedGrades[middle]) / 2).toFixed(2);
+            }
+            return sortedGrades[middle].toFixed(2);
+        })() : '—';
+
+        document.getElementById('attendanceStats').innerHTML = `
+            Средняя оценка: ${avgAll ? avgAll.toFixed(2) : '—'}<br>
+            Медианная оценка: ${medianAll}<br>
+        `;
+
+        const attendanceToAnalyze = lessonsToAnalyze.length > 0 ?
+            journalData.attendance.filter(a => lessonsToAnalyze.some(l => l.lessonId === a.lessonId)) :
+            [];
+
+        const totalAttendance = attendanceToAnalyze.length;
+        const present = attendanceToAnalyze.filter(a => a.status === 1).length;
+        const absent = attendanceToAnalyze.filter(a => a.status === 0).length;
+        const late = attendanceToAnalyze.filter(a => a.status === 2).length;
+        const attendancePercent = totalAttendance ? (( (present + late) / totalAttendance) * 100).toFixed(1) : 0;
+
+        document.getElementById('attendanceStats').innerHTML += `
+            <hr style="margin:5px 0;" />
+            Присутствовали: ${present}<br>
+            Отсутствовали: ${absent}<br>
+            Опоздали: ${late}<br>
+            Процент посещаемости: ${attendancePercent}%
+        `;
+    }
 
     // Загрузка предметов учителя
     async function loadTeacherSubjects() {
@@ -289,8 +1160,8 @@
         }
     }
 
-    // Загрузка классов учителя
-    async function loadTeacherClasses() {
+    // Загрузка классов учителя для урока
+    async function loadTeacherClassesForLesson() {
         try {
             const res = await fetch(`${apiUrl}/teacher/classes?teacherId=${currentUser.id}`, 
                 { credentials: "include", headers: getHeaders() });
@@ -309,207 +1180,130 @@
         }
     }
 
-    // Загрузка уроков для модалок
-    async function loadTeacherLessonsForModal(selectId) {
-        try {
-            const res = await fetch(`${apiUrl}/teacher/lessons?teacherId=${currentUser.id}`, 
-                { credentials: "include", headers: getHeaders() });
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-            const select = document.getElementById(selectId);
-            select.innerHTML = '<option value="">Выберите урок</option>';
-            data.forEach(l => {
-                const opt = document.createElement('option');
-                opt.value = l.lessonId || l.id;
-                opt.textContent = `${l.subjectName} — ${l.className} — ${l.topic}`;
-                select.appendChild(opt);
-            });
-        } catch (e) {
-            console.error("Ошибка загрузки уроков для модалки:", e);
-        }
-    }
-
-    // Загрузка учеников для класса
-    async function loadClassStudents(lessonId) {
-        try {
-            // Получаем информацию об уроке чтобы узнать класс
-            if (!lessonId) return;
-            const res = await fetch(`${apiUrl}/teacher/lessons?teacherId=${currentUser.id}`, 
-                { credentials: "include", headers: getHeaders() });
-            if (!res.ok) throw new Error("Не удалось загрузить уроки");
-            const lessons = await res.json();
-            const lesson = lessons.find(l => (l.lessonId || l.id) == lessonId);
-            if (!lesson) {
-                console.error("Урок не найден, доступные уроки:", lessons);
-                throw new Error("Урок не найден");
-            }
-            
-            console.log("Полная информация об уроке:", lesson);
-            
-            // Получаем название класса из урока
-            const className = lesson.className || lesson.name;
-            if (!className) {
-                throw new Error(`Название класса не найдено в уроке: ${JSON.stringify(lesson)}`);
-            }
-            
-            console.log("Название класса из урока:", className);
-            
-            // Загружаем все классы учителя чтобы найти ID по названию
-            const classesRes = await fetch(`${apiUrl}/teacher/classes?teacherId=${currentUser.id}`, 
-                { credentials: "include", headers: getHeaders() });
-            if (!classesRes.ok) throw new Error("Не удалось загрузить классы");
-            const classes = await classesRes.json();
-            console.log("Все классы учителя:", classes);
-            
-            // Ищем класс по названию
-            const classObj = classes.find(c => (c.name || c.className) === className);
-            if (!classObj) {
-                throw new Error(`Класс "${className}" не найден в списке классов учителя`);
-            }
-            
-            const classId = classObj.classId || classObj.id;
-            console.log("Найден класс с ID:", classId);
-            
-            // Загружаем студентов класса
-            const classRes = await fetch(`${apiUrl}/teacher/classes/${classId}/students`, 
-                { credentials: "include", headers: getHeaders() });
-            if (!classRes.ok) throw new Error(`Ошибка загрузки студентов: ${classRes.status}`);
-            const data = await classRes.json();
-            console.log("Студенты класса:", data);
-            
-            const select = document.getElementById("gradeStudentSelect");
-            const select2 = document.getElementById("attendanceStudentSelect");
-            [select, select2].forEach(sel => {
-                if (sel) {
-                    sel.innerHTML = '<option value="">Выберите ученика</option>';
-                    if (Array.isArray(data)) {
-                        data.forEach(s => {
-                            const opt = document.createElement('option');
-                            opt.value = s.studentId || s.id;
-                            opt.textContent = s.fullName || `${s.lastName || ''} ${s.firstName || ''}`;
-                            sel.appendChild(opt);
-                        });
-                    }
-                }
-            });
-        } catch (e) {
-            console.error("Ошибка загрузки учеников:", e);
-        }
-    }
-    async function loadData() {
-        if (currentTab === "lessons") {
-            await loadLessons();
-        } else if (currentTab === "grades") {
-            await loadTeacherLessonsForGrades();
-            // Не вызываем loadGrades без выбранного урока
-        } else if (currentTab === "attendance") {
-            await loadTeacherLessonsForAttendance();
-            // Не вызываем loadAttendance без выбранного урока
-        }
-    }
-
-    // Загрузка уроков в селектор для оценок
-    async function loadTeacherLessonsForGrades() {
-        try {
-            const res = await fetch(`${apiUrl}/teacher/lessons?teacherId=${currentUser.id}`, 
-                { credentials: "include", headers: getHeaders() });
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-            const select = document.getElementById("viewGradeLessonSelect");
-            select.innerHTML = '<option value="">Выберите урок</option>';
-            data.forEach(l => {
-                const opt = document.createElement('option');
-                opt.value = l.lessonId || l.id;
-                opt.textContent = `${l.subjectName} — ${l.className} — ${l.topic}`;
-                select.appendChild(opt);
-            });
-        } catch (e) {
-            console.error("Ошибка загрузки уроков для оценок:", e);
-        }
-    }
-
-    // Загрузка уроков в селектор для посещаемости
-    async function loadTeacherLessonsForAttendance() {
-        try {
-            const res = await fetch(`${apiUrl}/teacher/lessons?teacherId=${currentUser.id}`, 
-                { credentials: "include", headers: getHeaders() });
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-            const select = document.getElementById("viewAttendanceLessonSelect");
-            select.innerHTML = '<option value="">Выберите урок</option>';
-            data.forEach(l => {
-                const opt = document.createElement('option');
-                opt.value = l.lessonId || l.id;
-                opt.textContent = `${l.subjectName} — ${l.className} — ${l.topic}`;
-                select.appendChild(opt);
-            });
-        } catch (e) {
-            console.error("Ошибка загрузки уроков для посещаемости:", e);
-        }
-    }
-
-    // Обработчики изменения селекторов уроков
-    document.getElementById("viewGradeLessonSelect").addEventListener("change", (e) => {
-        loadGrades(e.target.value || null);
-    });
-
-    document.getElementById("viewAttendanceLessonSelect").addEventListener("change", (e) => {
-        loadAttendance(e.target.value || null);
-    });
-
-    // Обработчики загрузки студентов при выборе урока в модалках
-    document.getElementById("gradeLessonSelect").addEventListener("change", (e) => {
-        const lessonId = e.target.value;
-        if (lessonId) {
-            loadClassStudents(lessonId);
+    // Обработчики
+    document.getElementById("classSelect").addEventListener("change", async () => {
+        const classId = document.getElementById("classSelect").value;
+        document.getElementById("subjectSelect").disabled = true;
+        document.getElementById("lessonFilterSelect").disabled = true;
+        document.getElementById("addLessonToClassBtn").disabled = true;
+        
+        if (classId) {
+            await loadJournal(classId);
+            // populateSubjects, populateLessons, renderJournal, renderStats вызываются в конце loadJournal
         }
     });
 
-    document.getElementById("attendanceLessonSelect").addEventListener("change", (e) => {
-        const lessonId = e.target.value;
-        if (lessonId) {
-            loadClassStudents(lessonId);
+    // Обработчик выбора предмета
+    document.getElementById("subjectSelect").addEventListener("change", () => {
+        currentSubject = document.getElementById("subjectSelect").value;
+        console.log("Выбран предмет:", currentSubject);
+        document.getElementById("lessonFilterSelect").disabled = false;
+        populateLessons();
+        if (currentSubject) {
+            renderJournal();
+            renderStats();
         }
     });
 
-    // Кнопки модалок
-    document.getElementById("addGradeBtn").addEventListener("click", async () => {
-        await loadTeacherLessonsForModal("gradeLessonSelect");
-        document.getElementById("gradeModal").style.display = "block";
-        document.getElementById("overlay").style.display = "block";
+    // Обработчик выбора урока
+    document.getElementById("lessonFilterSelect").addEventListener("change", () => {
+        console.log("Выбран урок");
+        if (currentClassId) {
+            renderJournal();
+            renderStats();
+        }
+    });
+
+    // Обработчики фильтра по дате
+    document.getElementById("dateFrom").addEventListener("change", () => {
+        renderJournal();
+        renderStats();
+    });
+    document.getElementById("dateTo").addEventListener("change", () => {
+        renderJournal();
+        renderStats();
+    });
+    document.getElementById("clearDateFilterBtn").addEventListener("click", () => {
+        document.getElementById("dateFrom").value = "";
+        document.getElementById("dateTo").value = "";
+        renderJournal();
+        renderStats();
+    });
+
+    document.getElementById("addLessonToClassBtn").addEventListener("click", async () => {
+        openLessonModalForAdd();
     });
 
     document.getElementById("createLessonBtn").addEventListener("click", async () => {
+        openLessonModalForAdd();
+    });
+
+    async function openLessonModalForAdd() {
         editingLessonId = null;
         await loadTeacherSubjects();
-        await loadTeacherClasses();
-        document.getElementById('lessonSubjectSelect').value = '';
-        document.getElementById('lessonClassSelect').value = '';
+        await loadTeacherClassesForLesson();
+
+        const today = new Date().toISOString().slice(0, 10);
+        
+        if (currentClassId) {
+            document.getElementById('lessonClassSelect').value = currentClassId.toString();
+        } else {
+            document.getElementById('lessonClassSelect').value = '';
+        }
+        if (currentSubject) {
+            const subjectSelect = document.getElementById('lessonSubjectSelect');
+            const opt = [...subjectSelect.options].find(o => o.textContent === currentSubject);
+            if (opt) {
+                subjectSelect.value = opt.value;
+            }
+        } else {
+            document.getElementById('lessonSubjectSelect').value = '';
+        }
+
         document.getElementById('lessonTopic').value = '';
-        document.getElementById('lessonDate').value = '';
+        document.getElementById('lessonDate').value = today;
         document.getElementById('lessonHomework').value = '';
         document.getElementById("lessonModal").style.display = "block";
         document.getElementById("overlay").style.display = "block";
-    });
+    }
 
-    document.getElementById("cancelGradeBtn").addEventListener("click", () => {
-        document.getElementById("gradeModal").style.display = "none";
-        document.getElementById("overlay").style.display = "none";
-    });
+    async function openLessonModalForEdit(lessonId) {
+        const lesson = journalData.lessons.find(l => l.lessonId == lessonId);
+        if (!lesson) {
+            alert('Урок не найден');
+            return;
+        }
+
+        editingLessonId = lesson.lessonId;
+        await loadTeacherSubjects();
+        await loadTeacherClassesForLesson();
+
+        const subjectSelect = document.getElementById('lessonSubjectSelect');
+        if (lesson.subjectId) {
+            subjectSelect.value = lesson.subjectId;
+        } else if (lesson.subjectName) {
+            const opt = [...subjectSelect.options].find(o => o.textContent === lesson.subjectName);
+            if (opt) subjectSelect.value = opt.value;
+        }
+
+        const classSelect = document.getElementById('lessonClassSelect');
+        if (lesson.classId) {
+            classSelect.value = lesson.classId;
+        } else if (lesson.className) {
+            const opt = [...classSelect.options].find(o => o.textContent === lesson.className);
+            if (opt) classSelect.value = opt.value;
+        }
+
+        document.getElementById('lessonTopic').value = lesson.topic || '';
+        document.getElementById('lessonDate').value = lesson.date ? new Date(lesson.date).toISOString().slice(0,10) : '';
+        document.getElementById('lessonHomework').value = lesson.homework || '';
+
+        document.getElementById("lessonModal").style.display = "block";
+        document.getElementById("overlay").style.display = "block";
+    }
 
     document.getElementById("cancelLessonBtn").addEventListener("click", () => {
         document.getElementById("lessonModal").style.display = "none";
-        document.getElementById("overlay").style.display = "none";
-    });
-
-    document.getElementById("addAttendanceBtn").addEventListener("click", async () => {
-        await loadTeacherLessonsForModal("attendanceLessonSelect");
-        document.getElementById("attendanceModal").style.display = "block";
-        document.getElementById("overlay").style.display = "block";
-    });
-
-    document.getElementById("cancelAttendanceBtn").addEventListener("click", () => {
-        document.getElementById("attendanceModal").style.display = "none";
         document.getElementById("overlay").style.display = "none";
     });
 
@@ -537,7 +1331,7 @@
             };
 
             const isEdit = !!editingLessonId;
-            const url = isEdit ? `${apiUrl}/teacher/lessons/${editingLessonId}` : `${apiUrl}/teacher/lessons`;
+            const url = isEdit ? `${apiUrl}/lessons/${editingLessonId}` : `${apiUrl}/teacher/lessons`;
             const method = isEdit ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -556,82 +1350,12 @@
             document.getElementById("lessonHomework").value = "";
             editingLessonId = null;
             await loadLessons();
+            // Если мы в журнале и класс загружен, перезагрузим журнал
+            if (currentTab === "journal" && currentClassId) {
+                await loadJournal(currentClassId);
+            }
         } catch (e) {
             document.getElementById("lessonError").textContent = e.message || "Ошибка при сохранении урока";
-        }
-    });
-
-    // Сохранение оценки
-    document.getElementById("saveGradeBtn").addEventListener("click", async () => {
-        const lessonId = document.getElementById("gradeLessonSelect").value;
-        const studentId = document.getElementById("gradeStudentSelect").value;
-        const value = document.getElementById("gradeValue").value;
-
-        if (!lessonId || !studentId || !value) {
-            document.getElementById("gradeError").textContent = "Заполните все поля";
-            return;
-        }
-
-        try {
-            const payload = { lessonId: Number(lessonId), studentId: Number(studentId), value: Number(value) };
-            console.log('Отправляем оценку:', payload);
-            const res = await fetch(`${apiUrl}/teacher/grades`, {
-                method: "POST",
-                credentials: "include",
-                headers: getHeaders(),
-                body: JSON.stringify(payload)
-            });
-            if (!res.ok) {
-                const txt = await res.text();
-                console.error('Ошибка сервера при добавлении оценки:', res.status, txt);
-                throw new Error(txt || `Ошибка ${res.status}`);
-            }
-            document.getElementById("gradeModal").style.display = "none";
-            document.getElementById("overlay").style.display = "none";
-            // Перезагружаем выбранный урок
-            const selectedLessonId = document.getElementById("viewGradeLessonSelect").value;
-            if (selectedLessonId) {
-                await loadGrades(selectedLessonId);
-            }
-        } catch (e) {
-            document.getElementById("gradeError").textContent = e.message || "Ошибка при сохранении";
-        }
-    });
-
-    // Сохранение посещаемости
-    document.getElementById("saveAttendanceBtn").addEventListener("click", async () => {
-        const lessonId = document.getElementById("attendanceLessonSelect").value;
-        const studentId = document.getElementById("attendanceStudentSelect").value;
-        const status = document.getElementById("attendanceStatus").value;
-
-        if (!lessonId || !studentId || status === "") {
-            document.getElementById("attendanceError").textContent = "Заполните все поля";
-            return;
-        }
-
-        try {
-            const payload = { lessonId: Number(lessonId), studentId: Number(studentId), status: Number(status) };
-            console.log('Отправляем посещаемость:', payload);
-            const res = await fetch(`${apiUrl}/teacher/attendance`, {
-                method: "POST",
-                credentials: "include",
-                headers: getHeaders(),
-                body: JSON.stringify(payload)
-            });
-            if (!res.ok) {
-                const txt = await res.text();
-                console.error('Ошибка сервера при добавлении посещаемости:', res.status, txt);
-                throw new Error(txt || `Ошибка ${res.status}`);
-            }
-            document.getElementById("attendanceModal").style.display = "none";
-            document.getElementById("overlay").style.display = "none";
-            // Перезагружаем выбранный урок
-            const selectedLessonId = document.getElementById("viewAttendanceLessonSelect").value;
-            if (selectedLessonId) {
-                await loadAttendance(selectedLessonId);
-            }
-        } catch (e) {
-            document.getElementById("attendanceError").textContent = e.message || "Ошибка при сохранении";
         }
     });
 
@@ -640,3 +1364,4 @@
 </script>
 </body>
 </html>
+

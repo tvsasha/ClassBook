@@ -1,0 +1,245 @@
+using ClassBook.Application.Facades;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Threading.Tasks;
+
+namespace ClassBook.Controllers
+{
+    [ApiController]
+    [Route("api/director")]
+    [Authorize(Policy = "DirectorOnly")]
+    public class DirectorController : ControllerBase
+    {
+        private readonly AnalyticsFacade _analyticsFacade;
+        private readonly AuditFacade _auditFacade;
+
+        public DirectorController(AnalyticsFacade analyticsFacade, AuditFacade auditFacade)
+        {
+            _analyticsFacade = analyticsFacade;
+            _auditFacade = auditFacade;
+        }
+
+        /// <summary>
+        /// Ежедневный отчет: кто заполнил оценки и посещаемость
+        /// </summary>
+        [HttpGet("report/daily")]
+        public async Task<IActionResult> GetDailyReport([FromQuery] string? date = null)
+        {
+            try
+            {
+                var reportDate = string.IsNullOrEmpty(date) ? DateTime.Now : DateTime.Parse(date);
+                var report = await _analyticsFacade.GetDailyCompletionReportAsync(reportDate);
+                return Ok(report);
+            }
+            catch (FormatException)
+            {
+                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Статистика посещаемости по классам за период
+        /// </summary>
+        [HttpGet("report/attendance")]
+        public async Task<IActionResult> GetAttendanceStatistics([FromQuery] string? startDate = null, [FromQuery] string? endDate = null)
+        {
+            try
+            {
+                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
+                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
+
+                if (start > end)
+                {
+                    return BadRequest("Дата начала не может быть позже даты конца");
+                }
+
+                var stats = await _analyticsFacade.GetAttendanceStatisticsAsync(start, end);
+                return Ok(stats);
+            }
+            catch (FormatException)
+            {
+                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Проблемные ученики: много пропусков или низкие оценки
+        /// Фильтры: классId, studentId, teacherId (опционально)
+        /// </summary>
+        [HttpGet("report/problematic")]
+        public async Task<IActionResult> GetProblematicStudents(
+            [FromQuery] string? startDate = null,
+            [FromQuery] string? endDate = null,
+            [FromQuery] int? classId = null,
+            [FromQuery] int? studentId = null,
+            [FromQuery] int? teacherId = null)
+        {
+            try
+            {
+                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
+                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
+
+                if (start > end)
+                {
+                    return BadRequest("Дата начала не может быть позже даты конца");
+                }
+
+                var report = await _analyticsFacade.GetProblematicStudentsAsync(start, end, classId, studentId, teacherId);
+                return Ok(report);
+            }
+            catch (FormatException)
+            {
+                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Прогресс учителя: сколько уроков провел, оценок и посещаемости заполнил
+        /// </summary>
+        [HttpGet("report/teacher-progress/{teacherId}")]
+        public async Task<IActionResult> GetTeacherProgress(
+            int teacherId,
+            [FromQuery] string? startDate = null,
+            [FromQuery] string? endDate = null)
+        {
+            try
+            {
+                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
+                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
+
+                if (start > end)
+                {
+                    return BadRequest("Дата начала не может быть позже даты конца");
+                }
+
+                var report = await _analyticsFacade.GetTeacherProgressAsync(teacherId, start, end);
+                return Ok(report);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (FormatException)
+            {
+                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Сводка по классам: количество учеников, средние отсутствия, средняя оценка
+        /// </summary>
+        [HttpGet("report/class-summary")]
+        public async Task<IActionResult> GetClassSummary(
+            [FromQuery] string? startDate = null,
+            [FromQuery] string? endDate = null)
+        {
+            try
+            {
+                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
+                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
+
+                if (start > end)
+                {
+                    return BadRequest("Дата начала не может быть позже даты конца");
+                }
+
+                var summary = await _analyticsFacade.GetClassSummaryAsync(start, end);
+                return Ok(summary);
+            }
+            catch (FormatException)
+            {
+                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// История изменений (аудит лог) по типу сущности за период
+        /// </summary>
+        [HttpGet("audit-log")]
+        public async Task<IActionResult> GetAuditLog(
+            [FromQuery] string? entityType = null,
+            [FromQuery] string? startDate = null,
+            [FromQuery] string? endDate = null)
+        {
+            try
+            {
+                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
+                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
+
+                if (start > end)
+                {
+                    return BadRequest("Дата начала не может быть позже даты конца");
+                }
+
+                if (string.IsNullOrEmpty(entityType))
+                {
+                    return BadRequest("Параметр entityType обязателен");
+                }
+
+                var logs = await _auditFacade.GetAuditLogByTypeAsync(entityType, start, end);
+                return Ok(logs);
+            }
+            catch (FormatException)
+            {
+                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Получить все действия конкретного пользователя за период
+        /// </summary>
+        [HttpGet("audit-log/user/{userId}")]
+        public async Task<IActionResult> GetUserAuditLog(
+            int userId,
+            [FromQuery] string? startDate = null,
+            [FromQuery] string? endDate = null)
+        {
+            try
+            {
+                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
+                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
+
+                if (start > end)
+                {
+                    return BadRequest("Дата начала не может быть позже даты конца");
+                }
+
+                var logs = await _auditFacade.GetUserActionsAsync(userId, start, end);
+                return Ok(logs);
+            }
+            catch (FormatException)
+            {
+                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+    }
+}

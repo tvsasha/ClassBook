@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Расписание уроков</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+    body {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+        margin: 0;
+        padding: 40px 0 24px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    h1 { color: #222; margin-bottom: 8px; }
+    .date-time { font-size: 1.05rem; color: #333; margin-bottom: 10px; font-weight: 500; }
+    .week-caption { font-size: 0.95rem; color: #23313f; margin-bottom: 18px; font-weight: 500; }
+
+    .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 14px;
+    }
+
+    button, input, select, textarea {
+        font-family: inherit;
+        font-size: 0.95rem;
+    }
+
+    button {
+        padding: 10px 18px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    button:hover { background: #2980b9; }
+
+    input[type="date"], select, textarea, input[type="text"] {
+        border: 1px solid #c7d3dd;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: white;
+    }
+
+    .table-wrap {
+        width: 95%;
+        max-width: 1600px;
+        overflow: auto;
+        max-height: calc(100vh - 280px);
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+        background: #fff;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+    }
+
+    th, td {
+        border: 2px solid #222;
+        padding: 8px 6px;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    thead th {
+        background: #2c3e50;
+        color: white;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 200;
+        padding: 6px 8px;
+        height: 38px;
+        line-height: 1;
+        box-shadow: 0 2px 0 rgba(0,0,0,0.18);
+    }
+
+    thead th.class-header-top {
+        z-index: 260;
+    }
+
+    .day-header {
+        background: #1a2533 !important;
+        color: white;
+        font-weight: bold;
+        width: 48px;
+        border-right: 6px solid #222 !important;
+        position: sticky;
+        left: 0;
+        z-index: 150;
+    }
+
+    .day-header div {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        text-orientation: mixed;
+        white-space: nowrap;
+        font-size: 1.05rem;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .time-header {
+        background: #34495e !important;
+        color: white;
+        width: 135px;
+        position: sticky;
+        left: 48px;
+        z-index: 140;
+    }
+
+    .lesson-number {
+        font-weight: bold;
+        background: #ecf0f1;
+        width: 40px;
+        position: sticky;
+        left: 183px;
+        z-index: 130;
+    }
+
+    thead .day-header {
+        z-index: 280;
+    }
+
+    thead .time-header {
+        z-index: 270;
+    }
+
+    thead .lesson-number {
+        z-index: 265;
+    }
+
+    .schedule-cell {
+        background: #f8f9fa;
+        cursor: pointer;
+        min-height: 84px;
+        transition: background 0.2s;
+    }
+
+    .schedule-cell:hover { background: #e3f0ff; }
+    .schedule-cell.empty { color: #9aa4ac; }
+    .schedule-cell.has-lesson { background: #eef7ff; }
+    .schedule-cell.selected { outline: 3px solid #3498db; outline-offset: -3px; }
+
+    .cell-subject {
+        font-weight: 600;
+        color: #1f2b37;
+        margin-bottom: 4px;
+    }
+
+    .cell-topic {
+        color: #405160;
+        font-size: 0.88rem;
+        margin-bottom: 4px;
+    }
+
+    .cell-teacher {
+        color: #6a7b88;
+        font-size: 0.8rem;
+    }
+
+    tr.day-end td { border-bottom: 6px solid #222 !important; }
+
+    .logout-btn { background: #dc3545; }
+    .logout-btn:hover { background: #c82333; }
+    .muted-btn { background: #6c7a89; }
+    .muted-btn:hover { background: #55616d; }
+    .danger-btn { background: #c0392b; }
+    .danger-btn:hover { background: #a93226; }
+
+    .status-box {
+        width: min(95%, 1600px);
+        margin-bottom: 12px;
+        min-height: 24px;
+        color: #1f2b37;
+        font-weight: 500;
+    }
+
+    .status-box.error { color: #a61d24; }
+
+    .hint-box {
+        width: min(95%, 1600px);
+        background: rgba(255,255,255,0.78);
+        color: #1f2b37;
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+    }
+
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(16, 24, 32, 0.42);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 500;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+        width: min(560px, calc(100vw - 32px));
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+        padding: 24px;
+    }
+
+    .modal h2 { margin-top: 0; margin-bottom: 10px; }
+    .modal-info { color: #4d5b67; margin-bottom: 16px; }
+    .form-grid { display: grid; gap: 12px; }
+    .form-grid label { display: grid; gap: 6px; text-align: left; font-weight: 500; color: #1f2b37; }
+    textarea { min-height: 110px; resize: vertical; }
+
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        margin-top: 18px;
+    }
+
+    @media (max-width: 768px) {
+        body { padding-top: 20px; }
+        table { font-size: 0.85rem; }
+        .controls { width: 95%; }
+        .controls > * { width: 100%; }
+        .modal-actions > * { width: 100%; }
+    }
+</style>
+</head>
+<body>
+
+<h1>Расписание уроков</h1>
+<div class="date-time" id="dateTime"></div>
+<div class="week-caption" id="weekCaption"></div>
+
+<div class="controls">
+    <button id="addClassBtn">+ Добавить класс</button>
+    <button id="addLessonBtn">+ Добавить урок</button>
+    <button id="prevWeekBtn" class="muted-btn">← Предыдущая неделя</button>
+    <input id="weekStartInput" type="date">
+    <button id="nextWeekBtn" class="muted-btn">Следующая неделя →</button>
+    <button id="refreshBtn">Обновить</button>
+    <button id="logoutBtn" class="logout-btn">Выйти</button>
+</div>
+
+<div id="statusBox" class="status-box"></div>
+<div class="hint-box">
+    Чтобы добавить урок, нажмите на нужную ячейку в сетке или сначала выберите ячейку, а потом кнопку `Добавить урок`.
+    Чтобы расширить таблицу новым классом, используйте кнопку `Добавить класс`.
+</div>
+
+<div class="table-wrap">
+    <table id="scheduleTable">
+        <thead>
+            <tr id="headerRow">
+                <th class="day-header"><div>День</div></th>
+                <th class="time-header">Время</th>
+                <th class="lesson-number">№</th>
+            </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+    </table>
+</div>
+
+<div id="lessonModalBackdrop" class="modal-backdrop">
+    <div class="modal">
+        <h2 id="modalTitle">Редактирование урока</h2>
+        <div id="modalInfo" class="modal-info"></div>
+        <div class="form-grid">
+            <label>
+                Предмет
+                <select id="subjectSelect"></select>
+            </label>
+            <label>
+                Преподаватель
+                <select id="teacherSelect"></select>
+            </label>
+            <label>
+                Домашнее задание
+                <textarea id="homeworkInput" placeholder="Необязательно"></textarea>
+            </label>
+        </div>
+        <div class="modal-actions">
+            <button id="deleteLessonBtn" class="danger-btn">Удалить урок</button>
+            <button id="cancelModalBtn" class="muted-btn">Отмена</button>
+            <button id="saveLessonBtn">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<div id="classModalBackdrop" class="modal-backdrop">
+    <div class="modal">
+        <h2>Новый класс</h2>
+        <div class="modal-info">Добавленный класс сразу появится в сетке расписания для всех недель.</div>
+        <div class="form-grid">
+            <label>
+                Название класса
+                <input id="classNameInput" type="text" maxlength="50" placeholder="Например: 7Б">
+            </label>
+        </div>
+        <div class="modal-actions">
+            <button id="cancelClassModalBtn" class="muted-btn">Отмена</button>
+            <button id="saveClassBtn">Сохранить класс</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_BASE = 'https://localhost:7062/api';
+const DAY_NAMES = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница'];
+
+let metadata = { classes: [], subjects: [], teachers: [], slots: [] };
+let lessons = [];
+let selectedCell = null;
+
+function getCurrentUser() {
+    const raw = sessionStorage.getItem('currentUser');
+    if (!raw || raw === 'null' || raw === 'undefined') {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw);
+    } catch (error) {
+        console.error('raspisanie.html: не удалось распарсить currentUser:', error);
+        sessionStorage.removeItem('currentUser');
+        return null;
+    }
+}
+
+function checkAuth() {
+    if (window.location.pathname.includes('login.html')) {
+        return false;
+    }
+
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+        sessionStorage.setItem('isRedirecting', 'true');
+        window.location.href = 'login.html';
+        return false;
+    }
+
+    const userRole = currentUser.role || currentUser.roleName;
+    const allowedRoles = ['Менеджер расписания', 'Администратор'];
+    if (!allowedRoles.includes(userRole)) {
+        sessionStorage.setItem('isRedirecting', 'true');
+
+        if (userRole === 'Учитель') window.location.href = 'teacher.html';
+        else if (userRole === 'Ученик') window.location.href = 'student-portal.html';
+        else if (userRole === 'Родитель') window.location.href = 'parent-portal.html';
+        else if (userRole === 'Директор') window.location.href = 'director-dashboard.html';
+        else window.location.href = 'login.html';
+
+        return false;
+    }
+
+    sessionStorage.removeItem('isRedirecting');
+    return true;
+}
+
+function updateDateTime() {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('ru-RU', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    const timeStr = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('dateTime').textContent = `${dateStr} • ${timeStr}`;
+}
+
+function toIsoDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function getMonday(date = new Date()) {
+    const result = new Date(date);
+    const day = result.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    result.setDate(result.getDate() + diff);
+    result.setHours(0, 0, 0, 0);
+    return result;
+}
+
+function getSelectedWeekStart() {
+    const raw = document.getElementById('weekStartInput').value;
+    return getMonday(raw ? new Date(raw) : new Date());
+}
+
+function setSelectedWeekStart(date) {
+    document.getElementById('weekStartInput').value = toIsoDate(getMonday(date));
+    updateWeekCaption();
+}
+
+function updateWeekCaption() {
+    const weekStart = getSelectedWeekStart();
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 4);
+    document.getElementById('weekCaption').textContent =
+        `Неделя: ${weekStart.toLocaleDateString('ru-RU')} - ${weekEnd.toLocaleDateString('ru-RU')}`;
+}
+
+function setStatus(message = '', isError = false) {
+    const box = document.getElementById('statusBox');
+    box.textContent = message;
+    box.classList.toggle('error', isError);
+}
+
+async function fetchJson(url, options = {}) {
+    const response = await fetch(url, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        ...options
+    });
+
+    if (response.status === 401) {
+        sessionStorage.removeItem('currentUser');
+        sessionStorage.setItem('authError', 'Сессия истекла. Войдите снова.');
+        window.location.href = 'login.html';
+        throw new Error('Сессия истекла. Выполняется переход на страницу входа.');
+    }
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || 'Ошибка запроса');
+    }
+
+    if (response.status === 204) return null;
+    return response.json();
+}
+
+async function loadMetadata() {
+    metadata = await fetchJson(`${API_BASE}/schedule/editor/metadata`);
+    populateSubjectSelect();
+    populateTeacherSelect();
+}
+
+async function loadWeek() {
+    const weekStart = toIsoDate(getSelectedWeekStart());
+    setStatus('Загрузка расписания...');
+    const data = await fetchJson(`${API_BASE}/schedule/editor/week?weekStart=${weekStart}`);
+    lessons = data.lessons || [];
+    renderTable();
+    setStatus(`Загружено уроков: ${lessons.length}`);
+}
+
+function populateSubjectSelect() {
+    const select = document.getElementById('subjectSelect');
+    select.innerHTML = '<option value="">Выберите предмет</option>';
+
+    metadata.subjects.forEach(subject => {
+        const option = document.createElement('option');
+        option.value = subject.subjectId;
+        option.textContent = `${subject.name} • ${subject.teacherName}`;
+        select.appendChild(option);
+    });
+}
+
+function populateTeacherSelect() {
+    const select = document.getElementById('teacherSelect');
+    select.innerHTML = '<option value="">Выберите преподавателя</option>';
+
+    metadata.teachers.forEach(teacher => {
+        const option = document.createElement('option');
+        option.value = teacher.id;
+        option.textContent = teacher.fullName || teacher.login;
+        select.appendChild(option);
+    });
+}
+
+function buildLessonMap() {
+    const map = new Map();
+    lessons.forEach(lesson => {
+        if (lesson.classId && lesson.scheduleId) {
+            map.set(`${lesson.classId}_${lesson.scheduleId}`, lesson);
+        }
+    });
+    return map;
+}
+
+function renderTable() {
+    const tbody = document.getElementById('tbody');
+    const headerRow = document.getElementById('headerRow');
+    const lessonMap = buildLessonMap();
+
+    tbody.innerHTML = '';
+    while (headerRow.children.length > 3) {
+        headerRow.removeChild(headerRow.lastChild);
+    }
+
+    metadata.classes.forEach(classItem => {
+        const th = document.createElement('th');
+        th.className = 'class-header-top';
+        th.textContent = classItem.name;
+        headerRow.appendChild(th);
+    });
+
+    const slotsByDay = metadata.slots.reduce((acc, slot) => {
+        if (!acc.has(slot.dayOfWeek)) acc.set(slot.dayOfWeek, []);
+        acc.get(slot.dayOfWeek).push(slot);
+        return acc;
+    }, new Map());
+
+    for (let day = 0; day < 5; day++) {
+        const daySlots = (slotsByDay.get(day) || []).sort((a, b) => a.lessonNumber - b.lessonNumber);
+        if (daySlots.length === 0) continue;
+
+        daySlots.forEach((slot, index) => {
+            const tr = document.createElement('tr');
+            if (index === daySlots.length - 1) tr.classList.add('day-end');
+
+            if (index === 0) {
+                const dayCell = document.createElement('td');
+                dayCell.className = 'day-header';
+                dayCell.rowSpan = daySlots.length;
+                dayCell.innerHTML = `<div>${DAY_NAMES[day]}</div>`;
+                tr.appendChild(dayCell);
+            }
+
+            const timeCell = document.createElement('td');
+            timeCell.className = 'time-header';
+            timeCell.textContent = `${slot.startTime} - ${slot.endTime}`;
+            tr.appendChild(timeCell);
+
+            const numberCell = document.createElement('td');
+            numberCell.className = 'lesson-number';
+            numberCell.textContent = slot.lessonNumber;
+            tr.appendChild(numberCell);
+
+            metadata.classes.forEach(classItem => {
+                const lesson = lessonMap.get(`${classItem.classId}_${slot.scheduleId}`) || null;
+                const td = document.createElement('td');
+                td.className = `schedule-cell ${lesson ? 'has-lesson' : 'empty'}`;
+                td.dataset.classId = classItem.classId;
+                td.dataset.scheduleId = slot.scheduleId;
+
+                if (lesson) {
+                    td.innerHTML = `
+                        <div class="cell-subject">${lesson.subjectName}</div>
+                        <div class="cell-topic">${lesson.topic || ''}</div>
+                        <div class="cell-teacher">${lesson.teacherName || ''}</div>
+                    `;
+                } else {
+                    td.textContent = 'Нажмите, чтобы добавить урок';
+                }
+
+                td.addEventListener('click', () => openLessonModal({
+                    classItem,
+                    slot,
+                    lesson
+                }));
+
+                tr.appendChild(td);
+            });
+
+            tbody.appendChild(tr);
+        });
+    }
+}
+
+function getLessonDateForSlot(slot) {
+    const date = getSelectedWeekStart();
+    date.setDate(date.getDate() + slot.dayOfWeek);
+    return date;
+}
+
+function openLessonModal(cell) {
+    selectedCell = cell;
+
+    document.querySelectorAll('.schedule-cell.selected').forEach(item => item.classList.remove('selected'));
+    const selector = `.schedule-cell[data-class-id="${cell.classItem.classId}"][data-schedule-id="${cell.slot.scheduleId}"]`;
+    const selectedElement = document.querySelector(selector);
+    if (selectedElement) {
+        selectedElement.classList.add('selected');
+    }
+
+    document.getElementById('modalTitle').textContent = cell.lesson ? 'Редактирование урока' : 'Новый урок';
+    document.getElementById('modalInfo').textContent =
+        `${cell.classItem.name} • ${DAY_NAMES[cell.slot.dayOfWeek]} • ${cell.slot.lessonNumber} урок • ${cell.slot.startTime}-${cell.slot.endTime} • ${getLessonDateForSlot(cell.slot).toLocaleDateString('ru-RU')}`;
+
+    document.getElementById('subjectSelect').value = cell.lesson?.subjectId || '';
+    document.getElementById('teacherSelect').value = cell.lesson?.teacherId || '';
+    document.getElementById('homeworkInput').value = cell.lesson?.homework || '';
+    document.getElementById('deleteLessonBtn').style.display = cell.lesson ? 'inline-block' : 'none';
+    document.getElementById('lessonModalBackdrop').classList.add('open');
+}
+
+function closeLessonModal() {
+    selectedCell = null;
+    document.getElementById('lessonModalBackdrop').classList.remove('open');
+    document.querySelectorAll('.schedule-cell.selected').forEach(item => item.classList.remove('selected'));
+}
+
+function openClassModal() {
+    document.getElementById('classNameInput').value = '';
+    document.getElementById('classModalBackdrop').classList.add('open');
+    document.getElementById('classNameInput').focus();
+}
+
+function closeClassModal() {
+    document.getElementById('classModalBackdrop').classList.remove('open');
+}
+
+async function saveLesson() {
+    if (!selectedCell) return;
+
+    const subjectId = Number(document.getElementById('subjectSelect').value);
+    const teacherId = Number(document.getElementById('teacherSelect').value);
+    const homework = document.getElementById('homeworkInput').value.trim();
+
+    if (!subjectId) {
+        setStatus('Выберите предмет', true);
+        return;
+    }
+
+    if (!teacherId) {
+        setStatus('Выберите преподавателя', true);
+        return;
+    }
+
+    const payload = {
+        classId: selectedCell.classItem.classId,
+        subjectId,
+        teacherId,
+        scheduleId: selectedCell.slot.scheduleId,
+        date: toIsoDate(getLessonDateForSlot(selectedCell.slot)),
+        homework
+    };
+
+    try {
+        setStatus('Сохраняю урок...');
+        if (selectedCell.lesson) {
+            await fetchJson(`${API_BASE}/schedule/editor/lesson/${selectedCell.lesson.lessonId}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+            });
+        } else {
+            await fetchJson(`${API_BASE}/schedule/editor/lesson`, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+        }
+
+        closeLessonModal();
+        await loadWeek();
+        setStatus('Изменения сохранены');
+    } catch (error) {
+        console.error(error);
+        setStatus(error.message, true);
+    }
+}
+
+async function deleteLesson() {
+    if (!selectedCell?.lesson) return;
+    if (!confirm('Удалить урок из этого слота?')) return;
+
+    try {
+        setStatus('Удаляю урок...');
+        await fetchJson(`${API_BASE}/schedule/editor/lesson/${selectedCell.lesson.lessonId}`, {
+            method: 'DELETE'
+        });
+        closeLessonModal();
+        await loadWeek();
+        setStatus('Урок удалён');
+    } catch (error) {
+        console.error(error);
+        setStatus(error.message, true);
+    }
+}
+
+async function saveClass() {
+    const name = document.getElementById('classNameInput').value.trim();
+
+    if (!name) {
+        setStatus('Введите название класса', true);
+        return;
+    }
+
+    try {
+        setStatus('Создаю класс...');
+        await fetchJson(`${API_BASE}/schedule/editor/class`, {
+            method: 'POST',
+            body: JSON.stringify({ name })
+        });
+        closeClassModal();
+        await loadMetadata();
+        await loadWeek();
+        setStatus(`Класс "${name}" добавлен`);
+    } catch (error) {
+        console.error(error);
+        setStatus(error.message, true);
+    }
+}
+
+async function init() {
+    if (!checkAuth()) return;
+
+    updateDateTime();
+    setInterval(updateDateTime, 30000);
+
+    setSelectedWeekStart(new Date());
+
+    try {
+        await loadMetadata();
+        await loadWeek();
+    } catch (error) {
+        console.error(error);
+        if (!String(error.message || '').includes('Сессия истекла')) {
+            setStatus(error.message, true);
+        }
+    }
+}
+
+document.getElementById('weekStartInput').addEventListener('change', async (event) => {
+    setSelectedWeekStart(new Date(event.target.value));
+    try {
+        await loadWeek();
+    } catch (error) {
+        console.error(error);
+        setStatus(error.message, true);
+    }
+});
+
+document.getElementById('prevWeekBtn').addEventListener('click', async () => {
+    const date = getSelectedWeekStart();
+    date.setDate(date.getDate() - 7);
+    setSelectedWeekStart(date);
+    try {
+        await loadWeek();
+    } catch (error) {
+        console.error(error);
+        setStatus(error.message, true);
+    }
+});
+
+document.getElementById('nextWeekBtn').addEventListener('click', async () => {
+    const date = getSelectedWeekStart();
+    date.setDate(date.getDate() + 7);
+    setSelectedWeekStart(date);
+    try {
+        await loadWeek();
+    } catch (error) {
+        console.error(error);
+        setStatus(error.message, true);
+    }
+});
+
+document.getElementById('refreshBtn').addEventListener('click', async () => {
+    try {
+        await loadMetadata();
+        await loadWeek();
+    } catch (error) {
+        console.error(error);
+        setStatus(error.message, true);
+    }
+});
+
+document.getElementById('saveLessonBtn').addEventListener('click', saveLesson);
+document.getElementById('deleteLessonBtn').addEventListener('click', deleteLesson);
+document.getElementById('cancelModalBtn').addEventListener('click', closeLessonModal);
+document.getElementById('subjectSelect').addEventListener('change', event => {
+    const selectedSubject = metadata.subjects.find(subject => Number(subject.subjectId) === Number(event.target.value));
+    if (!selectedSubject) return;
+
+    const teacherSelect = document.getElementById('teacherSelect');
+    if (!teacherSelect.value && selectedSubject.teacherId) {
+        teacherSelect.value = selectedSubject.teacherId;
+    }
+});
+document.getElementById('addClassBtn').addEventListener('click', openClassModal);
+document.getElementById('saveClassBtn').addEventListener('click', saveClass);
+document.getElementById('cancelClassModalBtn').addEventListener('click', closeClassModal);
+document.getElementById('addLessonBtn').addEventListener('click', () => {
+    if (!selectedCell) {
+        setStatus('Сначала нажмите на ячейку нужного класса и урока', true);
+        return;
+    }
+
+    openLessonModal(selectedCell);
+});
+document.getElementById('lessonModalBackdrop').addEventListener('click', event => {
+    if (event.target.id === 'lessonModalBackdrop') {
+        closeLessonModal();
+    }
+});
+document.getElementById('classModalBackdrop').addEventListener('click', event => {
+    if (event.target.id === 'classModalBackdrop') {
+        closeClassModal();
+    }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    try {
+        await fetch(`${API_BASE}/auth/logout`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+    } catch (error) {
+        console.warn('Ошибка при выходе:', error);
+    }
+
+    sessionStorage.removeItem('currentUser');
+    sessionStorage.removeItem('isRedirecting');
+    window.location.href = 'login.html';
+});
+
+init();
+</script>
+</body>
+</html>

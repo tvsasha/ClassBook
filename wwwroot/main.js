@@ -50,12 +50,35 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
 });
 
 // ===== ВЫХОД =====
-document.getElementById("logoutBtn").addEventListener("click", () => {
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+    try {
+        // Отправляем запрос на выход к серверу
+        const res = await fetch(`${apiUrl}/auth/logout`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" }
+        });
+        
+        // Даже если сервер вернул ошибку, продолжаем локальный выход
+        console.log("Выход выполнен", res.status);
+    } catch (err) {
+        console.warn("Ошибка при выходе с сервера:", err);
+    }
+    
+    // Локальный выход
     currentUser = null;
     usersList.innerHTML = "";
     authBlock.style.display = "block";
     userControls.style.display = "none";
     createBtn.style.display = "none";
+    
+    // Очищаем поля ввода
+    document.getElementById("loginInput").value = "";
+    document.getElementById("passwordInput").value = "";
+    document.getElementById("loginError").textContent = "";
+    
+    // Показываем сообщение об успешном выходе
+    alert("Вы успешно вышли из системы");
 });
 
 // ===== ЗАГРУЗКА ПОЛЬЗОВАТЕЛЕЙ =====

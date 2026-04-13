@@ -3,6 +3,7 @@ using ClassBook.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace ClassBook.Controllers
@@ -36,13 +37,17 @@ namespace ClassBook.Controllers
         {
             try
             {
+                var currentUserIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                int.TryParse(currentUserIdClaim, out var currentUserId);
+
                 var lesson = await _facade.CreateLessonAsync(
                     dto.SubjectId,
                     dto.ClassId,
                     dto.TeacherId,
                     dto.Topic,
                     dto.Date,
-                    dto.Homework
+                    dto.Homework,
+                    currentUserId > 0 ? currentUserId : null
                 );
 
                 // Загружаем данные одним запросом
@@ -78,14 +83,28 @@ namespace ClassBook.Controllers
             }
         }
 
-        // PUT: api/lessons/{id} — обновление урока
+        // PUT: api/lessons/{id} — обновление урока (админ/учитель)
         [HttpPut("{id}")]
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Roles = "Учитель,Администратор")]
         public async Task<IActionResult> UpdateLesson(int id, [FromBody] CreateLessonRequest dto)
         {
             try
             {
-                var updated = await _facade.UpdateLessonAsync(id, dto.SubjectId, dto.ClassId, dto.TeacherId, dto.Topic, dto.Date, dto.Homework);
+                var lesson = await _db.Lessons.FindAsync(id);
+                if (lesson == null) return NotFound("Урок не найден");
+
+                var currentUserIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!int.TryParse(currentUserIdClaim, out var currentUserId))
+                {
+                    return Unauthorized("Не удалось определить пользователя");
+                }
+
+                if (User.IsInRole("Учитель") && lesson.TeacherId != currentUserId)
+                {
+                    return Forbid("Вы можете редактировать только свои уроки");
+                }
+
+                var updated = await _facade.UpdateLessonAsync(id, dto.SubjectId, dto.ClassId, dto.TeacherId, dto.Topic, dto.Date, dto.Homework, currentUserId);
 
                 var result = await _db.Lessons
                     .Include(l => l.Subject)
@@ -123,14 +142,27 @@ namespace ClassBook.Controllers
             }
         }
 
-        // DELETE: api/lessons/{lessonId} — удаление урока
+        // DELETE: api/lessons/{lessonId} — удаление урока (Учитель/Админ)
         [HttpDelete("{lessonId}")]
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Roles = "Учитель,Администратор")]
         public async Task<IActionResult> DeleteLesson(int lessonId)
         {
             try
             {
-                await _facade.DeleteLessonAsync(lessonId);
+                var lesson = await _facade.GetLessonByIdAsync(lessonId);
+                if (lesson == null)
+                    return NotFound("Урок не найден");
+
+                var currentUserIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!int.TryParse(currentUserIdClaim, out var currentUserId))
+                {
+                    return Unauthorized("Не удалось определить пользователя");
+                }
+
+                if (User.IsInRole("Учитель") && lesson.TeacherId != currentUserId)
+                    return Forbid("Вы можете удалять только свои уроки");
+
+                await _facade.DeleteLessonAsync(lessonId, currentUserId);
                 return NoContent();
             }
             catch (KeyNotFoundException ex)

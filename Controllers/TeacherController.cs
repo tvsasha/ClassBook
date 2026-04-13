@@ -95,7 +95,18 @@ namespace ClassBook.Controllers
                     dto.Homework
                 );
 
-                return CreatedAtAction(nameof(GetLessons), new { id = lesson.LessonId }, lesson);
+                var response = new
+                {
+                    lesson.LessonId,
+                    lesson.SubjectId,
+                    lesson.ClassId,
+                    lesson.TeacherId,
+                    lesson.Topic,
+                    lesson.Date,
+                    lesson.Homework
+                };
+
+                return CreatedAtAction(nameof(GetLessons), new { id = lesson.LessonId }, response);
             }
             catch (InvalidOperationException ex)
             {
@@ -107,7 +118,70 @@ namespace ClassBook.Controllers
             }
         }
 
-        // ── Оценки и посещаемость ──────────────────────────────────────────────────────────────────────
+        // ── Удаление урока для учителя/админа ───────────────────────────────────────────────────────────
+        [HttpPut("lessons/{lessonId}")]
+        public async Task<IActionResult> UpdateLesson(int lessonId, [FromBody] CreateLessonDto dto)
+        {
+            try
+            {
+                var existingLesson = await _lessonFacade.GetLessonByIdAsync(lessonId);
+                if (existingLesson == null)
+                    return NotFound("Урок не найден");
+
+                var currentUserId = GetCurrentUserId();
+                if (existingLesson.TeacherId != currentUserId && !User.IsInRole("Администратор"))
+                    return Forbid("Вы можете редактировать только свои уроки");
+
+                var updatedLesson = await _lessonFacade.UpdateLessonAsync(
+                    lessonId,
+                    dto.SubjectId,
+                    dto.ClassId,
+                    dto.TeacherId,
+                    dto.Topic,
+                    dto.Date,
+                    dto.Homework
+                );
+
+                return Ok(updatedLesson);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("lessons/{lessonId}")]
+        public async Task<IActionResult> DeleteLesson(int lessonId)
+        {
+            try
+            {
+                var lesson = await _lessonFacade.GetLessonByIdAsync(lessonId);
+                if (lesson == null)
+                    return NotFound("Урок не найден");
+
+                var currentUserId = GetCurrentUserId();
+                if (lesson.TeacherId != currentUserId && !User.IsInRole("Администратор"))
+                    return Forbid("Вы можете удалять только свои уроки");
+
+                await _lessonFacade.DeleteLessonAsync(lessonId);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        // ── Удаление урока из панели учителя ────────────────────────────────────────────────────────
+        
 
         // ── Оценки и посещаемость ──────────────────────────────────────────────────────────────────────
 

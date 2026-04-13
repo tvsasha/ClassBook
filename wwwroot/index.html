@@ -47,6 +47,12 @@
 
 <div id="usersTab" class="tab-content active">
     <button id="createUserBtn" class="create-btn">Добавить пользователя</button>
+    <div style="display:flex; gap:15px; margin-bottom:15px; flex-wrap:wrap;">
+        <input id="userSearchInput" placeholder="Поиск по имени или логину" style="padding:10px; border:1px solid #ddd; border-radius:6px; flex:1; min-width:200px;">
+        <select id="roleFilter" style="padding:10px; border:1px solid #ddd; border-radius:6px; min-width:150px;">
+            <option value="">Все роли</option>
+        </select>
+    </div>
     <ul id="usersList"></ul>
 </div>
  
@@ -90,6 +96,13 @@
     <input id="modalLessonDate" type="date" class="modal-field hidden">
     <textarea id="modalHomework" placeholder="Домашнее задание (опционально)" class="modal-field hidden" style="width:100%;height:80px;margin-top:6px;border-radius:8px;padding:8px;"></textarea>
     <input id="modalPassword" type="password" placeholder="Пароль (опционально)" class="modal-field hidden">
+    <select id="modalStudent" class="modal-field hidden">
+        <option value="">Выберите ученика для привязки (для родителей)</option>
+    </select>
+    <div id="modalAttachedStudent" class="modal-field hidden" style="background:#f0f0f0;padding:10px;border-radius:6px;margin-top:6px;">
+        <strong>Текущий привязанный ученик:</strong>
+        <p id="modalAttachedStudentText" style="margin:8px 0;"></p>
+    </div>
     <button id="saveModalBtn" class="create-btn">Сохранить</button>
     <button id="cancelModalBtn" style="background:#6c757d;color:white;">Отмена</button>
     <p id="modalError" class="error"></p>
@@ -98,10 +111,12 @@
 <script>
     const apiUrl = "https://localhost:7062/api";
 
-    let currentUser = JSON.parse(localStorage.getItem("currentUser"));
+    let currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "null");
     let currentTab = "users";
     let editType = null;
     let editId = null;
+    let allUsers = [];  // Для фильтрации пользователей
+    let allRoles = [];  // Для фильтрации по ролям
 
     console.log("currentUser:", currentUser);
 
@@ -110,20 +125,41 @@
         return { "Content-Type": "application/json" };
     }
 
-    // Проверка авторизации
-    if (!currentUser) {
-        console.log("Перенаправление на логин, т.к. нет авторизации");
-        window.location.href = "login.html";
-        throw new Error("Not authorized");
-    }
-    
-    // Проверка, что это администратор (проверяем role, который отправляет сервер)
-    const isAdmin = currentUser.role === "Администратор";
-    if (!isAdmin) {
-        console.log("Перенаправление на логин, т.к. не администратор. Роль:", currentUser.role);
-        window.location.href = "login.html";
-        throw new Error("Not admin");
-    }
+    // Проверка авторизации и роли
+    (function checkAuth() {
+        if (!currentUser) {
+            console.log("Перенаправление на логин, т.к. нет авторизации");
+            sessionStorage.setItem("isRedirecting", "true");
+            window.location.href = "login.html";
+            return;
+        }
+        
+        const userRole = currentUser.role || currentUser.roleName;
+        const isAdmin = userRole === "Администратор";
+        if (!isAdmin) {
+            console.log("Перенаправление, т.к. не администратор. Роль:", userRole);
+            sessionStorage.setItem("isRedirecting", "true");
+            
+            if (userRole === "Учитель") {
+                window.location.href = "teacher.html";
+            } else if (userRole === "Ученик") {
+                window.location.href = "student-portal.html";
+            } else if (userRole === "Родитель") {
+                window.location.href = "parent-portal.html";
+            } else if (userRole === "Менеджер расписания") {
+                window.location.href = "raspisanie.html";
+            } else if (userRole === "Директор") {
+                window.location.href = "director-dashboard.html";
+            } else {
+                window.location.href = "login.html";
+            }
+            return;
+        }
+        
+        console.log("index.html: ✓ авторизация успешна, роль:", userRole);
+        // Очищаем флаг, так как мы на правильной странице
+        sessionStorage.removeItem("isRedirecting");
+    })();
 
     // Переключение вкладок
     document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -139,13 +175,59 @@
 
     // ВЫХОД
     document.getElementById("logoutBtn").addEventListener("click", () => {
-        localStorage.removeItem("currentUser");
+        sessionStorage.removeItem("currentUser");
+        sessionStorage.removeItem("isRedirecting");
         window.location.href = "login.html";
     });
 
     // МОДАЛКА
     const modal = document.getElementById("editModal");
     const overlay = document.getElementById("overlay");
+
+    // Функция фильтрации пользователей
+    function filterAndDisplayUsers() {
+        const searchText = document.getElementById("userSearchInput").value.toLowerCase().trim();
+        const roleFilter = document.getElementById("roleFilter").value;
+        
+        const filtered = allUsers.filter(u => {
+            const matchesSearch = !searchText || 
+                (u.fullName && u.fullName.toLowerCase().includes(searchText)) || 
+                (u.login && u.login.toLowerCase().includes(searchText));
+            
+            const matchesRole = !roleFilter || Number(u.roleId) === Number(roleFilter);
+            
+            return matchesSearch && matchesRole;
+        });
+
+        const list = document.getElementById("usersList");
+        list.innerHTML = "";
+        
+        if (filtered.length === 0) {
+            list.innerHTML = "<p style='color:#999;'>Пользователей не найдено</p>";
+            return;
+        }
+
+        filtered.forEach(u => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span>${u.fullName || u.login} (${u.roleName})</span>
+                <button class="edit-btn">Редактировать</button>
+                <button class="delete-btn" style="background:#dc3545;color:white;">Удалить</button>`;
+            const editBtn = li.querySelector(".edit-btn");
+            const deleteBtn = li.querySelector(".delete-btn");
+            editBtn.addEventListener("click", () => openModal('user', {id: u.id, login: u.login, fullName: u.fullName, roleId: u.roleId}));
+            deleteBtn.addEventListener("click", async () => {
+                if (!confirm(`Удалить пользователя ${u.fullName || u.login}?`)) return;
+                const resDel = await fetch(`${apiUrl}/users/${u.id}`, { method: 'DELETE', credentials: 'include', headers: getHeaders() });
+                if (resDel.ok) {
+                    await loadData();
+                } else {
+                    const txt = await resDel.text();
+                    alert(txt || 'Ошибка при удалении');
+                }
+            });
+            list.appendChild(li);
+        });
+    }
     const modalTitle = document.getElementById("modalTitle");
     const modalFirstName = document.getElementById("modalFirstName");
     const modalLastName = document.getElementById("modalLastName");
@@ -160,6 +242,7 @@
     const modalLessonDate = document.getElementById("modalLessonDate");
     const modalHomework = document.getElementById("modalHomework");
     const modalPassword = document.getElementById("modalPassword");
+    const modalStudent = document.getElementById("modalStudent");
     const modalError = document.getElementById("modalError");
 
     function resetModal() {
@@ -172,6 +255,7 @@
         modalRole.innerHTML = "";
         modalTeacher.innerHTML = "";
         modalClass.innerHTML = "";
+        modalStudent.innerHTML = '<option value="">Выберите ученика для привязки (для родителей)</option>';
         modalFirstName.classList.add("hidden");
         modalLastName.classList.add("hidden");
         modalBirthDate.classList.add("hidden");
@@ -185,7 +269,35 @@
         modalLessonDate.classList.add("hidden");
         modalHomework.classList.add("hidden");
         modalPassword.classList.add("hidden");
+        modalStudent.classList.add("hidden");
+        document.getElementById("modalAttachedStudent").classList.add("hidden");
+        document.getElementById("modalAttachedStudentText").textContent = "";
         modalError.textContent = "";
+    }
+
+    // Обработчик изменения роли в модальном окне
+    async function handleRoleChange() {
+        const selectedRoleId = Number(modalRole.value);  // Преобразуем в число!
+        try {
+            const selectRole = await fetch(`${apiUrl}/roles`, { credentials: "include", headers: getHeaders() });
+            const roles = await selectRole.json();
+            const parentRole = roles.find(r => r.id === selectedRoleId);
+            
+            if (parentRole && parentRole.name === 'Родитель') {
+                modalStudent.classList.remove("hidden");
+                if (editId) {
+                    document.getElementById("modalAttachedStudent").classList.remove("hidden");
+                }
+                await loadAllStudents();
+            } else {
+                modalStudent.classList.add("hidden");
+                document.getElementById("modalAttachedStudent").classList.add("hidden");
+            }
+        } catch (e) {
+            console.error('Ошибка при изменении роли:', e);
+            modalStudent.classList.add("hidden");
+            document.getElementById("modalAttachedStudent").classList.add("hidden");
+        }
     }
 
     async function openModal(type, item = null) {
@@ -205,12 +317,60 @@
             modalName.placeholder = "ФИО *";
             modalLogin.placeholder = "Логин *";
             modalPassword.placeholder = item ? "Новый пароль (опционально)" : "Пароль *";
-            loadRoles();
+            
+            // Загружаем роли
+            await loadRoles();
+            
             if (item) {
                 modalName.value = item.fullName || item.login;
                 modalLogin.value = item.login;
                 modalRole.value = item.roleId || "";
+                
+                // При редактировании родителя показываем поле для выбора студента
+                if (item.roleId) {
+                    const selectRole = await fetch(`${apiUrl}/roles`, { credentials: "include", headers: getHeaders() });
+                    const roles = await selectRole.json();
+                    const parentRole = roles.find(r => r.id === Number(item.roleId));  // Преобразуем в число!
+                    if (parentRole && parentRole.name === 'Родитель') {
+                        modalStudent.classList.remove("hidden");
+                        document.getElementById("modalAttachedStudent").classList.remove("hidden");
+                        await loadAllStudents();
+                        
+                        // Загружаем привязанных студентов для этого родителя (админом)
+                        try {
+                            const parentRes = await fetch(`${apiUrl}/users/${item.id}/students`, { 
+                                credentials: "include", 
+                                headers: getHeaders() 
+                            });
+                            if (parentRes.ok) {
+                                const students = await parentRes.json();
+                                console.log('Привязанные студенты родителя', item.id, ':', students);
+                                if (students.length > 0) {
+                                    const student = students[0];
+                                    document.getElementById("modalAttachedStudentText").textContent = 
+                                        `${student.firstName} ${student.lastName}`;
+                                    console.log('Показан привязанный студент:', student.firstName, student.lastName);
+                                } else {
+                                    document.getElementById("modalAttachedStudentText").textContent = "Не привязан";
+                                    console.log('Привязанных студентов нет');
+                                }
+                            } else {
+                                document.getElementById("modalAttachedStudentText").textContent = "Не привязан";
+                                console.warn('Ошибка загрузки привязанных студентов:', parentRes.status);
+                            }
+                        } catch (e) {
+                            console.warn('Ошибка при загрузке студентов родителя:', e);
+                            document.getElementById("modalAttachedStudentText").textContent = "Не привязан";
+                        }
+                    }
+                }
             }
+            
+            // Удаляем старый обработчик если он был
+            modalRole.removeEventListener("change", handleRoleChange);
+            
+            // При изменении роли показываем/скрываем поле студента
+            modalRole.addEventListener("change", handleRoleChange);
         } else if (type === "student") {
             modalTitle.textContent = item ? "Редактировать ученика" : "Новый ученик";
             modalFirstName.classList.remove("hidden");
@@ -226,6 +386,12 @@
                 modalBirthDate.value = item.birthDate ? item.birthDate.split('T')[0] : "";
                 // Убедимся, что опции уже загружены, затем установим значение
                 try { modalClass.value = item.classId || ""; } catch (e) { /* ignore */ }
+            } else {
+                // автозаполняем класс из фильтра, если выбран
+                const classFilter = document.getElementById('classFilter');
+                if (classFilter && classFilter.value) {
+                    try { modalClass.value = classFilter.value; } catch (e) { /* ignore */ }
+                }
             }
         } else if (type === "subject") {
             modalTitle.textContent = item ? "Редактировать предмет" : "Новый предмет";
@@ -331,6 +497,49 @@
             if (!res.ok) {
                 const txt = await res.text(); throw new Error(txt || "Ошибка сервера");
             }
+            
+            // Если это пользователь и его роль - родитель, привязываем студента (только при редактировании)
+            if (editType === "user" && editId) {
+                const roleId = Number(modalRole.value);  // Преобразуем в число!
+                const selectRole = await fetch(`${apiUrl}/roles`, { credentials: "include", headers: getHeaders() });
+                const roles = await selectRole.json();
+                const parentRole = roles.find(r => r.id === roleId);
+                
+                console.log('Поиск роли родителя:', { roleId, roles, parentRole });
+                
+                if (parentRole && parentRole.name === 'Родитель' && modalStudent.value) {
+                    try {
+                        console.log('Привязываем студента:', { parentId: editId, studentId: modalStudent.value });
+                        const attachRes = await fetch(`${apiUrl}/admin/students/parent-students`, {
+                            method: 'POST',
+                            credentials: "include",
+                            headers: getHeaders(),
+                            body: JSON.stringify({
+                                parentId: Number(editId),
+                                studentId: Number(modalStudent.value)
+                            })
+                        });
+                        console.log('Ответ от сервера:', attachRes.status);
+                        if (!attachRes.ok) {
+                            const txt = await attachRes.text();
+                            console.error('Ошибка при привязке студента (статус', attachRes.status + '):', txt);
+                        } else {
+                            const result = await attachRes.json();
+                            console.log('✓ Студент успешно привязан:', result);
+                        }
+                    } catch (e) {
+                        console.error('Сетевая ошибка при привязке студента:', e);
+                    }
+                } else {
+                    console.log('Условие для привязки не выполнено:', {
+                        isParent: parentRole?.name === 'Родитель',
+                        hasStudent: !!modalStudent.value,
+                        roleId: roleId,
+                        parentRoleName: parentRole?.name
+                    });
+                }
+            }
+            
             closeModal();
             loadData();
         } catch (err) {
@@ -345,17 +554,24 @@
             if (!res.ok) throw new Error();
             const classes = await res.json();
             const filter = document.getElementById('classFilter');
+            const selectedFilterValue = filter ? filter.value : "";
             if (filter) {
                 filter.innerHTML = '<option value="">Выберите класс</option>';
                 classes.forEach(c => {
                     const opt = document.createElement('option'); opt.value = c.classId || c.id; opt.textContent = c.name; filter.appendChild(opt);
                 });
+                if (selectedFilterValue) {
+                    filter.value = selectedFilterValue;
+                }
             }
             if (modalClass) {
                 modalClass.innerHTML = '<option value="">Выберите класс</option>';
                 classes.forEach(c => {
                     const opt = document.createElement('option'); opt.value = c.classId || c.id; opt.textContent = c.name; modalClass.appendChild(opt);
                 });
+                if (!modalClass.value && selectedFilterValue) {
+                    modalClass.value = selectedFilterValue;
+                }
             }
         } catch (e) { modalError.textContent = "Не удалось загрузить классы"; }
     }
@@ -370,9 +586,28 @@
             list.innerHTML = '';
             data.forEach(s => {
                 const li = document.createElement('li');
-                li.innerHTML = `<span>${s.lastName} ${s.firstName} (${new Date(s.birthDate).toLocaleDateString()})</span> <button class="edit-btn">Редактировать</button>`;
+                li.innerHTML = `
+                    <span>${s.lastName} ${s.firstName} (${new Date(s.birthDate).toLocaleDateString()})</span>
+                    <div style="display:flex; gap:8px;">
+                        <button class="edit-btn">Редактировать</button>
+                        <button class="delete-btn" style="background:#dc3545;color:white;">Удалить</button>
+                    </div>`;
                 const editBtn = li.querySelector('.edit-btn');
+                const deleteBtn = li.querySelector('.delete-btn');
                 editBtn.addEventListener('click', () => openModal('student', { id: s.studentId, firstName: s.firstName, lastName: s.lastName, birthDate: s.birthDate, classId: s.classId }));
+                deleteBtn.addEventListener('click', async () => {
+                    if (!confirm(`Удалить ученика ${s.lastName} ${s.firstName}?`)) return;
+                    try {
+                        const delRes = await fetch(`${apiUrl}/admin/students/${s.studentId}`, { method: 'DELETE', credentials: 'include', headers: getHeaders() });
+                        if (!delRes.ok) {
+                            const txt = await delRes.text();
+                            throw new Error(txt || 'Ошибка удаления');
+                        }
+                        await loadStudentsByClass(classId);
+                    } catch (err) {
+                        alert('Не удалось удалить ученика: ' + err.message);
+                    }
+                });
                 list.appendChild(li);
             });
         } catch (e) {
@@ -386,15 +621,40 @@
             const res = await fetch(`${apiUrl}/roles`, { credentials: "include", headers: getHeaders() });
             if (!res.ok) throw new Error();
             const roles = await res.json();
-            modalRole.innerHTML = '<option value="">Выберите роль</option>';
+            modalRole.innerHTML = "";
             roles.forEach(r => {
                 const opt = document.createElement("option");
-                opt.value = r.roleId;
-                opt.textContent = r.roleName;
+                opt.value = r.id;
+                opt.textContent = r.name;
                 modalRole.appendChild(opt);
             });
         } catch (e) {
-            modalError.textContent = "Не удалось загрузить роли";
+            modalError.textContent = "Ошибка загрузки ролей";
+        }
+    }
+
+    // Загрузка всех студентов для привязки к родителям
+    async function loadAllStudents() {
+        try {
+            const res = await fetch(`${apiUrl}/admin/students`, { credentials: "include", headers: getHeaders() });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const students = await res.json();
+            console.log('Загружено студентов:', students.length);
+            console.log('Данные студентов:', students);
+            
+            modalStudent.innerHTML = '<option value="">-- Выберите ученика для привязки --</option>';
+            students.forEach(s => {
+                const opt = document.createElement("option");
+                opt.value = s.studentId;
+                const className = s.class ? s.class.name : (s.className || 'Класс не определен');
+                opt.textContent = `${s.firstName} ${s.lastName} (${className})`;
+                modalStudent.appendChild(opt);
+                console.log('Добавлен студент:', opt.textContent, 'ID:', opt.value);
+            });
+            console.log('Всего опций в dropdown:', modalStudent.options.length);
+        } catch (e) {
+            console.error('Ошибка загрузки студентов:', e);
+            modalError.textContent = "Ошибка загрузки студентов: " + e.message;
         }
     }
 
@@ -483,19 +743,36 @@
     async function loadData() {
         if (currentTab === "users") {
             try {
+                // Загружаем роли для фильтра
+                const rolesRes = await fetch(`${apiUrl}/roles`, { credentials: "include", headers: getHeaders() });
+                if (rolesRes.ok) {
+                    allRoles = await rolesRes.json();
+                    const roleFilter = document.getElementById("roleFilter");
+                    roleFilter.innerHTML = '<option value="">Все роли</option>';
+                    allRoles.forEach(r => {
+                        const opt = document.createElement("option");
+                        opt.value = r.id;
+                        opt.textContent = r.name;
+                        roleFilter.appendChild(opt);
+                    });
+                }
+                
+                // Загружаем пользователей
                 const res = await fetch(`${apiUrl}/users`, { credentials: "include", headers: getHeaders() });
                 if (!res.ok) throw new Error();
-                const data = await res.json();
-                const list = document.getElementById("usersList");
-                list.innerHTML = "";
-                data.forEach(u => {
-                    const li = document.createElement("li");
-                    li.innerHTML = `<span>${u.fullName || u.login} (${u.roleName})</span>
-                        <button class="edit-btn">Редактировать</button>`;
-                    const editBtn = li.querySelector(".edit-btn");
-                    editBtn.addEventListener("click", () => openModal('user', {id: u.id, login: u.login, fullName: u.fullName, roleId: u.roleId}));
-                    list.appendChild(li);
-                });
+                allUsers = await res.json();
+                
+                // Очищаем поиск и фильтр при переходе на вкладку
+                document.getElementById("userSearchInput").value = "";
+                document.getElementById("roleFilter").value = "";
+                
+                // Отображаем отфильтрованных пользователей
+                filterAndDisplayUsers();
+                
+                // Добавляем обработчики для поиска и фильтра
+                document.getElementById("userSearchInput").addEventListener("input", filterAndDisplayUsers);
+                document.getElementById("roleFilter").addEventListener("change", filterAndDisplayUsers);
+                
             } catch (e) {
                 document.getElementById("usersList").innerHTML = "<p style='color:red'>Ошибка загрузки</p>";
             }
@@ -524,9 +801,21 @@
                 data.forEach(s => {
                     const li = document.createElement("li");
                     li.innerHTML = `<span>${s.name} (Учитель: ${s.teacherName || 'не назначен'})</span>
-                        <button class="edit-btn">Редактировать</button>`;
+                        <button class="edit-btn">Редактировать</button>
+                        <button class="delete-btn" style="background:#dc3545;color:white;">Удалить</button>`;
                     const editBtn = li.querySelector(".edit-btn");
+                    const deleteBtn = li.querySelector(".delete-btn");
                     editBtn.addEventListener("click", () => openModal('subject', {id: s.subjectId, name: s.name, teacherId: s.teacherId || ''}));
+                    deleteBtn.addEventListener("click", async () => {
+                        if (!confirm(`Удалить предмет ${s.name}?`)) return;
+                        const resDel = await fetch(`${apiUrl}/subjects/${s.subjectId}`, { method: 'DELETE', credentials: 'include', headers: getHeaders() });
+                        if (resDel.ok) {
+                            await loadData();
+                        } else {
+                            const txt = await resDel.text();
+                            alert(txt || 'Ошибка при удалении');
+                        }
+                    });
                     list.appendChild(li);
                 });
             } catch (e) {
@@ -542,9 +831,21 @@
                 data.forEach(c => {
                     const li = document.createElement("li");
                     li.innerHTML = `<span>${c.name}</span>
-                        <button class="edit-btn">Редактировать</button>`;
+                        <button class="edit-btn">Редактировать</button>
+                        <button class="delete-btn" style="background:#dc3545;color:white;">Удалить</button>`;
                     const editBtn = li.querySelector(".edit-btn");
+                    const deleteBtn = li.querySelector(".delete-btn");
                     editBtn.addEventListener("click", () => openModal('class', {id: c.classId, name: c.name}));
+                    deleteBtn.addEventListener("click", async () => {
+                        if (!confirm(`Удалить класс ${c.name}?`)) return;
+                        const resDel = await fetch(`${apiUrl}/classes/${c.classId}`, { method: 'DELETE', credentials: 'include', headers: getHeaders() });
+                        if (resDel.ok) {
+                            await loadData();
+                        } else {
+                            const txt = await resDel.text();
+                            alert(txt || 'Ошибка при удалении');
+                        }
+                    });
                     list.appendChild(li);
                 });
             } catch (e) {

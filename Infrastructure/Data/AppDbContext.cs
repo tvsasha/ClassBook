@@ -15,6 +15,9 @@ namespace ClassBook.Infrastructure.Data
         public DbSet<Class> Classes { get; set; } = null!;
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
+        public DbSet<Schedule> Schedules => Set<Schedule>();
+        public DbSet<StudentParent> StudentParents => Set<StudentParent>();
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -25,7 +28,9 @@ namespace ClassBook.Infrastructure.Data
                 new Role { Id = 1, Name = "Администратор" },
                 new Role { Id = 2, Name = "Учитель" },
                 new Role { Id = 3, Name = "Ученик" },
-                new Role { Id = 4, Name = "Родитель" }
+                new Role { Id = 4, Name = "Родитель" },
+                new Role { Id = 5, Name = "Менеджер расписания" },
+                new Role { Id = 6, Name = "Директор" }
             );
 
             // 🔹 User (учителя и админы)
@@ -97,6 +102,24 @@ namespace ClassBook.Infrastructure.Data
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
+            // 🔹 Schedule (фиксированные слоты расписания)
+            modelBuilder.Entity<Schedule>(entity =>
+            {
+                entity.HasKey(s => s.ScheduleId);
+                entity.Property(s => s.DayOfWeek).IsRequired();
+                entity.Property(s => s.LessonNumber).IsRequired();
+                entity.Property(s => s.StartTime).IsRequired();
+                entity.Property(s => s.EndTime).IsRequired();
+                entity.Property(s => s.CreatedAt).IsRequired();
+                entity.Property(s => s.UpdatedAt).IsRequired();
+
+                entity.HasMany(s => s.Lessons).WithOne(l => l.Schedule)
+                      .HasForeignKey(l => l.ScheduleId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(s => new { s.DayOfWeek, s.LessonNumber }).IsUnique();
+            });
+
             // 🔹 Lessons (TeacherId → User.Id)
             modelBuilder.Entity<Lesson>(entity =>
             {
@@ -118,6 +141,11 @@ namespace ClassBook.Infrastructure.Data
                       .WithMany(u => u.Lessons)
                       .HasForeignKey(l => l.TeacherId)
                       .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(l => l.Schedule)
+                      .WithMany(s => s.Lessons)
+                      .HasForeignKey(l => l.ScheduleId)
+                      .OnDelete(DeleteBehavior.SetNull);
 
                 entity.HasMany(l => l.Grades)
                       .WithOne(g => g.Lesson)
@@ -158,6 +186,42 @@ namespace ClassBook.Infrastructure.Data
                       .OnDelete(DeleteBehavior.Cascade);
                 entity.HasIndex(a => new { a.StudentId, a.LessonId })
                       .IsUnique();
+            });
+
+            // 🔹 StudentParent (связь ученик-родитель, many-to-many)
+            modelBuilder.Entity<StudentParent>(entity =>
+            {
+                entity.HasKey(sp => sp.StudentParentId);
+
+                entity.HasOne(sp => sp.Student)
+                      .WithMany(s => s.Parents)
+                      .HasForeignKey(sp => sp.StudentId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(sp => sp.Parent)
+                      .WithMany(u => u.StudentParents)
+                      .HasForeignKey(sp => sp.ParentId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(sp => new { sp.StudentId, sp.ParentId }).IsUnique();
+            });
+
+            // 🔹 AuditLog (история всех изменений)
+            modelBuilder.Entity<AuditLog>(entity =>
+            {
+                entity.HasKey(al => al.AuditLogId);
+                entity.Property(al => al.EntityType).IsRequired().HasMaxLength(50);
+                entity.Property(al => al.Action).IsRequired().HasMaxLength(20);
+                entity.Property(al => al.Timestamp).IsRequired();
+
+                entity.HasOne(al => al.User)
+                      .WithMany(u => u.AuditLogs)
+                      .HasForeignKey(al => al.UserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(al => new { al.EntityType, al.EntityId });
+                entity.HasIndex(al => al.UserId);
+                entity.HasIndex(al => al.Timestamp);
             });
         }
     }
