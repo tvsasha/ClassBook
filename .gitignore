@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# ClassBook local runtime data
+App_Data/
+
+# Temporary local publish folders
+/temp-build/
+/temp-build-*/
