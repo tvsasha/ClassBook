@@ -847,6 +847,8 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
     // Очищаем данные авторизации
     sessionStorage.removeItem('currentUser');
     sessionStorage.removeItem('isRedirecting');
+    sessionStorage.removeItem('redirectInProgress');
+    sessionStorage.removeItem('authError');
     
     // Перенаправление на страницу входа
     window.location.href = 'login.html';

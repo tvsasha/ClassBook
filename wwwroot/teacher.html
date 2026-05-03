@@ -318,6 +318,8 @@
     document.getElementById("logoutBtn").addEventListener("click", () => {
         sessionStorage.removeItem("currentUser");
         sessionStorage.removeItem("isRedirecting");
+        sessionStorage.removeItem("redirectInProgress");
+        sessionStorage.removeItem("authError");
         window.location.href = "login.html";
     });
 
