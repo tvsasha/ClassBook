@@ -7,6 +7,12 @@
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
+    :root {
+        --day-col-width: 48px;
+        --time-col-width: 135px;
+        --lesson-col-width: 56px;
+    }
+
     body {
         font-family: 'Inter', sans-serif;
         background: linear-gradient(135deg, #74ebd5, #ACB6E5);
@@ -65,8 +71,11 @@
     }
 
     table {
-        width: 100%;
-        border-collapse: collapse;
+        width: max-content;
+        min-width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        table-layout: fixed;
         background: #fff;
     }
 
@@ -75,6 +84,7 @@
         padding: 8px 6px;
         text-align: center;
         vertical-align: middle;
+        box-sizing: border-box;
     }
 
     thead th {
@@ -98,7 +108,9 @@
         background: #1a2533 !important;
         color: white;
         font-weight: bold;
-        width: 48px;
+        width: var(--day-col-width);
+        min-width: var(--day-col-width);
+        max-width: var(--day-col-width);
         border-right: 6px solid #222 !important;
         position: sticky;
         left: 0;
@@ -120,18 +132,24 @@
     .time-header {
         background: #34495e !important;
         color: white;
-        width: 135px;
+        width: var(--time-col-width);
+        min-width: var(--time-col-width);
+        max-width: var(--time-col-width);
+        white-space: nowrap;
         position: sticky;
-        left: 48px;
+        left: var(--day-col-width);
         z-index: 140;
     }
 
     .lesson-number {
         font-weight: bold;
         background: #ecf0f1;
-        width: 40px;
+        width: var(--lesson-col-width);
+        min-width: var(--lesson-col-width);
+        max-width: var(--lesson-col-width);
+        white-space: nowrap;
         position: sticky;
-        left: 183px;
+        left: calc(var(--day-col-width) + var(--time-col-width));
         z-index: 130;
     }
 
@@ -150,6 +168,8 @@
     .schedule-cell {
         background: #f8f9fa;
         cursor: pointer;
+        width: 190px;
+        min-width: 190px;
         min-height: 84px;
         transition: background 0.2s;
     }
@@ -826,6 +846,8 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
 
     sessionStorage.removeItem('currentUser');
     sessionStorage.removeItem('isRedirecting');
+    sessionStorage.removeItem('redirectInProgress');
+    sessionStorage.removeItem('authError');
     window.location.href = 'login.html';
 });
 
