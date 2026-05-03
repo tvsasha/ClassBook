@@ -88,6 +88,13 @@
     <input id="modalBirthDate" type="date" class="modal-field hidden">
     <input id="modalName" placeholder="ФИО пользователя" class="modal-field hidden">
     <input id="modalLogin" placeholder="Логин" class="modal-field hidden">
+    <div id="credentialTools" class="modal-field hidden" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:-4px;margin-bottom:8px;">
+        <button id="generateLoginBtn" type="button" style="background:#0d6efd;color:white;">Сгенерировать логин</button>
+        <button id="generatePasswordBtn" type="button" style="background:#198754;color:white;">Сгенерировать временный пароль</button>
+    </div>
+    <div id="credentialHint" class="modal-field hidden" style="background:#eef6ff;border:1px solid #cfe2ff;border-radius:8px;padding:10px 12px;margin-bottom:10px;color:#1f3b5b;font-size:0.92rem;">
+        Для новых учётных записей лучше использовать сгенерированный логин и временный пароль, а затем выдавать доступ индивидуально.
+    </div>
     <select id="modalRole" class="modal-field hidden"></select>
     <select id="modalTeacher" class="modal-field hidden"></select>
     <select id="modalClass" class="modal-field hidden"></select>
@@ -96,6 +103,11 @@
     <input id="modalLessonDate" type="date" class="modal-field hidden">
     <textarea id="modalHomework" placeholder="Домашнее задание (опционально)" class="modal-field hidden" style="width:100%;height:80px;margin-top:6px;border-radius:8px;padding:8px;"></textarea>
     <input id="modalPassword" type="password" placeholder="Пароль (опционально)" class="modal-field hidden">
+    <div id="passwordTools" class="modal-field hidden" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:-4px;margin-bottom:8px;">
+        <button id="togglePasswordBtn" type="button" style="background:#6c757d;color:white;">Показать пароль</button>
+        <button id="copyPasswordBtn" type="button" style="background:#0d6efd;color:white;">Скопировать пароль</button>
+    </div>
+    <div id="passwordCopyHint" class="modal-field hidden" style="color:#198754;font-size:0.9rem;margin-top:-4px;margin-bottom:8px;"></div>
     <select id="modalStudent" class="modal-field hidden">
         <option value="">Выберите ученика для привязки (для родителей)</option>
     </select>
@@ -177,6 +189,8 @@
     document.getElementById("logoutBtn").addEventListener("click", () => {
         sessionStorage.removeItem("currentUser");
         sessionStorage.removeItem("isRedirecting");
+        sessionStorage.removeItem("redirectInProgress");
+        sessionStorage.removeItem("authError");
         window.location.href = "login.html";
     });
 
@@ -244,6 +258,15 @@
     const modalPassword = document.getElementById("modalPassword");
     const modalStudent = document.getElementById("modalStudent");
     const modalError = document.getElementById("modalError");
+    const credentialTools = document.getElementById("credentialTools");
+    const credentialHint = document.getElementById("credentialHint");
+    const passwordTools = document.getElementById("passwordTools");
+    const passwordCopyHint = document.getElementById("passwordCopyHint");
+    const generateLoginBtn = document.getElementById("generateLoginBtn");
+    const generatePasswordBtn = document.getElementById("generatePasswordBtn");
+    const togglePasswordBtn = document.getElementById("togglePasswordBtn");
+    const copyPasswordBtn = document.getElementById("copyPasswordBtn");
+    let attachedStudentExists = false;
 
     function resetModal() {
         modalFirstName.value = "";
@@ -252,6 +275,7 @@
         modalName.value = "";
         modalLogin.value = "";
         modalPassword.value = "";
+        modalPassword.type = "password";
         modalRole.innerHTML = "";
         modalTeacher.innerHTML = "";
         modalClass.innerHTML = "";
@@ -269,10 +293,114 @@
         modalLessonDate.classList.add("hidden");
         modalHomework.classList.add("hidden");
         modalPassword.classList.add("hidden");
+        passwordTools.classList.add("hidden");
+        passwordCopyHint.classList.add("hidden");
+        passwordCopyHint.textContent = "";
+        togglePasswordBtn.textContent = "Показать пароль";
         modalStudent.classList.add("hidden");
+        credentialTools.classList.add("hidden");
+        credentialHint.classList.add("hidden");
         document.getElementById("modalAttachedStudent").classList.add("hidden");
         document.getElementById("modalAttachedStudentText").textContent = "";
+        attachedStudentExists = false;
         modalError.textContent = "";
+    }
+
+    function transliterateToAscii(value) {
+        const map = {
+            'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e', 'ж': 'zh',
+            'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+            'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'ts',
+            'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu',
+            'я': 'ya'
+        };
+
+        return (value || '')
+            .toLowerCase()
+            .split('')
+            .map(char => map[char] ?? char)
+            .join('')
+            .replace(/[^a-z0-9]+/g, '.')
+            .replace(/\.{2,}/g, '.')
+            .replace(/^\.|\.$/g, '');
+    }
+
+    function buildUniqueLogin(baseLogin) {
+        const used = new Set((allUsers || []).map(user => String(user.login || '').toLowerCase()));
+        let candidate = baseLogin || 'user';
+        let suffix = 1;
+
+        while (used.has(candidate.toLowerCase())) {
+            suffix += 1;
+            candidate = `${baseLogin}.${suffix}`;
+        }
+
+        return candidate;
+    }
+
+    function getRoleMeta(roleId) {
+        const role = allRoles.find(item => Number(item.id) === Number(roleId))
+            || Array.from(modalRole.options).map(option => ({ id: Number(option.value), name: option.textContent }))
+                .find(item => Number(item.id) === Number(roleId));
+
+        const roleName = role?.name || '';
+        if (roleName === 'Администратор') return { prefix: 'admin', lockStudent: false };
+        if (roleName === 'Учитель') return { prefix: 'teacher', lockStudent: false };
+        if (roleName === 'Родитель') return { prefix: 'parent', lockStudent: true };
+        if (roleName === 'Ученик') return { prefix: 'student', lockStudent: false };
+        if (roleName === 'Менеджер расписания') return { prefix: 'schedule', lockStudent: false };
+        if (roleName === 'Директор') return { prefix: 'director', lockStudent: false };
+        return { prefix: 'user', lockStudent: false };
+    }
+
+    function suggestLogin() {
+        const fullName = modalName.value.trim();
+        const roleId = modalRole.value;
+        if (!fullName || !roleId) {
+            return;
+        }
+
+        const { prefix, lockStudent } = getRoleMeta(roleId);
+        const parts = fullName.split(/\s+/).filter(Boolean);
+        const lastName = transliterateToAscii(parts[0] || fullName) || 'user';
+        const firstInitial = transliterateToAscii((parts[1] || '').slice(0, 1));
+        const thirdInitial = transliterateToAscii((parts[2] || '').slice(0, 1));
+        const selectedStudentToken = lockStudent && modalStudent.value ? `.${modalStudent.value}` : '';
+        const baseLogin = `${prefix}.${lastName}${firstInitial ? `.${firstInitial}` : ''}${thirdInitial ? thirdInitial : ''}${selectedStudentToken}`;
+
+        modalLogin.value = buildUniqueLogin(baseLogin);
+    }
+
+    function generateTemporaryPassword() {
+        const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%';
+        let password = '';
+        for (let index = 0; index < 12; index += 1) {
+            password += alphabet[Math.floor(Math.random() * alphabet.length)];
+        }
+        modalPassword.value = password;
+        passwordCopyHint.classList.add("hidden");
+        passwordCopyHint.textContent = "";
+    }
+
+    async function copyPasswordToClipboard() {
+        const password = modalPassword.value.trim();
+        if (!password) {
+            passwordCopyHint.textContent = "Сначала сгенерируйте или введите пароль.";
+            passwordCopyHint.classList.remove("hidden");
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(password);
+            passwordCopyHint.textContent = "Пароль скопирован.";
+            passwordCopyHint.classList.remove("hidden");
+        } catch (error) {
+            modalPassword.type = "text";
+            modalPassword.focus();
+            modalPassword.select();
+            passwordCopyHint.textContent = "Не удалось скопировать автоматически. Пароль выделен, нажмите Ctrl+C.";
+            passwordCopyHint.classList.remove("hidden");
+        }
     }
 
     // Обработчик изменения роли в модальном окне
@@ -282,6 +410,15 @@
             const selectRole = await fetch(`${apiUrl}/roles`, { credentials: "include", headers: getHeaders() });
             const roles = await selectRole.json();
             const parentRole = roles.find(r => r.id === selectedRoleId);
+            const selectedRoleName = parentRole?.name || '';
+
+            if (selectedRoleName === 'Родитель') {
+                credentialHint.textContent = 'Для родителя нужно сразу выбрать конкретного ученика. Так ниже риск выдать доступ не тому человеку, особенно если родители с похожими фамилиями.';
+            } else if (selectedRoleName === 'Ученик') {
+                credentialHint.textContent = 'Новые ученические учётные записи через эту форму лучше пока не создавать: текущая серверная модель требует отдельной связки с карточкой ученика.';
+            } else {
+                credentialHint.textContent = 'Для новых учётных записей лучше использовать сгенерированный логин и временный пароль, а затем выдавать доступ индивидуально.';
+            }
             
             if (parentRole && parentRole.name === 'Родитель') {
                 modalStudent.classList.remove("hidden");
@@ -312,11 +449,18 @@
             modalTitle.textContent = item ? "Редактировать пользователя" : "Новый пользователь";
             modalRole.classList.remove("hidden");
             modalPassword.classList.remove("hidden");
+            passwordTools.classList.remove("hidden");
+            passwordCopyHint.classList.remove("hidden");
             modalLogin.classList.remove("hidden");
             modalName.classList.remove("hidden");
+            credentialTools.classList.remove("hidden");
+            credentialHint.classList.remove("hidden");
             modalName.placeholder = "ФИО *";
             modalLogin.placeholder = "Логин *";
             modalPassword.placeholder = item ? "Новый пароль (опционально)" : "Пароль *";
+            passwordCopyHint.textContent = item
+                ? "Если задаёте новый пароль, его можно сразу показать и скопировать для выдачи."
+                : "Сгенерируйте временный пароль и сразу скопируйте его для передачи пользователю.";
             
             // Загружаем роли
             await loadRoles();
@@ -346,31 +490,39 @@
                                 const students = await parentRes.json();
                                 console.log('Привязанные студенты родителя', item.id, ':', students);
                                 if (students.length > 0) {
+                                    attachedStudentExists = true;
                                     const student = students[0];
                                     document.getElementById("modalAttachedStudentText").textContent = 
                                         `${student.firstName} ${student.lastName}`;
                                     console.log('Показан привязанный студент:', student.firstName, student.lastName);
                                 } else {
+                                    attachedStudentExists = false;
                                     document.getElementById("modalAttachedStudentText").textContent = "Не привязан";
                                     console.log('Привязанных студентов нет');
                                 }
                             } else {
+                                attachedStudentExists = false;
                                 document.getElementById("modalAttachedStudentText").textContent = "Не привязан";
                                 console.warn('Ошибка загрузки привязанных студентов:', parentRes.status);
                             }
                         } catch (e) {
                             console.warn('Ошибка при загрузке студентов родителя:', e);
+                            attachedStudentExists = false;
                             document.getElementById("modalAttachedStudentText").textContent = "Не привязан";
                         }
                     }
                 }
+            } else {
+                generateTemporaryPassword();
             }
             
-            // Удаляем старый обработчик если он был
-            modalRole.removeEventListener("change", handleRoleChange);
-            
             // При изменении роли показываем/скрываем поле студента
-            modalRole.addEventListener("change", handleRoleChange);
+            modalRole.onchange = async () => {
+                await handleRoleChange();
+                suggestLogin();
+            };
+            modalName.oninput = () => suggestLogin();
+            modalStudent.onchange = () => suggestLogin();
         } else if (type === "student") {
             modalTitle.textContent = item ? "Редактировать ученика" : "Новый ученик";
             modalFirstName.classList.remove("hidden");
@@ -433,16 +585,28 @@
     function closeModal() {
         modal.style.display = "none";
         overlay.style.display = "none";
+        modalRole.onchange = null;
+        modalName.oninput = null;
+        modalStudent.onchange = null;
         resetModal();
     }
 
     document.getElementById("cancelModalBtn").addEventListener("click", closeModal);
+    generateLoginBtn.addEventListener("click", suggestLogin);
+    generatePasswordBtn.addEventListener("click", generateTemporaryPassword);
+    togglePasswordBtn.addEventListener("click", () => {
+        const shouldShow = modalPassword.type === "password";
+        modalPassword.type = shouldShow ? "text" : "password";
+        togglePasswordBtn.textContent = shouldShow ? "Скрыть пароль" : "Показать пароль";
+    });
+    copyPasswordBtn.addEventListener("click", copyPasswordToClipboard);
 
     // СОХРАНЕНИЕ (с credentials: "include")
     document.getElementById("saveModalBtn").addEventListener("click", async () => {
         let body = {};
         let url = "";
         let method = editId ? "PUT" : "POST";
+        let createdUserId = editId;
 
         if (editType === "user") {
             const name = modalName.value.trim();
@@ -451,6 +615,17 @@
             const roleId = modalRole.value;
             if (!login) { modalError.textContent = "Логин обязателен"; return; }
             if (!roleId) { modalError.textContent = "Выберите роль"; return; }
+            const roleMeta = getRoleMeta(roleId);
+            const selectedRoleName = (allRoles.find(item => Number(item.id) === Number(roleId))?.name) || '';
+            if (selectedRoleName === 'Ученик' && !editId) {
+                modalError.textContent = "Новые аккаунты учеников пока не создавайте через общую форму пользователей: сначала нужно доработать серверную связь между учеткой и карточкой ученика";
+                return;
+            }
+            const requiresStudent = roleMeta.lockStudent;
+            if (requiresStudent && !modalStudent.value && !attachedStudentExists) {
+                modalError.textContent = "Для родителя нужно сразу выбрать ученика, чтобы не выдать доступ не тому человеку";
+                return;
+            }
             body = { login: login, fullName: name, roleId: Number(roleId) };
             const password = modalPassword.value.trim(); if (password) body.password = password;
             if (!editId && !password) { modalError.textContent = "Пароль обязателен для нового пользователя"; return; }
@@ -497,9 +672,14 @@
             if (!res.ok) {
                 const txt = await res.text(); throw new Error(txt || "Ошибка сервера");
             }
+
+            if (editType === "user" && !editId) {
+                const createdUser = await res.json();
+                createdUserId = createdUser?.id || createdUser?.userId || null;
+            }
             
-            // Если это пользователь и его роль - родитель, привязываем студента (только при редактировании)
-            if (editType === "user" && editId) {
+            // Если это пользователь и его роль - родитель, привязываем студента сразу после создания/редактирования
+            if (editType === "user" && createdUserId) {
                 const roleId = Number(modalRole.value);  // Преобразуем в число!
                 const selectRole = await fetch(`${apiUrl}/roles`, { credentials: "include", headers: getHeaders() });
                 const roles = await selectRole.json();
@@ -509,13 +689,13 @@
                 
                 if (parentRole && parentRole.name === 'Родитель' && modalStudent.value) {
                     try {
-                        console.log('Привязываем студента:', { parentId: editId, studentId: modalStudent.value });
+                        console.log('Привязываем студента:', { parentId: createdUserId, studentId: modalStudent.value });
                         const attachRes = await fetch(`${apiUrl}/admin/students/parent-students`, {
                             method: 'POST',
                             credentials: "include",
                             headers: getHeaders(),
                             body: JSON.stringify({
-                                parentId: Number(editId),
+                                parentId: Number(createdUserId),
                                 studentId: Number(modalStudent.value)
                             })
                         });
