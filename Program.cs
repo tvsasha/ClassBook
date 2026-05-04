@@ -44,7 +44,7 @@ namespace ClassBook
                 options.AddPolicy("StudentOrParent", policy => policy.RequireRole("Ученик", "Родитель"));
             });
 
-            builder.Services.AddScoped<IPasswordHasher, Sha256PasswordHasherAdapter>();
+            builder.Services.AddScoped<IPasswordHasher, AspNetIdentityPasswordHasherAdapter>();
 
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();

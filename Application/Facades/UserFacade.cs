@@ -93,7 +93,11 @@ namespace ClassBook.Application.Facades
                     throw new InvalidOperationException("Недопустимая роль");
                 user.RoleId = roleId.Value;
             }
-            if (!string.IsNullOrEmpty(password)) user.PasswordHash = _hasher.Hash(password);
+            if (!string.IsNullOrEmpty(password))
+            {
+                user.PasswordHash = _hasher.Hash(password);
+                user.MustChangePassword = true;
+            }
             if (isActive.HasValue) user.IsActive = isActive.Value;
 
             await _db.SaveChangesAsync();

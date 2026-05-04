@@ -34,7 +34,16 @@ namespace ClassBook.Application.Facades
             if (user == null)
                 return null;
 
-            return _hasher.Verify(password, user.PasswordHash) ? user : null;
+            if (!_hasher.Verify(password, user.PasswordHash))
+                return null;
+
+            if (_hasher.NeedsRehash(user.PasswordHash))
+            {
+                user.PasswordHash = _hasher.Hash(password);
+                await _db.SaveChangesAsync();
+            }
+
+            return user;
         }
 
         /// <summary>
