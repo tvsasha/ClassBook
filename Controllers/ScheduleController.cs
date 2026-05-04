@@ -36,9 +36,6 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
-        /// Получить все фиксированные слоты расписания
-        /// </summary>
-        /// <summary>
         /// Возвращает все фиксированные слоты расписания, используемые системой.
         /// </summary>
         /// <returns>Список временных слотов расписания.</returns>
@@ -50,9 +47,6 @@ namespace ClassBook.Controllers
             return Ok(slots);
         }
 
-        /// <summary>
-        /// Получить расписание на конкретный день недели
-        /// </summary>
         /// <summary>
         /// Возвращает расписание по выбранному дню недели.
         /// </summary>
@@ -74,9 +68,6 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
-        /// Получить полное расписание на неделю
-        /// </summary>
-        /// <summary>
         /// Возвращает полное недельное расписание по всем дням.
         /// </summary>
         /// <returns>Неделя расписания в агрегированном виде.</returns>
@@ -88,9 +79,6 @@ namespace ClassBook.Controllers
             return Ok(schedule);
         }
 
-        /// <summary>
-        /// Получить расписание класса
-        /// </summary>
         /// <summary>
         /// Возвращает расписание выбранного класса на указанную дату или ближайший период.
         /// </summary>
@@ -119,9 +107,6 @@ namespace ClassBook.Controllers
             }
         }
 
-        /// <summary>
-        /// Метаданные редактора расписания для менеджера.
-        /// </summary>
         /// <summary>
         /// Возвращает справочные данные для редактора расписания: классы, предметы, учителей и слоты.
         /// </summary>
@@ -206,9 +191,6 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
-        /// Создать класс из редактора расписания.
-        /// </summary>
-        /// <summary>
         /// Создаёт новый класс прямо из редактора расписания.
         /// </summary>
         /// <param name="request">Название создаваемого класса.</param>
@@ -251,9 +233,6 @@ namespace ClassBook.Controllers
             });
         }
 
-        /// <summary>
-        /// Уроки по неделе для редактора расписания.
-        /// </summary>
         /// <summary>
         /// Возвращает уроки выбранной недели для редактора расписания.
         /// </summary>
@@ -304,9 +283,6 @@ namespace ClassBook.Controllers
             });
         }
 
-        /// <summary>
-        /// Создать урок в конкретном слоте расписания.
-        /// </summary>
         /// <summary>
         /// Создаёт урок в конкретной ячейке редактора расписания.
         /// </summary>
@@ -371,9 +347,6 @@ namespace ClassBook.Controllers
             }
         }
 
-        /// <summary>
-        /// Обновить урок в конкретном слоте расписания.
-        /// </summary>
         /// <summary>
         /// Обновляет урок в редакторе расписания.
         /// </summary>
@@ -454,9 +427,6 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
-        /// Удалить урок из сетки расписания.
-        /// </summary>
-        /// <summary>
         /// Удаляет урок из редактора расписания.
         /// </summary>
         /// <param name="lessonId">Идентификатор урока.</param>
@@ -493,9 +463,6 @@ namespace ClassBook.Controllers
             return NoContent();
         }
 
-        /// <summary>
-        /// Создать новый слот расписания (только для менеджера расписания)
-        /// </summary>
         /// <summary>
         /// Создаёт новый слот расписания.
         /// </summary>
@@ -539,9 +506,6 @@ namespace ClassBook.Controllers
             }
         }
 
-        /// <summary>
-        /// Обновить слот расписания (только для менеджера расписания)
-        /// </summary>
         /// <summary>
         /// Обновляет существующий слот расписания.
         /// </summary>
@@ -588,9 +552,6 @@ namespace ClassBook.Controllers
             }
         }
 
-        /// <summary>
-        /// Удалить слот расписания (только для менеджера расписания)
-        /// </summary>
         /// <summary>
         /// Удаляет слот расписания, если к нему не привязаны уроки.
         /// </summary>
