@@ -20,9 +20,45 @@ namespace ClassBook.Application.Facades
         }
 
         /// <summary>
-        /// Логирует действие в AuditLog
+        /// Логирует действие без полезной нагрузки изменений.
         /// </summary>
-        public async Task LogActionAsync(int userId, string entityType, int entityId, string action, object? oldValues = null, object? newValues = null)
+        public Task LogActionAsync(int userId, string entityType, int entityId, string action)
+        {
+            return LogActionCoreAsync(userId, entityType, entityId, action, null, null);
+        }
+
+        /// <summary>
+        /// Логирует действие, у которого старые и новые значения имеют один DTO-тип.
+        /// </summary>
+        public Task LogActionAsync<TAuditValues>(
+            int userId,
+            string entityType,
+            int entityId,
+            string action,
+            TAuditValues? oldValues = default,
+            TAuditValues? newValues = default)
+            where TAuditValues : class
+        {
+            return LogActionCoreAsync(userId, entityType, entityId, action, oldValues, newValues);
+        }
+
+        /// <summary>
+        /// Логирует действие, у которого старые и новые значения представлены разными DTO-типами.
+        /// </summary>
+        public Task LogActionAsync<TOldValues, TNewValues>(
+            int userId,
+            string entityType,
+            int entityId,
+            string action,
+            TOldValues? oldValues,
+            TNewValues? newValues)
+            where TOldValues : class
+            where TNewValues : class
+        {
+            return LogActionCoreAsync(userId, entityType, entityId, action, oldValues, newValues);
+        }
+
+        private async Task LogActionCoreAsync(int userId, string entityType, int entityId, string action, object? oldValues, object? newValues)
         {
             var auditLog = new AuditLog
             {

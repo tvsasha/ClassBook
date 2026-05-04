@@ -58,7 +58,7 @@ namespace ClassBook.Application.Facades
 
             if (userId.HasValue)
             {
-                await _auditFacade.LogActionAsync(userId.Value, "Lesson", lesson.LessonId, "Create", null, BuildLessonAuditDto(lesson));
+                await _auditFacade.LogActionAsync<LessonAuditDto>(userId.Value, "Lesson", lesson.LessonId, "Create", null, BuildLessonAuditDto(lesson));
             }
 
             return await GetRequiredLessonResponseAsync(lesson.LessonId);
@@ -85,7 +85,7 @@ namespace ClassBook.Application.Facades
 
             if (userId.HasValue)
             {
-                await _auditFacade.LogActionAsync(userId.Value, "Lesson", id, "Update", oldValues, BuildLessonAuditDto(lesson));
+                await _auditFacade.LogActionAsync<LessonAuditDto>(userId.Value, "Lesson", id, "Update", oldValues, BuildLessonAuditDto(lesson));
             }
 
             return await GetRequiredLessonResponseAsync(id);
@@ -104,7 +104,7 @@ namespace ClassBook.Application.Facades
 
             if (userId.HasValue)
             {
-                await _auditFacade.LogActionAsync(userId.Value, "Lesson", lessonId, "Delete", oldValues, null);
+                await _auditFacade.LogActionAsync<LessonAuditDto>(userId.Value, "Lesson", lessonId, "Delete", oldValues, null);
             }
         }
 

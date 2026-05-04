@@ -45,7 +45,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "Student", student.StudentId, "Create", null, new StudentAuditDto
+                    await _auditFacade.LogActionAsync<StudentAuditDto>(currentUserId, "Student", student.StudentId, "Create", null, new StudentAuditDto
                     {
                         FirstName = student.FirstName,
                         LastName = student.LastName,
@@ -80,7 +80,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "User", user.Id, "IssueStudentAccess", null, new StudentAccessAuditDto
+                    await _auditFacade.LogActionAsync<StudentAccessAuditDto>(currentUserId, "User", user.Id, "IssueStudentAccess", null, new StudentAccessAuditDto
                     {
                         StudentId = studentId,
                         Login = user.Login,
@@ -115,7 +115,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "User", parent.Id, "IssueParentAccess", null, new StudentAccessAuditDto
+                    await _auditFacade.LogActionAsync<StudentAccessAuditDto>(currentUserId, "User", parent.Id, "IssueParentAccess", null, new StudentAccessAuditDto
                     {
                         StudentId = studentId,
                         Login = parent.Login,
@@ -182,7 +182,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "StudentParent", dto.StudentId, "AttachParent", null, new StudentParentLinkAuditDto
+                    await _auditFacade.LogActionAsync<StudentParentLinkAuditDto>(currentUserId, "StudentParent", dto.StudentId, "AttachParent", null, new StudentParentLinkAuditDto
                     {
                         ParentId = dto.ParentId,
                         StudentId = dto.StudentId
@@ -234,7 +234,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "Student", id, "Update", null, new StudentAuditDto
+                    await _auditFacade.LogActionAsync<StudentAuditDto>(currentUserId, "Student", id, "Update", null, new StudentAuditDto
                     {
                         FirstName = dto.FirstName,
                         LastName = dto.LastName,
@@ -268,7 +268,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "Student", id, "Delete", new StudentDeleteAuditDto
+                    await _auditFacade.LogActionAsync<StudentDeleteAuditDto>(currentUserId, "Student", id, "Delete", new StudentDeleteAuditDto
                     {
                         StudentId = id
                     }, null);

@@ -90,7 +90,7 @@ namespace ClassBook.Application.Facades
 
             if (userId.HasValue)
             {
-                await _auditFacade.LogActionAsync(userId.Value, "Grade", grade.GradeId, "Create", null, BuildGradeAuditDto(grade));
+                await _auditFacade.LogActionAsync<GradeAuditDto>(userId.Value, "Grade", grade.GradeId, "Create", null, BuildGradeAuditDto(grade));
             }
 
             return MapGrade(grade);
@@ -114,7 +114,7 @@ namespace ClassBook.Application.Facades
 
             if (userId.HasValue)
             {
-                await _auditFacade.LogActionAsync(userId.Value, "Grade", gradeId, "Update", new GradeAuditDto { GradeId = gradeId, Value = oldValue }, new GradeAuditDto { GradeId = gradeId, Value = newValue });
+                await _auditFacade.LogActionAsync<GradeAuditDto>(userId.Value, "Grade", gradeId, "Update", new GradeAuditDto { GradeId = gradeId, Value = oldValue }, new GradeAuditDto { GradeId = gradeId, Value = newValue });
             }
         }
 
@@ -159,7 +159,7 @@ namespace ClassBook.Application.Facades
 
             if (userId.HasValue)
             {
-                await _auditFacade.LogActionAsync(userId.Value, "Grade", gradeId, "Delete", oldValues, null);
+                await _auditFacade.LogActionAsync<GradeAuditDto>(userId.Value, "Grade", gradeId, "Delete", oldValues, null);
             }
         }
 

@@ -83,7 +83,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "User", result.User.Id, "Create", null, result.AuditValues);
+                    await _auditFacade.LogActionAsync<UserMutationAuditDto>(currentUserId, "User", result.User.Id, "Create", null, result.AuditValues);
                 }
 
                 return CreatedAtAction(nameof(GetById), new { id = result.User.Id }, result.User);
@@ -114,7 +114,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "User", result.User.Id, "Update", result.OldValues, result.NewValues);
+                    await _auditFacade.LogActionAsync<UserMutationAuditDto>(currentUserId, "User", result.User.Id, "Update", result.OldValues, result.NewValues);
                 }
 
                 return Ok(new MessageResponseDto { Message = "Пользователь обновлён" });
@@ -170,7 +170,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "User", id, "Delete", result.OldValues, null);
+                    await _auditFacade.LogActionAsync<UserMutationAuditDto>(currentUserId, "User", id, "Delete", result.OldValues, null);
                 }
 
                 return NoContent();

@@ -123,7 +123,7 @@ namespace ClassBook.Controllers
                 var userId = GetUserId();
                 if (userId > 0)
                 {
-                    await _auditFacade.LogActionAsync(userId, "Class", createdClass.ClassId, "Create", null, createdClass);
+                    await _auditFacade.LogActionAsync<ClassListItemDto>(userId, "Class", createdClass.ClassId, "Create", null, createdClass);
                 }
 
                 return Ok(createdClass);
@@ -169,7 +169,7 @@ namespace ClassBook.Controllers
                 var userId = GetUserId();
                 if (userId > 0)
                 {
-                    await _auditFacade.LogActionAsync(userId, "Lesson", result.Lesson.LessonId, "Create", null, result.NewValues);
+                    await _auditFacade.LogActionAsync<ScheduleEditorLessonAuditDto>(userId, "Lesson", result.Lesson.LessonId, "Create", null, result.NewValues);
                 }
 
                 return Ok(result.Lesson);
@@ -206,7 +206,7 @@ namespace ClassBook.Controllers
                 var userId = GetUserId();
                 if (userId > 0)
                 {
-                    await _auditFacade.LogActionAsync(userId, "Lesson", lessonId, "Update", result.OldValues, result.NewValues);
+                    await _auditFacade.LogActionAsync<ScheduleEditorLessonAuditDto>(userId, "Lesson", lessonId, "Update", result.OldValues, result.NewValues);
                 }
 
                 return Ok(result.Lesson);
@@ -246,7 +246,7 @@ namespace ClassBook.Controllers
                 var userId = GetUserId();
                 if (userId > 0)
                 {
-                    await _auditFacade.LogActionAsync(userId, "Lesson", lessonId, "Delete", result.OldValues, null);
+                    await _auditFacade.LogActionAsync<ScheduleEditorLessonAuditDto>(userId, "Lesson", lessonId, "Delete", result.OldValues, null);
                 }
 
                 return NoContent();
@@ -284,7 +284,7 @@ namespace ClassBook.Controllers
                 var userId = GetUserId();
                 if (userId > 0)
                 {
-                    await _auditFacade.LogActionAsync(userId, "Schedule", schedule.ScheduleId, "Create",
+                    await _auditFacade.LogActionAsync<ScheduleSlotAuditDto>(userId, "Schedule", schedule.ScheduleId, "Create",
                         null, new ScheduleSlotAuditDto
                         {
                             ScheduleId = schedule.ScheduleId,
@@ -342,7 +342,7 @@ namespace ClassBook.Controllers
                 var userId = GetUserId();
                 if (userId > 0)
                 {
-                    await _auditFacade.LogActionAsync(userId, "Schedule", id, "Update", oldValues, new ScheduleSlotAuditDto
+                    await _auditFacade.LogActionAsync<ScheduleSlotAuditDto>(userId, "Schedule", id, "Update", oldValues, new ScheduleSlotAuditDto
                     {
                         ScheduleId = schedule.ScheduleId,
                         DayOfWeek = schedule.DayOfWeek,
@@ -393,7 +393,7 @@ namespace ClassBook.Controllers
                 var userId = GetUserId();
                 if (userId > 0)
                 {
-                    await _auditFacade.LogActionAsync(userId, "Schedule", id, "Delete", oldValues, null);
+                    await _auditFacade.LogActionAsync<ScheduleSlotAuditDto>(userId, "Schedule", id, "Delete", oldValues, null);
                 }
 
                 return NoContent();
