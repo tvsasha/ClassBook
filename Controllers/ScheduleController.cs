@@ -38,6 +38,10 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить все фиксированные слоты расписания
         /// </summary>
+        /// <summary>
+        /// Возвращает все фиксированные слоты расписания, используемые системой.
+        /// </summary>
+        /// <returns>Список временных слотов расписания.</returns>
         [HttpGet]
         [Authorize]
         public async Task<IActionResult> GetAllScheduleSlots()
@@ -49,6 +53,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить расписание на конкретный день недели
         /// </summary>
+        /// <summary>
+        /// Возвращает расписание по выбранному дню недели.
+        /// </summary>
+        /// <param name="dayOfWeek">Номер дня недели.</param>
+        /// <returns>Список слотов расписания для дня.</returns>
         [HttpGet("day/{dayOfWeek}")]
         [Authorize]
         public async Task<IActionResult> GetScheduleByDay(int dayOfWeek)
@@ -67,6 +76,10 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить полное расписание на неделю
         /// </summary>
+        /// <summary>
+        /// Возвращает полное недельное расписание по всем дням.
+        /// </summary>
+        /// <returns>Неделя расписания в агрегированном виде.</returns>
         [HttpGet("week")]
         [Authorize]
         public async Task<IActionResult> GetFullWeekSchedule()
@@ -78,6 +91,12 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить расписание класса
         /// </summary>
+        /// <summary>
+        /// Возвращает расписание выбранного класса на указанную дату или ближайший период.
+        /// </summary>
+        /// <param name="classId">Идентификатор класса.</param>
+        /// <param name="date">Необязательная дата фильтрации.</param>
+        /// <returns>Список уроков класса.</returns>
         [HttpGet("class/{classId}")]
         [Authorize]
         public async Task<IActionResult> GetScheduleByClass(int classId, [FromQuery] string? date = null)
@@ -103,6 +122,10 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Метаданные редактора расписания для менеджера.
         /// </summary>
+        /// <summary>
+        /// Возвращает справочные данные для редактора расписания: классы, предметы, учителей и слоты.
+        /// </summary>
+        /// <returns>Полный набор метаданных редактора расписания.</returns>
         [HttpGet("editor/metadata")]
         [Authorize(Policy = "ScheduleManagerOnly")]
         public async Task<IActionResult> GetEditorMetadata()
@@ -185,6 +208,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Создать класс из редактора расписания.
         /// </summary>
+        /// <summary>
+        /// Создаёт новый класс прямо из редактора расписания.
+        /// </summary>
+        /// <param name="request">Название создаваемого класса.</param>
+        /// <returns>Созданный класс.</returns>
         [HttpPost("editor/class")]
         [Authorize(Policy = "ScheduleManagerOnly")]
         public async Task<IActionResult> CreateEditorClass([FromBody] ScheduleEditorClassRequest request)
@@ -226,6 +254,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Уроки по неделе для редактора расписания.
         /// </summary>
+        /// <summary>
+        /// Возвращает уроки выбранной недели для редактора расписания.
+        /// </summary>
+        /// <param name="weekStart">Дата начала недели.</param>
+        /// <returns>Неделя расписания с уроками и справочными полями.</returns>
         [HttpGet("editor/week")]
         [Authorize(Policy = "ScheduleManagerOnly")]
         public async Task<IActionResult> GetEditorWeek([FromQuery] string weekStart)
@@ -274,6 +307,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Создать урок в конкретном слоте расписания.
         /// </summary>
+        /// <summary>
+        /// Создаёт урок в конкретной ячейке редактора расписания.
+        /// </summary>
+        /// <param name="request">Данные класса, предмета, преподавателя, слота и даты.</param>
+        /// <returns>Созданный урок редактора.</returns>
         [HttpPost("editor/lesson")]
         [Authorize(Policy = "ScheduleManagerOnly")]
         public async Task<IActionResult> CreateEditorLesson([FromBody] ScheduleEditorLessonRequest request)
@@ -336,6 +374,12 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Обновить урок в конкретном слоте расписания.
         /// </summary>
+        /// <summary>
+        /// Обновляет урок в редакторе расписания.
+        /// </summary>
+        /// <param name="lessonId">Идентификатор урока.</param>
+        /// <param name="request">Новые данные урока.</param>
+        /// <returns>Обновлённый урок редактора.</returns>
         [HttpPut("editor/lesson/{lessonId}")]
         [Authorize(Policy = "ScheduleManagerOnly")]
         public async Task<IActionResult> UpdateEditorLesson(int lessonId, [FromBody] ScheduleEditorLessonRequest request)
@@ -412,6 +456,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Удалить урок из сетки расписания.
         /// </summary>
+        /// <summary>
+        /// Удаляет урок из редактора расписания.
+        /// </summary>
+        /// <param name="lessonId">Идентификатор урока.</param>
+        /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("editor/lesson/{lessonId}")]
         [Authorize(Policy = "ScheduleManagerOnly")]
         public async Task<IActionResult> DeleteEditorLesson(int lessonId)
@@ -447,6 +496,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Создать новый слот расписания (только для менеджера расписания)
         /// </summary>
+        /// <summary>
+        /// Создаёт новый слот расписания.
+        /// </summary>
+        /// <param name="request">Номер урока, день недели и время слота.</param>
+        /// <returns>Созданный слот расписания.</returns>
         [HttpPost]
         [Authorize(Policy = "ScheduleManagerOnly")]
         public async Task<IActionResult> CreateScheduleSlot([FromBody] CreateScheduleRequest request)
@@ -488,6 +542,12 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Обновить слот расписания (только для менеджера расписания)
         /// </summary>
+        /// <summary>
+        /// Обновляет существующий слот расписания.
+        /// </summary>
+        /// <param name="id">Идентификатор слота.</param>
+        /// <param name="request">Новые параметры слота.</param>
+        /// <returns>Обновлённый слот расписания.</returns>
         [HttpPut("{id}")]
         [Authorize(Policy = "ScheduleManagerOnly")]
         public async Task<IActionResult> UpdateScheduleSlot(int id, [FromBody] UpdateScheduleRequest request)
@@ -531,6 +591,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Удалить слот расписания (только для менеджера расписания)
         /// </summary>
+        /// <summary>
+        /// Удаляет слот расписания, если к нему не привязаны уроки.
+        /// </summary>
+        /// <param name="id">Идентификатор слота.</param>
+        /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("{id}")]
         [Authorize(Policy = "ScheduleManagerOnly")]
         public async Task<IActionResult> DeleteScheduleSlot(int id)

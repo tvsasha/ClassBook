@@ -23,6 +23,11 @@ namespace ClassBook.Controllers
             _authFacade = authFacade ?? throw new ArgumentNullException(nameof(authFacade));
         }
 
+        /// <summary>
+        /// Выполняет вход пользователя в систему и создаёт аутентифицированную cookie-сессию.
+        /// </summary>
+        /// <param name="dto">Логин и пароль пользователя.</param>
+        /// <returns>Данные текущего пользователя и его роль для последующего редиректа в интерфейсе.</returns>
         [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
@@ -53,6 +58,10 @@ namespace ClassBook.Controllers
             return Ok(BuildLoginResponse(user));
         }
 
+        /// <summary>
+        /// Завершает текущую пользовательскую сессию и удаляет серверную cookie-аутентификацию.
+        /// </summary>
+        /// <returns>Подтверждение успешного выхода.</returns>
         [Authorize]
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
@@ -61,6 +70,11 @@ namespace ClassBook.Controllers
             return Ok(new MessageResponseDto { Message = "Выход выполнен" });
         }
 
+        /// <summary>
+        /// Меняет пароль текущего пользователя и снимает флаг обязательной смены временного пароля.
+        /// </summary>
+        /// <param name="dto">Текущий и новый пароль пользователя.</param>
+        /// <returns>Обновлённые данные пользователя после успешной смены пароля.</returns>
         [Authorize]
         [HttpPost("change-password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)

@@ -288,12 +288,12 @@
 <script>
 function resolveApiBase() {
     const { hostname, port, origin } = window.location;
-    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
-    const liveServerPorts = new Set(["5500", "5501", "5502", "5503", "5504", "5505"]);
+        const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+        const liveServerPorts = new Set(["5500", "5501", "5502", "5503", "5504", "5505"]);
 
-    if (isLocalHost && liveServerPorts.has(port)) {
-        return "http://localhost:5156/api";
-    }
+        if (isLocalHost && liveServerPorts.has(port)) {
+            return "https://localhost:7062/api";
+        }
 
     return `${origin}/api`;
 }

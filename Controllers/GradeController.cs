@@ -27,6 +27,11 @@ namespace ClassBook.Controllers
             return int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId) ? userId : 0;
         }
 
+        /// <summary>
+        /// Добавляет оценку ученику за конкретный урок.
+        /// </summary>
+        /// <param name="dto">Данные урока, ученика и значение оценки.</param>
+        /// <returns>Созданная оценка с основными идентификаторами.</returns>
         [HttpPost]
         public async Task<IActionResult> AddGrade([FromBody] AddGradeRequest dto)
         {
@@ -57,6 +62,11 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает все оценки, выставленные по выбранному уроку.
+        /// </summary>
+        /// <param name="lessonId">Идентификатор урока.</param>
+        /// <returns>Список оценок с краткими данными учеников.</returns>
         [HttpGet("{lessonId}")]
         public async Task<IActionResult> GetGradesForLesson(int lessonId)
         {
@@ -86,6 +96,11 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает все оценки преподавателя за доступный ему период работы.
+        /// </summary>
+        /// <param name="teacherId">Идентификатор преподавателя.</param>
+        /// <returns>Плоский список оценок с привязкой к урокам и ученикам.</returns>
         [HttpGet("all")]
         public async Task<IActionResult> GetAllGrades(int teacherId)
         {
@@ -117,6 +132,11 @@ namespace ClassBook.Controllers
                 return InternalServerError("Не удалось загрузить оценки преподавателя");
             }
         }
+        /// <summary>
+        /// Возвращает список учеников урока вместе с уже поставленными оценками.
+        /// </summary>
+        /// <param name="lessonId">Идентификатор урока.</param>
+        /// <returns>Список учеников урока и их оценки.</returns>
         [HttpGet("lesson/{lessonId}/students")]
         public async Task<IActionResult> GetStudentsWithGrades(int lessonId)
         {
@@ -124,6 +144,11 @@ namespace ClassBook.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Удаляет выбранную оценку из журнала.
+        /// </summary>
+        /// <param name="gradeId">Идентификатор оценки.</param>
+        /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("{gradeId}")]
         public async Task<IActionResult> DeleteGrade(int gradeId)
         {

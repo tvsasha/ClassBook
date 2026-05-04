@@ -37,6 +37,11 @@ namespace ClassBook.Controllers
 
         // ── Просмотр данных ─────────────────────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Возвращает список предметов преподавателя или выбранного преподавателя для администратора.
+        /// </summary>
+        /// <param name="teacherId">Необязательный идентификатор преподавателя.</param>
+        /// <returns>Список доступных предметов.</returns>
         [HttpGet("subjects")]
         public async Task<IActionResult> GetSubjects(int? teacherId = null)
         {
@@ -45,6 +50,11 @@ namespace ClassBook.Controllers
             return Ok(subjects);
         }
 
+        /// <summary>
+        /// Возвращает список классов преподавателя или выбранного преподавателя для администратора.
+        /// </summary>
+        /// <param name="teacherId">Необязательный идентификатор преподавателя.</param>
+        /// <returns>Список классов.</returns>
         [HttpGet("classes")]
         public async Task<IActionResult> GetClasses(int? teacherId = null)
         {
@@ -53,6 +63,11 @@ namespace ClassBook.Controllers
             return Ok(classes);
         }
 
+        /// <summary>
+        /// Возвращает учеников выбранного класса.
+        /// </summary>
+        /// <param name="classId">Идентификатор класса.</param>
+        /// <returns>Список учеников класса.</returns>
         [HttpGet("classes/{classId}/students")]
         public async Task<IActionResult> GetStudentsByClass(int classId)
         {
@@ -67,6 +82,11 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает уроки преподавателя или выбранного преподавателя для администратора.
+        /// </summary>
+        /// <param name="teacherId">Необязательный идентификатор преподавателя.</param>
+        /// <returns>Список уроков.</returns>
         [HttpGet("lessons")]
         public async Task<IActionResult> GetLessons(int? teacherId = null)
         {
@@ -77,6 +97,11 @@ namespace ClassBook.Controllers
 
         // ── Создание урока ──────────────────────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Создаёт новый урок от имени преподавателя или администратора.
+        /// </summary>
+        /// <param name="dto">Данные создаваемого урока.</param>
+        /// <returns>Созданный урок.</returns>
         [HttpPost("lessons")]
         public async Task<IActionResult> CreateLesson([FromBody] CreateLessonDto dto)
         {
@@ -119,6 +144,12 @@ namespace ClassBook.Controllers
         }
 
         // ── Удаление урока для учителя/админа ───────────────────────────────────────────────────────────
+        /// <summary>
+        /// Обновляет существующий урок.
+        /// </summary>
+        /// <param name="lessonId">Идентификатор урока.</param>
+        /// <param name="dto">Новые данные урока.</param>
+        /// <returns>Обновлённый урок.</returns>
         [HttpPut("lessons/{lessonId}")]
         public async Task<IActionResult> UpdateLesson(int lessonId, [FromBody] CreateLessonDto dto)
         {
@@ -158,6 +189,11 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Удаляет урок преподавателя.
+        /// </summary>
+        /// <param name="lessonId">Идентификатор урока.</param>
+        /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("lessons/{lessonId}")]
         public async Task<IActionResult> DeleteLesson(int lessonId)
         {
@@ -185,7 +221,12 @@ namespace ClassBook.Controllers
 
         // ── Оценки и посещаемость ──────────────────────────────────────────────────────────────────────
 
-        [HttpPost("grades/mark")]           // ← ИЗМЕНЕНО ЗДЕСЬ
+        /// <summary>
+        /// Выставляет оценку ученику через преподавательский режим.
+        /// </summary>
+        /// <param name="dto">Данные оценки, урока и ученика.</param>
+        /// <returns>Подтверждение успешного выставления оценки.</returns>
+        [HttpPost("grades/mark")]
         public async Task<IActionResult> AddGrade([FromBody] AddGradeDto dto)
         {
             try
@@ -211,6 +252,11 @@ namespace ClassBook.Controllers
 
         // Было: api/teacher/attendance
         // Стало: api/teacher/attendance/mark
+        /// <summary>
+        /// Отмечает посещаемость ученика на уроке.
+        /// </summary>
+        /// <param name="dto">Данные урока, ученика и статуса посещаемости.</param>
+        /// <returns>Подтверждение успешной отметки посещаемости.</returns>
         [HttpPost("attendance/mark")]
         public async Task<IActionResult> MarkAttendance([FromBody] MarkAttendanceDto dto)
         {

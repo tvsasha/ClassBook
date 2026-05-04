@@ -32,6 +32,7 @@ namespace ClassBook.Controllers
         /// </summary>
         /// <param name="db">Контекст базы данных</param>
         /// <param name="passwordHasher">Сервис хэширования паролей</param>
+        /// <param name="auditFacade">Сервис аудита административных действий</param>
         public UsersController(AppDbContext db, IPasswordHasher passwordHasher, AuditFacade auditFacade)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));

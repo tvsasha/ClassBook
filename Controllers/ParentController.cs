@@ -28,6 +28,10 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить всех учеников родителя
         /// </summary>
+        /// <summary>
+        /// Возвращает список детей, связанных с текущей родительской учетной записью.
+        /// </summary>
+        /// <returns>Список доступных родителю учеников.</returns>
         [HttpGet("students")]
         [Authorize(Roles = "Родитель,Администратор")]
         public async Task<IActionResult> GetMyStudents()
@@ -52,6 +56,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить расписание ученика
         /// </summary>
+        /// <summary>
+        /// Возвращает расписание выбранного ученика для родителя или администратора.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <returns>Список занятий ученика.</returns>
         [HttpGet("student/{studentId}/schedule")]
         [Authorize(Roles = "Родитель,Администратор")]
         public async Task<IActionResult> GetStudentSchedule(int studentId)
@@ -86,6 +95,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить оценки ученика
         /// </summary>
+        /// <summary>
+        /// Возвращает оценки выбранного ученика.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <returns>Список оценок ученика.</returns>
         [HttpGet("student/{studentId}/grades")]
         [Authorize(Roles = "Родитель,Администратор")]
         public async Task<IActionResult> GetStudentGrades(int studentId)
@@ -120,6 +134,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить домашние задания ученика
         /// </summary>
+        /// <summary>
+        /// Возвращает домашние задания выбранного ученика.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <returns>Список домашних заданий ученика.</returns>
         [HttpGet("student/{studentId}/homework")]
         [Authorize(Roles = "Родитель,Администратор")]
         public async Task<IActionResult> GetStudentHomework(int studentId)
@@ -154,6 +173,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить посещаемость ученика (все уроки с момента добавления ученика в систему)
         /// </summary>
+        /// <summary>
+        /// Возвращает посещаемость выбранного ученика.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <returns>Список записей посещаемости ученика.</returns>
         [HttpGet("student/{studentId}/attendance")]
         [Authorize(Roles = "Родитель,Администратор")]
         public async Task<IActionResult> GetStudentAttendance(int studentId)
@@ -188,6 +212,12 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Добавить ученика к родителю (только для админа)
         /// </summary>
+        /// <summary>
+        /// Привязывает родителя к ученику из административного режима.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <param name="request">Идентификатор родителя для привязки.</param>
+        /// <returns>Данные созданной связи ученик-родитель.</returns>
         [HttpPost("student/{studentId}")]
         [Authorize(Roles = "Администратор")]
         public async Task<IActionResult> AddParentToStudent(int studentId, [FromBody] AddParentRequest request)
@@ -210,6 +240,11 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получить родителей ученика (только для админа)
         /// </summary>
+        /// <summary>
+        /// Возвращает список родителей, привязанных к выбранному ученику.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <returns>Список родительских учетных записей.</returns>
         [HttpGet("student/{studentId}/parents")]
         [Authorize(Roles = "Администратор")]
         public async Task<IActionResult> GetStudentParents(int studentId)
@@ -229,6 +264,12 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Удалить связь ученик-родитель (только для админа)
         /// </summary>
+        /// <summary>
+        /// Удаляет связь между учеником и родителем.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <param name="parentId">Идентификатор родителя.</param>
+        /// <returns>Пустой ответ при успешном удалении связи.</returns>
         [HttpDelete("student/{studentId}/parent/{parentId}")]
         [Authorize(Roles = "Администратор")]
         public async Task<IActionResult> RemoveParentFromStudent(int studentId, int parentId)

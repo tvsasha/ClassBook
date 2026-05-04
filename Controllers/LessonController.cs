@@ -22,6 +22,10 @@ namespace ClassBook.Controllers
         }
 
         // GET: api/lessons — все уроки (для админа)
+        /// <summary>
+        /// Возвращает полный список уроков для административного режима.
+        /// </summary>
+        /// <returns>Список уроков системы.</returns>
         [HttpGet]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> GetAll()
@@ -31,6 +35,11 @@ namespace ClassBook.Controllers
         }
 
         // POST: api/lessons — создание урока
+        /// <summary>
+        /// Создаёт новый урок с привязкой к классу, предмету и преподавателю.
+        /// </summary>
+        /// <param name="dto">Данные создаваемого урока.</param>
+        /// <returns>Созданный урок с развернутыми справочными значениями.</returns>
         [HttpPost]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> CreateLesson([FromBody] CreateLessonRequest dto)
@@ -87,6 +96,12 @@ namespace ClassBook.Controllers
         }
 
         // PUT: api/lessons/{id} — обновление урока (админ/учитель)
+        /// <summary>
+        /// Обновляет существующий урок. Учитель может изменять только свои уроки.
+        /// </summary>
+        /// <param name="id">Идентификатор урока.</param>
+        /// <param name="dto">Новые данные урока.</param>
+        /// <returns>Обновлённый урок.</returns>
         [HttpPut("{id}")]
         [Authorize(Roles = "Учитель,Администратор")]
         public async Task<IActionResult> UpdateLesson(int id, [FromBody] CreateLessonRequest dto)
@@ -149,6 +164,11 @@ namespace ClassBook.Controllers
         }
 
         // DELETE: api/lessons/{lessonId} — удаление урока (Учитель/Админ)
+        /// <summary>
+        /// Удаляет урок. Учитель может удалять только собственные уроки.
+        /// </summary>
+        /// <param name="lessonId">Идентификатор урока.</param>
+        /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("{lessonId}")]
         [Authorize(Roles = "Учитель,Администратор")]
         public async Task<IActionResult> DeleteLesson(int lessonId)

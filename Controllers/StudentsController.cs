@@ -31,6 +31,11 @@ namespace ClassBook.Controllers
             return int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) ? userId : 0;
         }
 
+        /// <summary>
+        /// Создаёт карточку ученика без создания учетной записи.
+        /// </summary>
+        /// <param name="dto">Основные данные ученика.</param>
+        /// <returns>Созданная карточка ученика.</returns>
         [HttpPost]
         public async Task<IActionResult> CreateStudent([FromBody] CreateStudentDto dto)
         {
@@ -60,6 +65,12 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Создаёт учетную запись для уже существующей карточки ученика.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <param name="dto">Логин и временный пароль для выдачи доступа.</param>
+        /// <returns>Данные созданной ученической учетной записи.</returns>
         [HttpPost("{studentId}/account")]
         public async Task<IActionResult> CreateStudentAccount(int studentId, [FromBody] CreateStudentAccountDto dto)
         {
@@ -96,6 +107,12 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Создаёт родительскую учетную запись сразу в контексте выбранного ученика.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <param name="dto">Логин, временный пароль и данные родителя.</param>
+        /// <returns>Данные созданной родительской учетной записи.</returns>
         [HttpPost("{studentId}/parent-account")]
         public async Task<IActionResult> CreateParentAccountForStudent(int studentId, [FromBody] CreateParentAccountDto dto)
         {
@@ -136,6 +153,10 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает полный список учеников для административного режима.
+        /// </summary>
+        /// <returns>Список учеников с данными классов и доступов.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAllStudents()
         {
@@ -151,6 +172,11 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Привязывает существующего ученика к родительской учетной записи.
+        /// </summary>
+        /// <param name="dto">Идентификаторы ученика и родителя.</param>
+        /// <returns>Подтверждение успешной привязки.</returns>
         [HttpPost("parent-students")]
         public async Task<IActionResult> AttachStudentToParent([FromBody] AttachStudentToParentDto dto)
         {
@@ -181,6 +207,11 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает учеников выбранного класса.
+        /// </summary>
+        /// <param name="classId">Идентификатор класса.</param>
+        /// <returns>Список учеников класса.</returns>
         [HttpGet("{classId}")]
         public async Task<IActionResult> GetStudentsByClass(int classId)
         {
@@ -195,6 +226,12 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Обновляет карточку ученика.
+        /// </summary>
+        /// <param name="id">Идентификатор ученика.</param>
+        /// <param name="dto">Новые данные ученика.</param>
+        /// <returns>Обновлённая карточка ученика.</returns>
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateStudent(int id, [FromBody] CreateStudentDto dto)
         {
@@ -224,6 +261,11 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Удаляет карточку ученика и связанные доступы, если это допустимо по бизнес-логике.
+        /// </summary>
+        /// <param name="id">Идентификатор ученика.</param>
+        /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteStudent(int id)
         {

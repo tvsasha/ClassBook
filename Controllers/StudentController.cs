@@ -37,6 +37,10 @@ namespace ClassBook.Controllers
             return await query.FirstOrDefaultAsync(s => s.UserId == GetUserId());
         }
 
+        /// <summary>
+        /// Возвращает расписание текущего ученика по его учетной записи.
+        /// </summary>
+        /// <returns>Список занятий текущего ученика.</returns>
         [HttpGet("me/schedule")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMySchedule()
@@ -78,6 +82,10 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает оценки текущего ученика.
+        /// </summary>
+        /// <returns>Список оценок текущего ученика.</returns>
         [HttpGet("me/grades")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMyGrades()
@@ -114,6 +122,10 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает домашние задания текущего ученика.
+        /// </summary>
+        /// <returns>Список домашних заданий текущего ученика.</returns>
         [HttpGet("me/homework")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMyHomework()
@@ -149,6 +161,10 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает посещаемость текущего ученика.
+        /// </summary>
+        /// <returns>Список отметок посещаемости текущего ученика.</returns>
         [HttpGet("me/attendance")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMyAttendance()
@@ -185,6 +201,10 @@ namespace ClassBook.Controllers
             }
         }
 
+        /// <summary>
+        /// Возвращает сведения о классе текущего ученика.
+        /// </summary>
+        /// <returns>Краткая информация о классе и ученике.</returns>
         [HttpGet("me/class")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMyClassInfo()

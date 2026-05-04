@@ -272,7 +272,7 @@
         const liveServerPorts = new Set(["5500", "5501", "5502", "5503", "5504", "5505"]);
 
         if (isLocalHost && liveServerPorts.has(port)) {
-            return "http://localhost:5156/api";
+            return "https://localhost:7062/api";
         }
 
         return `${origin}/api`;

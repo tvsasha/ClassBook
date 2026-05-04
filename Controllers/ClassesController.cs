@@ -20,6 +20,10 @@ namespace ClassBook.Controllers
             _db = db;
         }
 
+        /// <summary>
+        /// Возвращает список всех учебных классов, доступных в системе.
+        /// </summary>
+        /// <returns>Краткий список классов для справочников и административных форм.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -33,7 +37,11 @@ namespace ClassBook.Controllers
             return Ok(classes);
         }
 
-        // POST: api/admin/classes
+        /// <summary>
+        /// Создаёт новый учебный класс в системе.
+        /// </summary>
+        /// <param name="dto">Название создаваемого класса.</param>
+        /// <returns>Созданный класс для немедленного отображения в интерфейсе.</returns>
         [HttpPost]
         public async Task<IActionResult> CreateClass([FromBody] CreateClassDto dto)
         {
@@ -52,7 +60,11 @@ namespace ClassBook.Controllers
             });
         }
 
-        // DELETE: api/classes/{id}
+        /// <summary>
+        /// Удаляет учебный класс, если к нему не привязаны ученики и уроки.
+        /// </summary>
+        /// <param name="id">Идентификатор класса.</param>
+        /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteClass(int id)
         {

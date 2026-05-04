@@ -6,8 +6,10 @@ using ClassBook.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.OpenApi.Models;
 using System.IO;
 using System.Security.Claims;
+using System.Reflection;
 
 namespace ClassBook
 {
@@ -49,7 +51,22 @@ namespace ClassBook
 
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddSwaggerGen(options =>
+            {
+                options.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Title = "ClassBook API",
+                    Version = "v1",
+                    Description = "API системы электронного журнала ClassBook для администрирования, учебного процесса, расписания, родительских и ученических кабинетов."
+                });
+
+                var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+                var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+                if (File.Exists(xmlPath))
+                {
+                    options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+                }
+            });
 
             builder.Services.AddScoped<AttendanceFacade>();
             builder.Services.AddScoped<GradeFacade>();
