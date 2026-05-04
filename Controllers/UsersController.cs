@@ -5,7 +5,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Security.Claims;
 using System.Threading.Tasks;
+
+using ClassBook.Application.Facades;
 
 namespace ClassBook.Controllers
 {
@@ -16,21 +19,28 @@ namespace ClassBook.Controllers
     [ApiController]
     [Route("api/users")]
     [Authorize(Policy = "AdminOnly")] // Только администратор может работать с пользователями
-    public class UsersController : ControllerBase
+    public class UsersController : ApiControllerBase
     {
         
         private readonly AppDbContext _db;
         private readonly IPasswordHasher _hasher;
+        private readonly AuditFacade _auditFacade;
 
         /// <summary>
         /// Конструктор контроллера.
         /// </summary>
         /// <param name="db">Контекст базы данных</param>
         /// <param name="passwordHasher">Сервис хэширования паролей</param>
-        public UsersController(AppDbContext db, IPasswordHasher passwordHasher)
+        public UsersController(AppDbContext db, IPasswordHasher passwordHasher, AuditFacade auditFacade)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
             _hasher = passwordHasher ?? throw new ArgumentNullException(nameof(passwordHasher));
+            _auditFacade = auditFacade ?? throw new ArgumentNullException(nameof(auditFacade));
+        }
+
+        private int GetCurrentUserId()
+        {
+            return int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) ? userId : 0;
         }
 
         /// <summary>
@@ -92,7 +102,7 @@ namespace ClassBook.Controllers
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (user == null)
-                return NotFound("Пользователь не найден");
+                return NotFoundError("Пользователь не найден");
 
             return Ok(new
             {
@@ -118,24 +128,24 @@ namespace ClassBook.Controllers
             if (string.IsNullOrWhiteSpace(dto.Login) ||
                 string.IsNullOrWhiteSpace(dto.Password) ||
                 string.IsNullOrWhiteSpace(dto.FullName))
-                return BadRequest("Логин, пароль и ФИО обязательны");
+                return BadRequestError("Логин, пароль и ФИО обязательны");
 
             if (await _db.Users.AnyAsync(u => u.Login == dto.Login))
-                return BadRequest("Логин уже занят");
+                return BadRequestError("Логин уже занят");
 
             // Проверяем что роль существует в БД (1-6)
             if (dto.RoleId < 1 || dto.RoleId > 6)
-                return BadRequest("Недопустимая роль");
+                return BadRequestError("Недопустимая роль");
 
             var role = await _db.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId);
             if (role == null)
-                return BadRequest("Роль не найдена");
+                return BadRequestError("Роль не найдена");
 
             if (role.Name == "Родитель")
-                return BadRequest("Новые учетные записи родителей создавайте только из карточки конкретного ученика");
+                return BadRequestError("Новые учетные записи родителей создавайте только из карточки конкретного ученика");
 
             if (role.Name == "Ученик")
-                return BadRequest("Новые учетные записи учеников создавайте только из карточки конкретного ученика");
+                return BadRequestError("Новые учетные записи учеников создавайте только из карточки конкретного ученика");
 
             var user = new User
             {
@@ -150,6 +160,19 @@ namespace ClassBook.Controllers
 
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
+
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId > 0)
+            {
+                await _auditFacade.LogActionAsync(currentUserId, "User", user.Id, "Create", null, new
+                {
+                    user.Login,
+                    user.FullName,
+                    user.RoleId,
+                    user.IsActive,
+                    user.MustChangePassword
+                });
+            }
 
             return CreatedAtAction(nameof(GetById), new { id = user.Id }, new
             {
@@ -174,14 +197,22 @@ namespace ClassBook.Controllers
                 .Include(u => u.Role)
                 .FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
-                return NotFound("Пользователь не найден");
+                return NotFoundError("Пользователь не найден");
 
             var currentRoleName = user.Role?.Name ?? string.Empty;
+            var oldValues = new
+            {
+                user.Login,
+                user.FullName,
+                RoleId = user.RoleId,
+                user.IsActive,
+                user.MustChangePassword
+            };
 
             if (!string.IsNullOrEmpty(dto.Login) && dto.Login != user.Login)
             {
                 if (await _db.Users.AnyAsync(u => u.Login == dto.Login))
-                    return BadRequest("Логин уже занят");
+                    return BadRequestError("Логин уже занят");
                 user.Login = dto.Login;
             }
 
@@ -192,11 +223,11 @@ namespace ClassBook.Controllers
             {
                 // Проверяем что роль существует в БД (1-6)
                 if (dto.RoleId < 1 || dto.RoleId > 6)
-                    return BadRequest("Недопустимая роль");
+                    return BadRequestError("Недопустимая роль");
 
                 var targetRole = await _db.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId.Value);
                 if (targetRole == null)
-                    return BadRequest("Роль не найдена");
+                    return BadRequestError("Роль не найдена");
 
                 var targetRoleName = targetRole.Name;
                 var touchesStrictRole =
@@ -206,7 +237,7 @@ namespace ClassBook.Controllers
                     targetRoleName == "Ученик";
 
                 if (touchesStrictRole)
-                    return BadRequest("Менять роль на 'Родитель' или 'Ученик' и обратно через общую форму пользователей нельзя. Используйте карточку ученика и специализированные сценарии выдачи доступа.");
+                    return BadRequestError("Менять роль на 'Родитель' или 'Ученик' и обратно через общую форму пользователей нельзя. Используйте карточку ученика и специализированные сценарии выдачи доступа.");
 
                 user.RoleId = targetRole.Id;
             }
@@ -221,6 +252,20 @@ namespace ClassBook.Controllers
                 user.IsActive = dto.IsActive.Value;
 
             await _db.SaveChangesAsync();
+
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId > 0)
+            {
+                await _auditFacade.LogActionAsync(currentUserId, "User", user.Id, "Update", oldValues, new
+                {
+                    user.Login,
+                    user.FullName,
+                    RoleId = user.RoleId,
+                    user.IsActive,
+                    user.MustChangePassword,
+                    PasswordReset = !string.IsNullOrEmpty(dto.Password)
+                });
+            }
             return Ok(new { message = "Пользователь обновлён" });
         }
 
@@ -241,10 +286,10 @@ namespace ClassBook.Controllers
                 .FirstOrDefaultAsync(u => u.Id == parentId);
             
             if (parent == null)
-                return NotFound("Родитель не найден");
+                return NotFoundError("Родитель не найден");
 
             if (parent.Role.Name != "Родитель")
-                return BadRequest("Пользователь не является родителем");
+                return BadRequestError("Пользователь не является родителем");
 
             // Получаем всех студентов этого родителя через навигационное свойство
             var students = (parent.StudentParents ?? new List<StudentParent>())
@@ -272,17 +317,32 @@ namespace ClassBook.Controllers
         {
             var user = await _db.Users.FindAsync(id);
             if (user == null)
-                return NotFound("Пользователь не найден");
+                return NotFoundError("Пользователь не найден");
 
             // Проверка на связанные данные
             if (await _db.Subjects.AnyAsync(s => s.TeacherId == id) ||
                 await _db.Lessons.AnyAsync(l => l.TeacherId == id))
             {
-                return BadRequest("Нельзя удалить учителя с привязанными предметами или уроками");
+                return BadRequestError("Нельзя удалить учителя с привязанными предметами или уроками");
             }
+
+            var currentUserId = GetCurrentUserId();
+            var oldValues = new
+            {
+                user.Login,
+                user.FullName,
+                user.RoleId,
+                user.IsActive,
+                user.MustChangePassword
+            };
 
             _db.Users.Remove(user);
             await _db.SaveChangesAsync();
+
+            if (currentUserId > 0)
+            {
+                await _auditFacade.LogActionAsync(currentUserId, "User", id, "Delete", oldValues, null);
+            }
 
             return NoContent();
         }

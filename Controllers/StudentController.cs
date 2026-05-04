@@ -1,5 +1,6 @@
 using ClassBook.Domain.Entities;
 using ClassBook.Infrastructure.Data;
+using ClassBook.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/student")]
-    public class StudentController : ControllerBase
+    public class StudentController : ApiControllerBase
     {
         private readonly AppDbContext _db;
 
@@ -41,7 +42,7 @@ namespace ClassBook.Controllers
             {
                 var student = await GetCurrentStudentAsync();
                 if (student == null)
-                    return NotFound("Карточка ученика не привязана к учетной записи");
+                    return NotFoundError("Карточка ученика не привязана к учетной записи");
 
                 var schedule = await _db.Lessons
                     .Where(l => l.ClassId == student.ClassId)
@@ -50,15 +51,15 @@ namespace ClassBook.Controllers
                     .Include(l => l.Schedule)
                     .OrderBy(l => l.Date)
                     .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
-                    .Select(l => new
+                    .Select(l => new PortalScheduleEntryDto
                     {
-                        l.LessonId,
+                        LessonId = l.LessonId,
                         Subject = l.Subject.Name,
                         Teacher = l.Teacher.FullName,
-                        l.Date,
-                        l.Topic,
-                        l.Homework,
-                        l.ScheduleId,
+                        Date = l.Date,
+                        Topic = l.Topic,
+                        Homework = l.Homework,
+                        ScheduleId = l.ScheduleId,
                         LessonNumber = l.Schedule != null ? l.Schedule.LessonNumber : (int?)null,
                         StartTime = l.Schedule != null ? l.Schedule.StartTime.ToString(@"hh\:mm") : null,
                         EndTime = l.Schedule != null ? l.Schedule.EndTime.ToString(@"hh\:mm") : null
@@ -69,7 +70,9 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[StudentController.GetMySchedule] Exception: {ex.Message}");
+                Console.WriteLine($"[StudentController.GetMySchedule] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить расписание ученика");
             }
         }
 
@@ -81,7 +84,7 @@ namespace ClassBook.Controllers
             {
                 var student = await GetCurrentStudentAsync();
                 if (student == null)
-                    return NotFound("Карточка ученика не привязана к учетной записи");
+                    return NotFoundError("Карточка ученика не привязана к учетной записи");
 
                 var grades = await _db.Grades
                     .Where(g => g.StudentId == student.StudentId)
@@ -89,12 +92,12 @@ namespace ClassBook.Controllers
                     .ThenInclude(l => l.Subject)
                     .ThenInclude(s => s.Teacher)
                     .OrderByDescending(g => g.Lesson.Date)
-                    .Select(g => new
+                    .Select(g => new PortalGradeEntryDto
                     {
-                        g.GradeId,
+                        GradeId = g.GradeId,
                         Subject = g.Lesson.Subject.Name,
                         Teacher = g.Lesson.Subject.Teacher.FullName,
-                        g.Value,
+                        Value = g.Value,
                         Date = g.Lesson.Date,
                         Topic = g.Lesson.Topic
                     })
@@ -104,7 +107,9 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[StudentController.GetMyGrades] Exception: {ex.Message}");
+                Console.WriteLine($"[StudentController.GetMyGrades] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить оценки ученика");
             }
         }
 
@@ -116,21 +121,21 @@ namespace ClassBook.Controllers
             {
                 var student = await GetCurrentStudentAsync();
                 if (student == null)
-                    return NotFound("Карточка ученика не привязана к учетной записи");
+                    return NotFoundError("Карточка ученика не привязана к учетной записи");
 
                 var homework = await _db.Lessons
                     .Where(l => l.ClassId == student.ClassId && !string.IsNullOrEmpty(l.Homework))
                     .Include(l => l.Subject)
                     .Include(l => l.Teacher)
                     .OrderByDescending(l => l.Date)
-                    .Select(l => new
+                    .Select(l => new PortalHomeworkEntryDto
                     {
-                        l.LessonId,
+                        LessonId = l.LessonId,
                         Subject = l.Subject.Name,
                         Teacher = l.Teacher.FullName,
-                        l.Date,
-                        l.Topic,
-                        l.Homework
+                        Date = l.Date,
+                        Topic = l.Topic,
+                        Homework = l.Homework!
                     })
                     .ToListAsync();
 
@@ -138,7 +143,9 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[StudentController.GetMyHomework] Exception: {ex.Message}");
+                Console.WriteLine($"[StudentController.GetMyHomework] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить домашние задания ученика");
             }
         }
 
@@ -150,18 +157,19 @@ namespace ClassBook.Controllers
             {
                 var student = await GetCurrentStudentAsync();
                 if (student == null)
-                    return NotFound("Карточка ученика не привязана к учетной записи");
+                    return NotFoundError("Карточка ученика не привязана к учетной записи");
 
                 var attendance = await _db.Attendances
                     .Where(a => a.StudentId == student.StudentId)
                     .Include(a => a.Lesson)
                     .ThenInclude(l => l.Subject)
                     .OrderByDescending(a => a.Lesson.Date)
-                    .Select(a => new
+                    .Select(a => new PortalAttendanceEntryDto
                     {
-                        a.AttendanceId,
+                        LessonId = a.LessonId,
+                        AttendanceId = a.AttendanceId,
                         Subject = a.Lesson.Subject.Name,
-                        a.Status,
+                        Status = a.Status,
                         StatusLabel = a.Status == 1 ? "Присутствовал" : (a.Status == 0 ? "Отсутствовал" : "Отсутствовал по уважительной причине"),
                         Date = a.Lesson.Date,
                         Topic = a.Lesson.Topic
@@ -172,7 +180,9 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[StudentController.GetMyAttendance] Exception: {ex.Message}");
+                Console.WriteLine($"[StudentController.GetMyAttendance] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить посещаемость ученика");
             }
         }
 
@@ -184,18 +194,25 @@ namespace ClassBook.Controllers
             {
                 var student = await GetCurrentStudentAsync(includeClass: true);
                 if (student == null)
-                    return NotFound("Карточка ученика не привязана к учетной записи");
+                    return NotFoundError("Карточка ученика не привязана к учетной записи");
 
-                return Ok(new
+                return Ok(new PortalStudentInfoDto
                 {
-                    student.StudentId,
-                    Name = $"{student.FirstName} {student.LastName}",
-                    Class = student.Class.Name
+                    StudentId = student.StudentId,
+                    FirstName = student.FirstName,
+                    LastName = student.LastName,
+                    BirthDate = student.BirthDate,
+                    Class = new PortalClassDto
+                    {
+                        Name = student.Class.Name
+                    }
                 });
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[StudentController.GetMyClassInfo] Exception: {ex.Message}");
+                Console.WriteLine($"[StudentController.GetMyClassInfo] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить информацию об ученике");
             }
         }
     }

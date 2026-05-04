@@ -8,7 +8,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/parent")]
-    public class ParentController : ControllerBase
+    public class ParentController : ApiControllerBase
     {
         private readonly ParentFacade _parentFacade;
 
@@ -20,14 +20,6 @@ namespace ClassBook.Controllers
         private int GetUserId()
         {
             return int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId) ? userId : 0;
-        }
-
-        private static IActionResult InternalServerError(string message)
-        {
-            return new ObjectResult(new { error = message })
-            {
-                StatusCode = StatusCodes.Status500InternalServerError
-            };
         }
 
         /// <summary>
@@ -46,7 +38,7 @@ namespace ClassBook.Controllers
                 Console.WriteLine($"[ParentController.GetMyStudents] userId={userId}");
                 var students = await _parentFacade.GetStudentsForParentAsync(userId);
                 Console.WriteLine($"[ParentController.GetMyStudents] Found {students?.Count ?? 0} students");
-                return Ok(students ?? new List<dynamic>());
+                return Ok(students ?? new List<ClassBook.Application.DTOs.PortalStudentInfoDto>());
             }
             catch (Exception ex)
             {
@@ -73,7 +65,7 @@ namespace ClassBook.Controllers
                 var isParent = await _parentFacade.IsParentOfStudentAsync(userId, studentId);
                 if (!isParent && !User.IsInRole("Администратор"))
                 {
-                    return Forbid("У вас нет доступа к этому ученику");
+                    return ForbiddenError("У вас нет доступа к этому ученику");
                 }
                 var schedule = await _parentFacade.GetStudentScheduleAsync(studentId);
 
@@ -81,7 +73,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -108,7 +100,7 @@ namespace ClassBook.Controllers
                 var isParent = await _parentFacade.IsParentOfStudentAsync(userId, studentId);
                 if (!isParent && !User.IsInRole("Администратор"))
                 {
-                    return Forbid("У вас нет доступа к этому ученику");
+                    return ForbiddenError("У вас нет доступа к этому ученику");
                 }
                 var grades = await _parentFacade.GetStudentGradesAsync(studentId);
 
@@ -116,7 +108,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -143,7 +135,7 @@ namespace ClassBook.Controllers
                 var isParent = await _parentFacade.IsParentOfStudentAsync(userId, studentId);
                 if (!isParent && !User.IsInRole("Администратор"))
                 {
-                    return Forbid("У вас нет доступа к этому ученику");
+                    return ForbiddenError("У вас нет доступа к этому ученику");
                 }
                 var homework = await _parentFacade.GetStudentHomeworkAsync(studentId);
 
@@ -151,7 +143,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -178,7 +170,7 @@ namespace ClassBook.Controllers
                 var isParent = await _parentFacade.IsParentOfStudentAsync(userId, studentId);
                 if (!isParent && !User.IsInRole("Администратор"))
                 {
-                    return Forbid("У вас нет доступа к этому ученику");
+                    return ForbiddenError("У вас нет доступа к этому ученику");
                 }
                 var result = await _parentFacade.GetStudentAttendanceAsync(studentId);
 
@@ -186,7 +178,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -210,11 +202,11 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFoundError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return BadRequestError(ex.Message);
             }
         }
 
@@ -252,7 +244,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFoundError(ex.Message);
             }
         }
     }

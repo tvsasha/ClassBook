@@ -10,7 +10,7 @@ namespace ClassBook.Controllers
     [ApiController]
     [Route("api/teacher")]
     [Authorize(Roles = "Учитель,Администратор")]
-    public class TeacherController : ControllerBase
+    public class TeacherController : ApiControllerBase
     {
         private readonly SubjectFacade _subjectFacade;
         private readonly ClassFacade _classFacade;
@@ -63,7 +63,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
         }
 
@@ -84,7 +84,7 @@ namespace ClassBook.Controllers
             {
                 var currentUserId = GetCurrentUserId();
                 if (dto.TeacherId != currentUserId && !User.IsInRole("Администратор"))
-                    return Forbid("Вы можете создавать только свои уроки");
+                    return ForbiddenError("Вы можете создавать только свои уроки");
 
                 var lesson = await _lessonFacade.CreateLessonAsync(
                     dto.SubjectId,
@@ -110,11 +110,11 @@ namespace ClassBook.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
         }
 
@@ -126,11 +126,11 @@ namespace ClassBook.Controllers
             {
                 var existingLesson = await _lessonFacade.GetLessonByIdAsync(lessonId);
                 if (existingLesson == null)
-                    return NotFound("Урок не найден");
+                    return NotFoundError("Урок не найден");
 
                 var currentUserId = GetCurrentUserId();
                 if (existingLesson.TeacherId != currentUserId && !User.IsInRole("Администратор"))
-                    return Forbid("Вы можете редактировать только свои уроки");
+                    return ForbiddenError("Вы можете редактировать только свои уроки");
 
                 var updatedLesson = await _lessonFacade.UpdateLessonAsync(
                     lessonId,
@@ -146,15 +146,15 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
         }
 
@@ -165,18 +165,18 @@ namespace ClassBook.Controllers
             {
                 var lesson = await _lessonFacade.GetLessonByIdAsync(lessonId);
                 if (lesson == null)
-                    return NotFound("Урок не найден");
+                    return NotFoundError("Урок не найден");
 
                 var currentUserId = GetCurrentUserId();
                 if (lesson.TeacherId != currentUserId && !User.IsInRole("Администратор"))
-                    return Forbid("Вы можете удалять только свои уроки");
+                    return ForbiddenError("Вы можете удалять только свои уроки");
 
                 await _lessonFacade.DeleteLessonAsync(lessonId);
                 return NoContent();
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
         }
 
@@ -195,15 +195,15 @@ namespace ClassBook.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
         }
 
@@ -221,11 +221,11 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
         }
 

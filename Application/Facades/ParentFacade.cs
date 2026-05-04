@@ -1,6 +1,7 @@
 using ClassBook.Domain.Entities;
 using ClassBook.Domain.Interfaces;
 using ClassBook.Infrastructure.Data;
+using ClassBook.Application.DTOs;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -113,7 +114,7 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Получает всех учеников родителя
         /// </summary>
-        public async Task<List<dynamic>> GetStudentsForParentAsync(int parentId)
+        public async Task<List<PortalStudentInfoDto>> GetStudentsForParentAsync(int parentId)
         {
             Console.WriteLine($"[ParentFacade.GetStudentsForParentAsync] parentId={parentId}");
             try
@@ -127,15 +128,17 @@ namespace ClassBook.Application.Facades
                 Console.WriteLine($"[ParentFacade.GetStudentsForParentAsync] Found {studentParents.Count} StudentParent records");
 
                 var students = studentParents
-                    .Select(sp => new
+                    .Select(sp => new PortalStudentInfoDto
                     {
-                        sp.Student.StudentId,
-                        sp.Student.FirstName,
-                        sp.Student.LastName,
-                        sp.Student.BirthDate,
-                        @class = new { name = sp.Student.Class?.Name ?? "Класс не определен" }
+                        StudentId = sp.Student.StudentId,
+                        FirstName = sp.Student.FirstName,
+                        LastName = sp.Student.LastName,
+                        BirthDate = sp.Student.BirthDate,
+                        Class = new PortalClassDto
+                        {
+                            Name = sp.Student.Class?.Name ?? "Класс не определен"
+                        }
                     })
-                    .Cast<dynamic>()
                     .ToList();
 
                 Console.WriteLine($"[ParentFacade.GetStudentsForParentAsync] Returning {students.Count} students");
@@ -204,7 +207,7 @@ namespace ClassBook.Application.Facades
                 .AnyAsync(sp => sp.ParentId == parentId && sp.StudentId == studentId);
         }
 
-        public async Task<List<dynamic>> GetStudentScheduleAsync(int studentId)
+        public async Task<List<PortalScheduleEntryDto>> GetStudentScheduleAsync(int studentId)
         {
             var studentClassId = await _db.Students
                 .Where(s => s.StudentId == studentId)
@@ -221,26 +224,25 @@ namespace ClassBook.Application.Facades
                 .Include(l => l.Schedule)
                 .OrderBy(l => l.Date)
                 .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
-                .Select(l => new
+                .Select(l => new PortalScheduleEntryDto
                 {
-                    l.LessonId,
+                    LessonId = l.LessonId,
                     Subject = l.Subject.Name,
                     Teacher = l.Teacher.FullName,
-                    l.Date,
-                    l.Topic,
-                    l.Homework,
-                    l.ScheduleId,
+                    Date = l.Date,
+                    Topic = l.Topic,
+                    Homework = l.Homework,
+                    ScheduleId = l.ScheduleId,
                     LessonNumber = l.Schedule != null ? l.Schedule.LessonNumber : (int?)null,
                     StartTime = l.Schedule != null ? l.Schedule.StartTime.ToString(@"hh\:mm") : null,
                     EndTime = l.Schedule != null ? l.Schedule.EndTime.ToString(@"hh\:mm") : null
                 })
-                .Cast<dynamic>()
                 .ToListAsync();
 
             return schedule;
         }
 
-        public async Task<List<dynamic>> GetStudentGradesAsync(int studentId)
+        public async Task<List<PortalGradeEntryDto>> GetStudentGradesAsync(int studentId)
         {
             var studentExists = await _db.Students.AnyAsync(s => s.StudentId == studentId);
             if (!studentExists)
@@ -251,21 +253,20 @@ namespace ClassBook.Application.Facades
                 .Include(g => g.Lesson)
                 .ThenInclude(l => l.Subject)
                 .OrderBy(g => g.Lesson.Date)
-                .Select(g => new
+                .Select(g => new PortalGradeEntryDto
                 {
-                    g.GradeId,
+                    GradeId = g.GradeId,
                     Subject = g.Lesson.Subject.Name,
-                    g.Value,
+                    Value = g.Value,
                     Date = g.Lesson.Date,
                     Topic = g.Lesson.Topic
                 })
-                .Cast<dynamic>()
                 .ToListAsync();
 
             return grades;
         }
 
-        public async Task<List<dynamic>> GetStudentHomeworkAsync(int studentId)
+        public async Task<List<PortalHomeworkEntryDto>> GetStudentHomeworkAsync(int studentId)
         {
             var studentClassId = await _db.Students
                 .Where(s => s.StudentId == studentId)
@@ -280,22 +281,21 @@ namespace ClassBook.Application.Facades
                 .Include(l => l.Subject)
                 .Include(l => l.Teacher)
                 .OrderBy(l => l.Date)
-                .Select(l => new
+                .Select(l => new PortalHomeworkEntryDto
                 {
-                    l.LessonId,
+                    LessonId = l.LessonId,
                     Subject = l.Subject.Name,
                     Teacher = l.Teacher.FullName,
-                    l.Date,
-                    l.Topic,
-                    l.Homework
+                    Date = l.Date,
+                    Topic = l.Topic,
+                    Homework = l.Homework!
                 })
-                .Cast<dynamic>()
                 .ToListAsync();
 
             return homework;
         }
 
-        public async Task<List<dynamic>> GetStudentAttendanceAsync(int studentId)
+        public async Task<List<PortalAttendanceEntryDto>> GetStudentAttendanceAsync(int studentId)
         {
             var studentAddedDate = await _db.StudentParents
                 .Where(sp => sp.StudentId == studentId)
@@ -323,7 +323,7 @@ namespace ClassBook.Application.Facades
             {
                 var attendance = attendanceRecords.FirstOrDefault(a => a.LessonId == lesson.LessonId);
 
-                return (dynamic)new
+                return new PortalAttendanceEntryDto
                 {
                     LessonId = lesson.LessonId,
                     AttendanceId = attendance?.AttendanceId,

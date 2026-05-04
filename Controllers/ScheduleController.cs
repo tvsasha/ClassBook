@@ -12,7 +12,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/schedule")]
-    public class ScheduleController : ControllerBase
+    public class ScheduleController : ApiControllerBase
     {
         private readonly ScheduleFacade _scheduleFacade;
         private readonly AuditFacade _auditFacade;
@@ -55,7 +55,7 @@ namespace ClassBook.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
         }
 
@@ -90,7 +90,9 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[ScheduleController.GetScheduleByClass] Exception: {ex.Message}");
+                Console.WriteLine($"[ScheduleController.GetScheduleByClass] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить расписание класса");
             }
         }
 
@@ -164,13 +166,13 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> CreateEditorClass([FromBody] ScheduleEditorClassRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Name))
-                return BadRequest("Название класса обязательно");
+                return BadRequestError("Название класса обязательно");
 
             var normalizedName = request.Name.Trim();
 
             var exists = await _db.Classes.AnyAsync(c => c.Name == normalizedName);
             if (exists)
-                return BadRequest("Класс с таким названием уже существует");
+                return BadRequestError("Класс с таким названием уже существует");
 
             var classEntity = new Class
             {
@@ -205,7 +207,7 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> GetEditorWeek([FromQuery] string weekStart)
         {
             if (!DateTime.TryParse(weekStart, out var parsedWeekStart))
-                return BadRequest("Некорректная дата начала недели");
+                return BadRequestError("Некорректная дата начала недели");
 
             var weekStartDate = parsedWeekStart.Date;
             var weekEndDate = weekStartDate.AddDays(7);
@@ -252,7 +254,7 @@ namespace ClassBook.Controllers
             {
                 var validationError = await ValidateEditorLessonRequestAsync(request);
                 if (validationError != null)
-                    return BadRequest(validationError);
+                    return BadRequestError(validationError);
 
                 var lessonDate = request.Date.Date;
 
@@ -263,7 +265,7 @@ namespace ClassBook.Controllers
                         l.Date.Date == lessonDate);
 
                 if (existingLesson != null)
-                    return BadRequest("В этом слоте уже есть урок. Используйте редактирование.");
+                    return BadRequestError("В этом слоте уже есть урок. Используйте редактирование.");
 
                 var lesson = new Lesson
                 {
@@ -298,7 +300,9 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[ScheduleController.CreateEditorLesson] Exception: {ex.Message}");
+                Console.WriteLine($"[ScheduleController.CreateEditorLesson] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось создать урок в расписании");
             }
         }
 
@@ -313,11 +317,11 @@ namespace ClassBook.Controllers
             {
                 var validationError = await ValidateEditorLessonRequestAsync(request);
                 if (validationError != null)
-                    return BadRequest(validationError);
+                    return BadRequestError(validationError);
 
                 var lesson = await _db.Lessons.FindAsync(lessonId);
                 if (lesson == null)
-                    return NotFound("Урок не найден");
+                    return NotFoundError("Урок не найден");
 
                 var lessonDate = request.Date.Date;
                 var duplicate = await _db.Lessons
@@ -328,7 +332,7 @@ namespace ClassBook.Controllers
                         l.Date.Date == lessonDate);
 
                 if (duplicate)
-                    return BadRequest("В этом слоте уже есть другой урок");
+                    return BadRequestError("В этом слоте уже есть другой урок");
 
                 var oldValues = new
                 {
@@ -373,7 +377,9 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[ScheduleController.UpdateEditorLesson] Exception: {ex.Message}");
+                Console.WriteLine($"[ScheduleController.UpdateEditorLesson] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось обновить урок в расписании");
             }
         }
 
@@ -386,7 +392,7 @@ namespace ClassBook.Controllers
         {
             var lesson = await _db.Lessons.FindAsync(lessonId);
             if (lesson == null)
-                return NotFound("Урок не найден");
+                return NotFoundError("Урок не найден");
 
             var oldValues = new
             {
@@ -424,7 +430,7 @@ namespace ClassBook.Controllers
                 if (!System.TimeSpan.TryParse(request.StartTime, out var startTime) ||
                     !System.TimeSpan.TryParse(request.EndTime, out var endTime))
                 {
-                    return BadRequest("Некорректный формат времени");
+                    return BadRequestError("Некорректный формат времени");
                 }
 
                 var schedule = await _scheduleFacade.CreateScheduleSlotAsync(
@@ -445,11 +451,11 @@ namespace ClassBook.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
         }
 
@@ -465,12 +471,12 @@ namespace ClassBook.Controllers
                 if (!System.TimeSpan.TryParse(request.StartTime, out var startTime) ||
                     !System.TimeSpan.TryParse(request.EndTime, out var endTime))
                 {
-                    return BadRequest("Некорректный формат времени");
+                    return BadRequestError("Некорректный формат времени");
                 }
 
                 var existing = await _scheduleFacade.GetScheduleSlotAsync(id);
                 if (existing == null)
-                    return NotFound($"Слот расписания с ID {id} не найден");
+                    return NotFoundError($"Слот расписания с ID {id} не найден");
 
                 var oldValues = new { existing.StartTime, existing.EndTime };
 
@@ -487,11 +493,13 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[ScheduleController.UpdateScheduleSlot] Exception: {ex.Message}");
+                Console.WriteLine($"[ScheduleController.UpdateScheduleSlot] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось обновить слот расписания");
             }
         }
 
@@ -506,7 +514,7 @@ namespace ClassBook.Controllers
             {
                 var schedule = await _scheduleFacade.GetScheduleSlotAsync(id);
                 if (schedule == null)
-                    return NotFound($"Слот расписания с ID {id} не найден");
+                    return NotFoundError($"Слот расписания с ID {id} не найден");
 
                 var oldValues = new { schedule.ScheduleId, schedule.DayOfWeek, schedule.LessonNumber, schedule.StartTime, schedule.EndTime };
 
@@ -522,7 +530,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
         }
 
