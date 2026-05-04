@@ -10,7 +10,7 @@ namespace ClassBook.Controllers
     [ApiController]
     [Route("api/teacher/grades")]
     [Authorize(Roles = "Учитель")]
-    public class GradeController : ControllerBase
+    public class GradeController : ApiControllerBase
     {
         private readonly GradeFacade _facade;
 
@@ -42,15 +42,15 @@ namespace ClassBook.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return BadRequestError(ex.Message);
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFoundError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(new { error = ex.Message });
+                return BadRequestError(ex.Message);
             }
         }
 
@@ -79,7 +79,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFoundError(ex.Message);
             }
         }
 
@@ -112,7 +112,7 @@ namespace ClassBook.Controllers
             {
                 Console.WriteLine($"[GradeController.GetAllGrades] Exception: {ex.Message}");
                 Console.WriteLine($"[GradeController.GetAllGrades] StackTrace: {ex.StackTrace}");
-                return StatusCode(500, new { error = "Не удалось загрузить оценки преподавателя" });
+                return InternalServerError("Не удалось загрузить оценки преподавателя");
             }
         }
         [HttpGet("lesson/{lessonId}/students")]
@@ -133,13 +133,13 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(new { error = ex.Message });
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[GradeController.DeleteGrade] Exception: {ex.Message}");
                 Console.WriteLine($"[GradeController.DeleteGrade] StackTrace: {ex.StackTrace}");
-                return StatusCode(500, new { error = "Не удалось удалить оценку" });
+                return InternalServerError("Не удалось удалить оценку");
             }
         }
     }

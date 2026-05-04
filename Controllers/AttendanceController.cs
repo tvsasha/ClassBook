@@ -9,7 +9,7 @@ namespace ClassBook.Controllers
     [ApiController]
     [Route("api/teacher/attendance")]
     [Authorize(Roles = "Учитель")]
-    public class AttendanceController : ControllerBase
+    public class AttendanceController : ApiControllerBase
     {
         private readonly AttendanceFacade _facade;
 
@@ -31,11 +31,11 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
         }
 
@@ -52,7 +52,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
         }
     }

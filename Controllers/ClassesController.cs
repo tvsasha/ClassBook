@@ -10,7 +10,7 @@ namespace ClassBook.Controllers
     [ApiController]
     [Route("api/classes")]
     [Authorize(Policy = "AdminOnly")]
-    public class ClassesController : ControllerBase
+    public class ClassesController : ApiControllerBase
     {
         private readonly AppDbContext _db;
 
@@ -49,13 +49,13 @@ namespace ClassBook.Controllers
         {
             var classEntity = await _db.Classes.FindAsync(id);
             if (classEntity == null)
-                return NotFound("Класс не найден");
+                return NotFoundError("Класс не найден");
 
             // Проверка на связанные данные
             if (await _db.Students.AnyAsync(s => s.ClassId == id) ||
                 await _db.Lessons.AnyAsync(l => l.ClassId == id))
             {
-                return BadRequest("Нельзя удалить класс с привязанными учениками или уроками");
+                return BadRequestError("Нельзя удалить класс с привязанными учениками или уроками");
             }
 
             _db.Classes.Remove(classEntity);

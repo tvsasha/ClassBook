@@ -9,7 +9,7 @@ namespace ClassBook.Controllers
     [ApiController]
     [Route("api/director")]
     [Authorize(Policy = "DirectorOnly")]
-    public class DirectorController : ControllerBase
+    public class DirectorController : ApiControllerBase
     {
         private readonly AnalyticsFacade _analyticsFacade;
         private readonly AuditFacade _auditFacade;
@@ -34,11 +34,13 @@ namespace ClassBook.Controllers
             }
             catch (FormatException)
             {
-                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[DirectorController.GetDailyReport] Exception: {ex.Message}");
+                Console.WriteLine($"[DirectorController.GetDailyReport] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось сформировать ежедневный отчет");
             }
         }
 
@@ -55,7 +57,7 @@ namespace ClassBook.Controllers
 
                 if (start > end)
                 {
-                    return BadRequest("Дата начала не может быть позже даты конца");
+                    return BadRequestError("Дата начала не может быть позже даты конца");
                 }
 
                 var stats = await _analyticsFacade.GetAttendanceStatisticsAsync(start, end);
@@ -63,11 +65,13 @@ namespace ClassBook.Controllers
             }
             catch (FormatException)
             {
-                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[DirectorController.GetAttendanceStatistics] Exception: {ex.Message}");
+                Console.WriteLine($"[DirectorController.GetAttendanceStatistics] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось сформировать статистику посещаемости");
             }
         }
 
@@ -90,7 +94,7 @@ namespace ClassBook.Controllers
 
                 if (start > end)
                 {
-                    return BadRequest("Дата начала не может быть позже даты конца");
+                    return BadRequestError("Дата начала не может быть позже даты конца");
                 }
 
                 var report = await _analyticsFacade.GetProblematicStudentsAsync(start, end, classId, studentId, teacherId);
@@ -98,11 +102,13 @@ namespace ClassBook.Controllers
             }
             catch (FormatException)
             {
-                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[DirectorController.GetProblematicStudents] Exception: {ex.Message}");
+                Console.WriteLine($"[DirectorController.GetProblematicStudents] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось сформировать отчет по проблемным ученикам");
             }
         }
 
@@ -122,7 +128,7 @@ namespace ClassBook.Controllers
 
                 if (start > end)
                 {
-                    return BadRequest("Дата начала не может быть позже даты конца");
+                    return BadRequestError("Дата начала не может быть позже даты конца");
                 }
 
                 var report = await _analyticsFacade.GetTeacherProgressAsync(teacherId, start, end);
@@ -130,15 +136,17 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
             catch (FormatException)
             {
-                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[DirectorController.GetTeacherProgress] Exception: {ex.Message}");
+                Console.WriteLine($"[DirectorController.GetTeacherProgress] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось сформировать отчет по прогрессу преподавателя");
             }
         }
 
@@ -157,7 +165,7 @@ namespace ClassBook.Controllers
 
                 if (start > end)
                 {
-                    return BadRequest("Дата начала не может быть позже даты конца");
+                    return BadRequestError("Дата начала не может быть позже даты конца");
                 }
 
                 var summary = await _analyticsFacade.GetClassSummaryAsync(start, end);
@@ -165,11 +173,13 @@ namespace ClassBook.Controllers
             }
             catch (FormatException)
             {
-                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[DirectorController.GetClassSummary] Exception: {ex.Message}");
+                Console.WriteLine($"[DirectorController.GetClassSummary] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось сформировать сводку по классам");
             }
         }
 
@@ -189,12 +199,12 @@ namespace ClassBook.Controllers
 
                 if (start > end)
                 {
-                    return BadRequest("Дата начала не может быть позже даты конца");
+                    return BadRequestError("Дата начала не может быть позже даты конца");
                 }
 
                 if (string.IsNullOrEmpty(entityType))
                 {
-                    return BadRequest("Параметр entityType обязателен");
+                    return BadRequestError("Параметр entityType обязателен");
                 }
 
                 var logs = await _auditFacade.GetAuditLogByTypeAsync(entityType, start, end);
@@ -202,11 +212,13 @@ namespace ClassBook.Controllers
             }
             catch (FormatException)
             {
-                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[DirectorController.GetAuditLog] Exception: {ex.Message}");
+                Console.WriteLine($"[DirectorController.GetAuditLog] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить журнал аудита");
             }
         }
 
@@ -226,7 +238,7 @@ namespace ClassBook.Controllers
 
                 if (start > end)
                 {
-                    return BadRequest("Дата начала не может быть позже даты конца");
+                    return BadRequestError("Дата начала не может быть позже даты конца");
                 }
 
                 var logs = await _auditFacade.GetUserActionsAsync(userId, start, end);
@@ -234,11 +246,13 @@ namespace ClassBook.Controllers
             }
             catch (FormatException)
             {
-                return BadRequest("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[DirectorController.GetUserAuditLog] Exception: {ex.Message}");
+                Console.WriteLine($"[DirectorController.GetUserAuditLog] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить действия пользователя");
             }
         }
     }

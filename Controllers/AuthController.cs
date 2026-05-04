@@ -13,7 +13,7 @@ namespace ClassBook.Controllers
     /// </summary>
     [ApiController]
     [Route("api/auth")]
-    public class AuthController : ControllerBase
+    public class AuthController : ApiControllerBase
     {
         private readonly AuthFacade _authFacade;
 
@@ -28,7 +28,7 @@ namespace ClassBook.Controllers
         {
             var user = await _authFacade.LoginAsync(dto.Login, dto.Password);
             if (user == null)
-                return Unauthorized("Неверный логин или пароль");
+                return UnauthorizedError("Неверный логин или пароль");
 
             var claims = new List<Claim>
             {
@@ -65,7 +65,7 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
         {
             if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
-                return Unauthorized("Не удалось определить пользователя");
+                return UnauthorizedError("Не удалось определить пользователя");
 
             try
             {
@@ -74,15 +74,15 @@ namespace ClassBook.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
         }
 

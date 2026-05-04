@@ -10,7 +10,7 @@ namespace ClassBook.Controllers
     [ApiController]
     [Route("api/subjects")]
     [Authorize(Policy = "AdminOnly")]
-    public class SubjectsController : ControllerBase
+    public class SubjectsController : ApiControllerBase
     {
         private readonly AppDbContext _db;
         private readonly SubjectFacade _subjectFacade;
@@ -34,7 +34,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
         }
 
@@ -65,13 +65,13 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> CreateSubject([FromBody] CreateSubjectDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.Name))
-                return BadRequest("Название предмета обязательно");
+                return BadRequestError("Название предмета обязательно");
 
             var teacher = await _db.Users
                 .FirstOrDefaultAsync(u => u.Id == dto.TeacherId && u.RoleId == 2);
 
             if (teacher == null)
-                return BadRequest("Учитель не найден или это не учитель");
+                return BadRequestError("Учитель не найден или это не учитель");
 
             var subject = await _subjectFacade.CreateSubjectAsync(dto.Name, dto.TeacherId);
 
@@ -85,17 +85,17 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> UpdateSubject(int id, [FromBody] CreateSubjectDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.Name))
-                return BadRequest("Название предмета обязательно");
+                return BadRequestError("Название предмета обязательно");
 
             var subject = await _db.Subjects.FindAsync(id);
             if (subject == null)
-                return NotFound("Предмет не найден");
+                return NotFoundError("Предмет не найден");
 
             var teacher = await _db.Users
                 .FirstOrDefaultAsync(u => u.Id == dto.TeacherId && u.RoleId == 2);
 
             if (teacher == null)
-                return BadRequest("Учитель не найден или это не учитель");
+                return BadRequestError("Учитель не найден или это не учитель");
 
             subject.Name = dto.Name;
             subject.TeacherId = dto.TeacherId;
@@ -119,11 +119,11 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
         }
 
@@ -135,10 +135,10 @@ namespace ClassBook.Controllers
         {
             var subject = await _db.Subjects.FindAsync(id);
             if (subject == null)
-                return NotFound("Предмет не найден");
+                return NotFoundError("Предмет не найден");
 
             if (await _db.Lessons.AnyAsync(l => l.SubjectId == id))
-                return BadRequest("Нельзя удалить предмет, к которому привязаны уроки");
+                return BadRequestError("Нельзя удалить предмет, к которому привязаны уроки");
 
             _db.Subjects.Remove(subject);
             await _db.SaveChangesAsync();

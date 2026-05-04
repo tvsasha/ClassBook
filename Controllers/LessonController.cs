@@ -10,7 +10,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/lessons")]
-    public class LessonController : ControllerBase
+    public class LessonController : ApiControllerBase
     {
         private readonly LessonFacade _facade;
         private readonly AppDbContext _db;
@@ -72,17 +72,17 @@ namespace ClassBook.Controllers
                     .FirstOrDefaultAsync();
 
                 if (result == null)
-                    return StatusCode(500, "Не удалось загрузить созданный урок");
+                    return InternalServerError("Не удалось загрузить созданный урок");
 
                 return CreatedAtAction(nameof(GetAll), new { id = result.LessonId }, result);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
         }
 
@@ -94,17 +94,17 @@ namespace ClassBook.Controllers
             try
             {
                 var lesson = await _db.Lessons.FindAsync(id);
-                if (lesson == null) return NotFound("Урок не найден");
+                if (lesson == null) return NotFoundError("Урок не найден");
 
                 var currentUserIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
                 if (!int.TryParse(currentUserIdClaim, out var currentUserId))
                 {
-                    return Unauthorized("Не удалось определить пользователя");
+                    return UnauthorizedError("Не удалось определить пользователя");
                 }
 
                 if (User.IsInRole("Учитель") && lesson.TeacherId != currentUserId)
                 {
-                    return Forbid("Вы можете редактировать только свои уроки");
+                    return ForbiddenError("Вы можете редактировать только свои уроки");
                 }
 
                 var updated = await _facade.UpdateLessonAsync(id, dto.SubjectId, dto.ClassId, dto.TeacherId, dto.Topic, dto.Date, dto.Homework, currentUserId);
@@ -130,21 +130,21 @@ namespace ClassBook.Controllers
                     .FirstOrDefaultAsync();
 
                 if (result == null)
-                    return StatusCode(500, "Не удалось загрузить обновленный урок");
+                    return InternalServerError("Не удалось загрузить обновленный урок");
 
                 return Ok(result);
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequestError(ex.Message);
             }
         }
 
@@ -157,23 +157,23 @@ namespace ClassBook.Controllers
             {
                 var lesson = await _facade.GetLessonByIdAsync(lessonId);
                 if (lesson == null)
-                    return NotFound("Урок не найден");
+                    return NotFoundError("Урок не найден");
 
                 var currentUserIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
                 if (!int.TryParse(currentUserIdClaim, out var currentUserId))
                 {
-                    return Unauthorized("Не удалось определить пользователя");
+                    return UnauthorizedError("Не удалось определить пользователя");
                 }
 
                 if (User.IsInRole("Учитель") && lesson.TeacherId != currentUserId)
-                    return Forbid("Вы можете удалять только свои уроки");
+                    return ForbiddenError("Вы можете удалять только свои уроки");
 
                 await _facade.DeleteLessonAsync(lessonId, currentUserId);
                 return NoContent();
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFoundError(ex.Message);
             }
         }
     }

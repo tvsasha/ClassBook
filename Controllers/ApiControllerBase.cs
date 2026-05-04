@@ -13,6 +13,9 @@ namespace ClassBook.Controllers
         protected IActionResult ForbiddenError(string message, string? code = null)
             => StatusCode(StatusCodes.Status403Forbidden, new ApiErrorResponse(message, code));
 
+        protected IActionResult UnauthorizedError(string message, string? code = null)
+            => Unauthorized(new ApiErrorResponse(message, code));
+
         protected IActionResult InternalServerError(string message, string? code = null)
             => StatusCode(StatusCodes.Status500InternalServerError, new ApiErrorResponse(message, code));
     }

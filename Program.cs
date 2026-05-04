@@ -5,6 +5,7 @@ using ClassBook.Application.Facades;
 using ClassBook.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics;
 using System.IO;
 using System.Security.Claims;
 
@@ -101,6 +102,28 @@ namespace ClassBook
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+
+            app.UseExceptionHandler(errorApp =>
+            {
+                errorApp.Run(async context =>
+                {
+                    var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+
+                    if (exception != null)
+                    {
+                        Console.WriteLine($"[UnhandledException] {exception.Message}");
+                        Console.WriteLine($"[UnhandledException] {exception.StackTrace}");
+                    }
+
+                    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                    context.Response.ContentType = "application/json; charset=utf-8";
+
+                    await context.Response.WriteAsJsonAsync(new ClassBook.Controllers.ApiErrorResponse(
+                        "Внутренняя ошибка сервера",
+                        "server_error"));
+                });
+            });
+
             app.UseDefaultFiles();
             app.UseStaticFiles();
             app.UseHttpsRedirection();
