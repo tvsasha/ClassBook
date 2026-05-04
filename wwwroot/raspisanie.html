@@ -347,7 +347,19 @@
 </div>
 
 <script>
-const API_BASE = `${window.location.origin}/api`;
+function resolveApiBase() {
+    const { hostname, port, origin } = window.location;
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+    const liveServerPorts = new Set(["5500", "5501", "5502", "5503", "5504", "5505"]);
+
+    if (isLocalHost && liveServerPorts.has(port)) {
+        return "http://localhost:5156/api";
+    }
+
+    return `${origin}/api`;
+}
+
+const API_BASE = resolveApiBase();
 const DAY_NAMES = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница'];
 
 let metadata = { classes: [], subjects: [], teachers: [], slots: [] };
