@@ -3,6 +3,7 @@ using ClassBook.Domain.Interfaces;
 using ClassBook.Infrastructure.Data;
 using ClassBook.Application.DTOs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,11 +15,13 @@ namespace ClassBook.Application.Facades
     {
         private readonly AppDbContext _db;
         private readonly IPasswordHasher _hasher;
+        private readonly ILogger<ParentFacade> _logger;
 
-        public ParentFacade(AppDbContext db, IPasswordHasher hasher)
+        public ParentFacade(AppDbContext db, IPasswordHasher hasher, ILogger<ParentFacade> logger)
         {
             _db = db;
             _hasher = hasher;
+            _logger = logger;
         }
 
         /// <summary>
@@ -116,7 +119,7 @@ namespace ClassBook.Application.Facades
         /// </summary>
         public async Task<List<PortalStudentInfoDto>> GetStudentsForParentAsync(int parentId)
         {
-            Console.WriteLine($"[ParentFacade.GetStudentsForParentAsync] parentId={parentId}");
+            _logger.LogInformation("Загрузка списка детей для родителя {ParentId}", parentId);
             try
             {
                 var studentParents = await _db.StudentParents
@@ -125,7 +128,7 @@ namespace ClassBook.Application.Facades
                     .ThenInclude(s => s.Class)
                     .ToListAsync();
 
-                Console.WriteLine($"[ParentFacade.GetStudentsForParentAsync] Found {studentParents.Count} StudentParent records");
+                _logger.LogDebug("Для родителя {ParentId} найдено {Count} связей StudentParent", parentId, studentParents.Count);
 
                 var students = studentParents
                     .Select(sp => new PortalStudentInfoDto
@@ -141,14 +144,13 @@ namespace ClassBook.Application.Facades
                     })
                     .ToList();
 
-                Console.WriteLine($"[ParentFacade.GetStudentsForParentAsync] Returning {students.Count} students");
+                _logger.LogInformation("Для родителя {ParentId} возвращено {Count} учеников", parentId, students.Count);
                 
                 return students;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ParentFacade.GetStudentsForParentAsync] Exception: {ex.Message}");
-                Console.WriteLine($"[ParentFacade.GetStudentsForParentAsync] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке детей для родителя {ParentId}", parentId);
                 throw;
             }
         }

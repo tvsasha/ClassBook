@@ -1,3 +1,4 @@
+using ClassBook.Application.DTOs;
 using ClassBook.Application.Facades;
 using ClassBook.Domain.Entities;
 using Microsoft.AspNetCore.Authentication;
@@ -57,7 +58,7 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> Logout()
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return Ok(new { message = "Выход выполнен" });
+            return Ok(new MessageResponseDto { Message = "Выход выполнен" });
         }
 
         [Authorize]
@@ -86,17 +87,17 @@ namespace ClassBook.Controllers
             }
         }
 
-        private static object BuildLoginResponse(User user)
+        private static AuthUserDto BuildLoginResponse(User user)
         {
-            return new
+            return new AuthUserDto
             {
-                user.Id,
-                user.Login,
-                user.FullName,
-                role = user.Role.Name,
-                user.IsActive,
-                user.MustChangePassword,
-                createdAt = user.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                Id = user.Id,
+                Login = user.Login,
+                FullName = user.FullName,
+                Role = user.Role.Name,
+                IsActive = user.IsActive,
+                MustChangePassword = user.MustChangePassword,
+                CreatedAt = user.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
             };
         }
     }

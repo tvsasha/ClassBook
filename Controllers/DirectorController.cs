@@ -2,6 +2,7 @@ using ClassBook.Application.Common;
 using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
 
@@ -14,11 +15,13 @@ namespace ClassBook.Controllers
     {
         private readonly AnalyticsFacade _analyticsFacade;
         private readonly AuditFacade _auditFacade;
+        private readonly ILogger<DirectorController> _logger;
 
-        public DirectorController(AnalyticsFacade analyticsFacade, AuditFacade auditFacade)
+        public DirectorController(AnalyticsFacade analyticsFacade, AuditFacade auditFacade, ILogger<DirectorController> logger)
         {
             _analyticsFacade = analyticsFacade;
             _auditFacade = auditFacade;
+            _logger = logger;
         }
 
         /// <summary>
@@ -39,8 +42,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DirectorController.GetDailyReport] Exception: {ex.Message}");
-                Console.WriteLine($"[DirectorController.GetDailyReport] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при формировании ежедневного отчета");
                 return InternalServerError("Не удалось сформировать ежедневный отчет");
             }
         }
@@ -67,8 +69,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DirectorController.GetAttendanceStatistics] Exception: {ex.Message}");
-                Console.WriteLine($"[DirectorController.GetAttendanceStatistics] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при формировании статистики посещаемости");
                 return InternalServerError("Не удалось сформировать статистику посещаемости");
             }
         }
@@ -101,8 +102,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DirectorController.GetProblematicStudents] Exception: {ex.Message}");
-                Console.WriteLine($"[DirectorController.GetProblematicStudents] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при формировании отчета по проблемным ученикам");
                 return InternalServerError("Не удалось сформировать отчет по проблемным ученикам");
             }
         }
@@ -136,8 +136,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DirectorController.GetTeacherProgress] Exception: {ex.Message}");
-                Console.WriteLine($"[DirectorController.GetTeacherProgress] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при формировании отчета по прогрессу преподавателя {TeacherId}", teacherId);
                 return InternalServerError("Не удалось сформировать отчет по прогрессу преподавателя");
             }
         }
@@ -166,8 +165,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DirectorController.GetClassSummary] Exception: {ex.Message}");
-                Console.WriteLine($"[DirectorController.GetClassSummary] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при формировании сводки по классам");
                 return InternalServerError("Не удалось сформировать сводку по классам");
             }
         }
@@ -203,8 +201,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DirectorController.GetAuditLog] Exception: {ex.Message}");
-                Console.WriteLine($"[DirectorController.GetAuditLog] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке журнала аудита по типу {EntityType}", entityType);
                 return InternalServerError("Не удалось загрузить журнал аудита");
             }
         }
@@ -234,8 +231,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DirectorController.GetUserAuditLog] Exception: {ex.Message}");
-                Console.WriteLine($"[DirectorController.GetUserAuditLog] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке действий пользователя {UserId}", userId);
                 return InternalServerError("Не удалось загрузить действия пользователя");
             }
         }

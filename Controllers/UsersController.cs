@@ -8,6 +8,7 @@ using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
+using ClassBook.Application.DTOs;
 using ClassBook.Application.Facades;
 
 namespace ClassBook.Controllers
@@ -266,7 +267,7 @@ namespace ClassBook.Controllers
                     PasswordReset = !string.IsNullOrEmpty(dto.Password)
                 });
             }
-            return Ok(new { message = "Пользователь обновлён" });
+            return Ok(new MessageResponseDto { Message = "Пользователь обновлён" });
         }
 
         /// <summary>

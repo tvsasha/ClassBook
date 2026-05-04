@@ -1,3 +1,4 @@
+using ClassBook.Application.DTOs;
 using ClassBook.Application.Facades;
 using ClassBook.Domain.Constants;
 using ClassBook.Domain.Entities;
@@ -5,6 +6,7 @@ using ClassBook.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
@@ -18,12 +20,14 @@ namespace ClassBook.Controllers
         private readonly ScheduleFacade _scheduleFacade;
         private readonly AuditFacade _auditFacade;
         private readonly AppDbContext _db;
+        private readonly ILogger<ScheduleController> _logger;
 
-        public ScheduleController(ScheduleFacade scheduleFacade, AuditFacade auditFacade, AppDbContext db)
+        public ScheduleController(ScheduleFacade scheduleFacade, AuditFacade auditFacade, AppDbContext db, ILogger<ScheduleController> logger)
         {
             _scheduleFacade = scheduleFacade;
             _auditFacade = auditFacade;
             _db = db;
+            _logger = logger;
         }
 
         private int GetUserId()
@@ -91,8 +95,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ScheduleController.GetScheduleByClass] Exception: {ex.Message}");
-                Console.WriteLine($"[ScheduleController.GetScheduleByClass] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке расписания класса {ClassId}", classId);
                 return InternalServerError("Не удалось загрузить расписание класса");
             }
         }
@@ -135,28 +138,48 @@ namespace ClassBook.Controllers
             var teachers = await _db.Users
                 .Where(u => u.RoleId == SystemRoleIds.Teacher)
                 .OrderBy(u => u.FullName)
-                .Select(u => new
+                .Select(u => new TeacherLookupDto
                 {
-                    u.Id,
-                    u.FullName,
-                    u.Login
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    Login = u.Login
                 })
                 .ToListAsync();
 
             var slots = await _db.Schedules
                 .OrderBy(s => s.DayOfWeek)
                 .ThenBy(s => s.LessonNumber)
-                .Select(s => new
+                .Select(s => new ScheduleSlotDto
                 {
-                    s.ScheduleId,
-                    s.DayOfWeek,
-                    s.LessonNumber,
+                    ScheduleId = s.ScheduleId,
+                    DayOfWeek = s.DayOfWeek,
+                    LessonNumber = s.LessonNumber,
                     StartTime = s.StartTime.ToString(@"hh\:mm"),
                     EndTime = s.EndTime.ToString(@"hh\:mm")
                 })
                 .ToListAsync();
 
-            return Ok(new { classes = sortedClasses, subjects, teachers, slots });
+            return Ok(new ScheduleEditorMetadataDto
+            {
+                Classes = sortedClasses
+                    .Select(c => new ClassListItemDto
+                    {
+                        ClassId = c.ClassId,
+                        Name = c.Name
+                    })
+                    .ToList(),
+                Subjects = subjects
+                    .Select(s => new ScheduleEditorSubjectDto
+                    {
+                        SubjectId = s.SubjectId,
+                        Name = s.Name,
+                        TeacherId = s.TeacherId,
+                        TeacherName = s.TeacherName
+                    })
+                    .ToList(),
+                Teachers = teachers,
+                Slots = slots
+            });
         }
 
         /// <summary>
@@ -193,10 +216,10 @@ namespace ClassBook.Controllers
                 });
             }
 
-            return Ok(new
+            return Ok(new ClassListItemDto
             {
-                classEntity.ClassId,
-                classEntity.Name
+                ClassId = classEntity.ClassId,
+                Name = classEntity.Name
             });
         }
 
@@ -221,27 +244,31 @@ namespace ClassBook.Controllers
                 .Include(l => l.Schedule)
                 .OrderBy(l => l.Date)
                 .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
-                .Select(l => new
+                .Select(l => new ScheduleEditorLessonDto
                 {
-                    l.LessonId,
-                    l.ClassId,
+                    LessonId = l.LessonId,
+                    ClassId = l.ClassId,
                     ClassName = l.Class.Name,
-                    l.SubjectId,
+                    SubjectId = l.SubjectId,
                     SubjectName = l.Subject.Name,
-                    l.TeacherId,
+                    TeacherId = l.TeacherId,
                     TeacherName = l.Teacher.FullName,
-                    l.ScheduleId,
+                    ScheduleId = l.ScheduleId,
                     DayOfWeek = l.Schedule != null ? l.Schedule.DayOfWeek : (int?)null,
                     LessonNumber = l.Schedule != null ? l.Schedule.LessonNumber : (int?)null,
                     StartTime = l.Schedule != null ? l.Schedule.StartTime.ToString(@"hh\:mm") : null,
                     EndTime = l.Schedule != null ? l.Schedule.EndTime.ToString(@"hh\:mm") : null,
-                    l.Topic,
-                    l.Homework,
-                    l.Date
+                    Topic = l.Topic,
+                    Homework = l.Homework,
+                    Date = l.Date
                 })
                 .ToListAsync();
 
-            return Ok(new { weekStart = weekStartDate, lessons });
+            return Ok(new ScheduleEditorWeekDto
+            {
+                WeekStart = weekStartDate,
+                Lessons = lessons
+            });
         }
 
         /// <summary>
@@ -301,8 +328,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ScheduleController.CreateEditorLesson] Exception: {ex.Message}");
-                Console.WriteLine($"[ScheduleController.CreateEditorLesson] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при создании урока в расписании");
                 return InternalServerError("Не удалось создать урок в расписании");
             }
         }
@@ -378,8 +404,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ScheduleController.UpdateEditorLesson] Exception: {ex.Message}");
-                Console.WriteLine($"[ScheduleController.UpdateEditorLesson] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при обновлении урока в расписании {LessonId}", lessonId);
                 return InternalServerError("Не удалось обновить урок в расписании");
             }
         }
@@ -498,8 +523,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ScheduleController.UpdateScheduleSlot] Exception: {ex.Message}");
-                Console.WriteLine($"[ScheduleController.UpdateScheduleSlot] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при обновлении слота расписания");
                 return InternalServerError("Не удалось обновить слот расписания");
             }
         }

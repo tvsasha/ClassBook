@@ -1,6 +1,7 @@
 using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -11,10 +12,12 @@ namespace ClassBook.Controllers
     public class ParentController : ApiControllerBase
     {
         private readonly ParentFacade _parentFacade;
+        private readonly ILogger<ParentController> _logger;
 
-        public ParentController(ParentFacade parentFacade)
+        public ParentController(ParentFacade parentFacade, ILogger<ParentController> logger)
         {
             _parentFacade = parentFacade;
+            _logger = logger;
         }
 
         private int GetUserId()
@@ -35,15 +38,13 @@ namespace ClassBook.Controllers
 
             try
             {
-                Console.WriteLine($"[ParentController.GetMyStudents] userId={userId}");
                 var students = await _parentFacade.GetStudentsForParentAsync(userId);
-                Console.WriteLine($"[ParentController.GetMyStudents] Found {students?.Count ?? 0} students");
+                _logger.LogDebug("Для родителя {UserId} найдено {Count} учеников", userId, students?.Count ?? 0);
                 return Ok(students ?? new List<ClassBook.Application.DTOs.PortalStudentInfoDto>());
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ParentController.GetMyStudents] Exception: {ex.Message}");
-                Console.WriteLine($"[ParentController.GetMyStudents] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке детей родителя {UserId}", userId);
                 return InternalServerError("Не удалось загрузить список учеников");
             }
         }
@@ -77,8 +78,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ParentController.GetStudentSchedule] Exception: {ex.Message}");
-                Console.WriteLine($"[ParentController.GetStudentSchedule] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке расписания ученика {StudentId} для родителя {UserId}", studentId, userId);
                 return InternalServerError("Не удалось загрузить расписание ученика");
             }
         }
@@ -112,8 +112,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ParentController.GetStudentGrades] Exception: {ex.Message}");
-                Console.WriteLine($"[ParentController.GetStudentGrades] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке оценок ученика {StudentId} для родителя {UserId}", studentId, userId);
                 return InternalServerError("Не удалось загрузить оценки ученика");
             }
         }
@@ -147,8 +146,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ParentController.GetStudentHomework] Exception: {ex.Message}");
-                Console.WriteLine($"[ParentController.GetStudentHomework] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке домашнего задания ученика {StudentId} для родителя {UserId}", studentId, userId);
                 return InternalServerError("Не удалось загрузить домашние задания ученика");
             }
         }
@@ -182,8 +180,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ParentController.GetStudentAttendance] Exception: {ex.Message}");
-                Console.WriteLine($"[ParentController.GetStudentAttendance] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке посещаемости ученика {StudentId} для родителя {UserId}", studentId, userId);
                 return InternalServerError("Не удалось загрузить посещаемость ученика");
             }
         }
@@ -224,8 +221,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ParentController.GetStudentParents] Exception: {ex.Message}");
-                Console.WriteLine($"[ParentController.GetStudentParents] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке родителей ученика {StudentId}", studentId);
                 return InternalServerError("Не удалось загрузить список родителей ученика");
             }
         }

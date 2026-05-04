@@ -1,4 +1,5 @@
 ﻿// Application/Facades/UserFacade.cs
+using ClassBook.Application.DTOs;
 using ClassBook.Domain.Entities;
 using ClassBook.Domain.Interfaces;
 using ClassBook.Domain.Constants;
@@ -24,19 +25,19 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Получает всех пользователей.
         /// </summary>
-        public async Task<IEnumerable<object>> GetAllUsersAsync()
+        public async Task<IEnumerable<UserListItemDto>> GetAllUsersAsync()
         {
             return await _db.Users
                 .Include(u => u.Role)
-                .Select(u => new
+                .Select(u => new UserListItemDto
                 {
-                    u.Id,
-                    u.Login,
-                    u.FullName,
+                    Id = u.Id,
+                    Login = u.Login,
+                    FullName = u.FullName,
                     RoleId = u.RoleId,
                     RoleName = u.Role.Name,
-                    u.IsActive,
-                    u.CreatedAt
+                    IsActive = u.IsActive,
+                    CreatedAt = u.CreatedAt
                 })
                 .ToListAsync();
         }
@@ -44,11 +45,16 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Получает учителей.
         /// </summary>
-        public async Task<IEnumerable<object>> GetTeachersAsync()
+        public async Task<IEnumerable<TeacherLookupDto>> GetTeachersAsync()
         {
             return await _db.Users
                 .Where(u => u.RoleId == SystemRoleIds.Teacher)
-                .Select(u => new { u.Id, u.FullName, u.Login })
+                .Select(u => new TeacherLookupDto
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    Login = u.Login
+                })
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
         }
@@ -56,18 +62,18 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Получает пользователя по ID.
         /// </summary>
-        public async Task<object?> GetUserByIdAsync(int id)
+        public async Task<UserListItemDto?> GetUserByIdAsync(int id)
         {
             var user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == id);
-            return user == null ? null : new
+            return user == null ? null : new UserListItemDto
             {
-                user.Id,
-                user.Login,
-                user.FullName,
+                Id = user.Id,
+                Login = user.Login,
+                FullName = user.FullName,
                 RoleId = user.RoleId,
                 RoleName = user.Role.Name,
-                user.IsActive,
-                user.CreatedAt
+                IsActive = user.IsActive,
+                CreatedAt = user.CreatedAt
             };
         }
 

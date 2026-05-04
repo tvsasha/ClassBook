@@ -1,4 +1,5 @@
 ﻿// Application/Facades/GradeFacade.cs
+using ClassBook.Application.DTOs;
 using ClassBook.Domain.Entities;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +24,7 @@ namespace ClassBook.Application.Facades
             _auditFacade = auditFacade ?? throw new ArgumentNullException(nameof(auditFacade));
         }
 
-        public async Task<IEnumerable<object>> GetStudentsWithGradesAsync(int lessonId)
+        public async Task<IEnumerable<StudentGradesForLessonDto>> GetStudentsWithGradesAsync(int lessonId)
         {
             var lesson = await _db.Lessons.FindAsync(lessonId);
             if (lesson == null)
@@ -40,14 +41,18 @@ namespace ClassBook.Application.Facades
             var result = students.Select(s =>
             {
                 var studentGrades = grades.Where(x => x.StudentId == s.StudentId)
-                    .Select(g => new { g.GradeId, g.Value })
+                    .Select(g => new GradeValueDto
+                    {
+                        GradeId = g.GradeId,
+                        Value = g.Value
+                    })
                     .ToList();
 
-                return new
+                return new StudentGradesForLessonDto
                 {
-                    studentId = s.StudentId,
-                    fullName = s.FirstName + " " + s.LastName,
-                    grades = studentGrades
+                    StudentId = s.StudentId,
+                    FullName = s.FirstName + " " + s.LastName,
+                    Grades = studentGrades
                 };
             });
 

@@ -1,6 +1,8 @@
+using ClassBook.Application.DTOs;
 using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -14,12 +16,14 @@ namespace ClassBook.Controllers
         private readonly StudentFacade _facade;
         private readonly ParentFacade _parentFacade;
         private readonly AuditFacade _auditFacade;
+        private readonly ILogger<AdminStudentController> _logger;
 
-        public AdminStudentController(StudentFacade facade, ParentFacade parentFacade, AuditFacade auditFacade)
+        public AdminStudentController(StudentFacade facade, ParentFacade parentFacade, AuditFacade auditFacade, ILogger<AdminStudentController> logger)
         {
             _facade = facade;
             _parentFacade = parentFacade;
             _auditFacade = auditFacade;
+            _logger = logger;
         }
 
         private int GetCurrentUserId()
@@ -142,8 +146,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[AdminStudentController.GetAllStudents] Exception: {ex.Message}");
-                Console.WriteLine($"[AdminStudentController.GetAllStudents] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке списка учеников");
                 return InternalServerError("Не удалось загрузить список учеников");
             }
         }
@@ -166,8 +169,8 @@ namespace ClassBook.Controllers
                         dto.StudentId
                     });
                 }
-                return Ok(new { message = "Ученик успешно привязан к родителю" });
-            }
+            return Ok(new MessageResponseDto { Message = "Ученик успешно привязан к родителю" });
+        }
             catch (ArgumentException ex)
             {
                 return BadRequestError(ex.Message);

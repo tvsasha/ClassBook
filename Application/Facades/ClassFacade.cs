@@ -1,4 +1,5 @@
 ﻿// Application/Facades/ClassFacade.cs
+using ClassBook.Application.DTOs;
 using ClassBook.Domain.Entities;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -28,13 +29,17 @@ namespace ClassBook.Application.Facades
             return classEntity;
         }
 
-        public async Task<IEnumerable<object>> GetClassesForTeacherAsync(int teacherId)
+        public async Task<IEnumerable<ClassListItemDto>> GetClassesForTeacherAsync(int teacherId)
         {
             return await _db.Lessons
                 .Where(l => l.TeacherId == teacherId)
                 .Select(l => l.Class)
                 .Distinct()
-                .Select(c => new { c.ClassId, c.Name })
+                .Select(c => new ClassListItemDto
+                {
+                    ClassId = c.ClassId,
+                    Name = c.Name
+                })
                 .ToListAsync();
         }
 

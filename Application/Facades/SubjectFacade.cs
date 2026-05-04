@@ -1,4 +1,5 @@
 ﻿// Application/Facades/SubjectFacade.cs
+using ClassBook.Application.DTOs;
 using ClassBook.Domain.Entities;
 using ClassBook.Domain.Constants;
 using ClassBook.Infrastructure.Data;
@@ -15,11 +16,15 @@ namespace ClassBook.Application.Facades
 
         public SubjectFacade(AppDbContext db) => _db = db;
 
-        public async Task<IEnumerable<object>> GetSubjectsForTeacherAsync(int teacherId)
+        public async Task<IEnumerable<SubjectLookupDto>> GetSubjectsForTeacherAsync(int teacherId)
         {
             return await _db.Subjects
                 .Where(s => s.TeacherId == teacherId)
-                .Select(s => new { s.SubjectId, s.Name })
+                .Select(s => new SubjectLookupDto
+                {
+                    SubjectId = s.SubjectId,
+                    Name = s.Name
+                })
                 .ToListAsync();
         }
         /// <summary>
@@ -40,13 +45,13 @@ namespace ClassBook.Application.Facades
             return subject;
         }
 
-        public async Task<IEnumerable<object>> GetClassesForSubjectAsync(int subjectId)
+        public async Task<IEnumerable<SubjectClassAssignmentDto>> GetClassesForSubjectAsync(int subjectId)
         {
             return await _db.Lessons
                 .Where(l => l.SubjectId == subjectId)
                 .Include(l => l.Class)
                 .Include(l => l.Teacher)
-                .Select(l => new
+                .Select(l => new SubjectClassAssignmentDto
                 {
                     ClassId = l.ClassId,
                     ClassName = l.Class.Name,

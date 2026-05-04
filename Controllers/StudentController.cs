@@ -4,6 +4,7 @@ using ClassBook.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 
 namespace ClassBook.Controllers
@@ -13,10 +14,12 @@ namespace ClassBook.Controllers
     public class StudentController : ApiControllerBase
     {
         private readonly AppDbContext _db;
+        private readonly ILogger<StudentController> _logger;
 
-        public StudentController(AppDbContext db)
+        public StudentController(AppDbContext db, ILogger<StudentController> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         private int GetUserId()
@@ -70,8 +73,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[StudentController.GetMySchedule] Exception: {ex.Message}");
-                Console.WriteLine($"[StudentController.GetMySchedule] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке расписания текущего ученика");
                 return InternalServerError("Не удалось загрузить расписание ученика");
             }
         }
@@ -107,8 +109,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[StudentController.GetMyGrades] Exception: {ex.Message}");
-                Console.WriteLine($"[StudentController.GetMyGrades] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке оценок текущего ученика");
                 return InternalServerError("Не удалось загрузить оценки ученика");
             }
         }
@@ -143,8 +144,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[StudentController.GetMyHomework] Exception: {ex.Message}");
-                Console.WriteLine($"[StudentController.GetMyHomework] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке домашнего задания текущего ученика");
                 return InternalServerError("Не удалось загрузить домашние задания ученика");
             }
         }
@@ -180,8 +180,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[StudentController.GetMyAttendance] Exception: {ex.Message}");
-                Console.WriteLine($"[StudentController.GetMyAttendance] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке посещаемости текущего ученика");
                 return InternalServerError("Не удалось загрузить посещаемость ученика");
             }
         }
@@ -210,8 +209,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[StudentController.GetMyClassInfo] Exception: {ex.Message}");
-                Console.WriteLine($"[StudentController.GetMyClassInfo] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке информации о текущем ученике");
                 return InternalServerError("Не удалось загрузить информацию об ученике");
             }
         }

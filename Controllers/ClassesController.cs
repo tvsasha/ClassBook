@@ -1,5 +1,6 @@
 ﻿using ClassBook.Domain.Entities;
 using ClassBook.Infrastructure.Data;
+using ClassBook.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +24,11 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> GetAll()
         {
             var classes = await _db.Classes
-                .Select(c => new { c.ClassId, c.Name })
+                .Select(c => new ClassListItemDto
+                {
+                    ClassId = c.ClassId,
+                    Name = c.Name
+                })
                 .ToListAsync();
             return Ok(classes);
         }
@@ -40,7 +45,11 @@ namespace ClassBook.Controllers
             _db.Classes.Add(classEntity);
             await _db.SaveChangesAsync();
 
-            return Ok(new { classEntity.ClassId, classEntity.Name });
+            return Ok(new ClassListItemDto
+            {
+                ClassId = classEntity.ClassId,
+                Name = classEntity.Name
+            });
         }
 
         // DELETE: api/classes/{id}

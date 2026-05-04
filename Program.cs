@@ -111,8 +111,8 @@ namespace ClassBook
 
                     if (exception != null)
                     {
-                        Console.WriteLine($"[UnhandledException] {exception.Message}");
-                        Console.WriteLine($"[UnhandledException] {exception.StackTrace}");
+                        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+                        logger.LogError(exception, "Неперехваченное исключение при обработке запроса {Path}", context.Request.Path);
                     }
 
                     context.Response.StatusCode = StatusCodes.Status500InternalServerError;

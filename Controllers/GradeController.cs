@@ -2,6 +2,7 @@
 using ClassBook.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -13,10 +14,12 @@ namespace ClassBook.Controllers
     public class GradeController : ApiControllerBase
     {
         private readonly GradeFacade _facade;
+        private readonly ILogger<GradeController> _logger;
 
-        public GradeController(GradeFacade facade)
+        public GradeController(GradeFacade facade, ILogger<GradeController> logger)
         {
             _facade = facade;
+            _logger = logger;
         }
 
         private int GetUserId()
@@ -110,8 +113,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GradeController.GetAllGrades] Exception: {ex.Message}");
-                Console.WriteLine($"[GradeController.GetAllGrades] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при загрузке оценок преподавателя {TeacherId}", teacherId);
                 return InternalServerError("Не удалось загрузить оценки преподавателя");
             }
         }
@@ -137,8 +139,7 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GradeController.DeleteGrade] Exception: {ex.Message}");
-                Console.WriteLine($"[GradeController.DeleteGrade] StackTrace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка при удалении оценки {GradeId}", gradeId);
                 return InternalServerError("Не удалось удалить оценку");
             }
         }

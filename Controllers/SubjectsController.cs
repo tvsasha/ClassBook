@@ -1,4 +1,5 @@
 ﻿using ClassBook.Application.Facades;
+using ClassBook.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -76,7 +77,12 @@ namespace ClassBook.Controllers
 
             var subject = await _subjectFacade.CreateSubjectAsync(dto.Name, dto.TeacherId);
 
-            return Ok(new { subject.SubjectId, subject.Name, TeacherName = teacher.FullName });
+            return Ok(new SubjectAdminResponseDto
+            {
+                SubjectId = subject.SubjectId,
+                Name = subject.Name,
+                TeacherName = teacher.FullName
+            });
         }
 
         /// <summary>
@@ -103,7 +109,12 @@ namespace ClassBook.Controllers
 
             await _db.SaveChangesAsync();
 
-            return Ok(new { subject.SubjectId, subject.Name, TeacherName = teacher.FullName });
+            return Ok(new SubjectAdminResponseDto
+            {
+                SubjectId = subject.SubjectId,
+                Name = subject.Name,
+                TeacherName = teacher.FullName
+            });
         }
 
         /// <summary>
@@ -116,7 +127,12 @@ namespace ClassBook.Controllers
             {
                 await _subjectFacade.AttachTeacherToSubjectAsync(subjectId, dto.TeacherId);
                 var teacher = await _db.Users.FindAsync(dto.TeacherId);
-                return Ok(new { message = "Учитель успешно прикреплён", TeacherName = teacher?.FullName });
+                return Ok(new MessageResponseDto
+                {
+                    Message = teacher == null
+                        ? "Учитель успешно прикреплён"
+                        : $"Учитель успешно прикреплён: {teacher.FullName}"
+                });
             }
             catch (KeyNotFoundException ex)
             {
