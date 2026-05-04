@@ -1,18 +1,15 @@
-﻿using ClassBook.Application.Facades;
+using ClassBook.Application.Facades;
 using ClassBook.Domain.Entities;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace ClassBook.Controllers
 {
     /// <summary>
     /// Контроллер аутентификации пользователей системы ClassBook.
-    /// Отвечает за вход в систему (авторизацию).
-    /// Регистрация пользователей осуществляется только администратором через отдельный контроллер.
     /// </summary>
     [ApiController]
     [Route("api/auth")]
@@ -20,23 +17,11 @@ namespace ClassBook.Controllers
     {
         private readonly AuthFacade _authFacade;
 
-        /// <summary>
-        /// Инициализирует новый экземпляр <see cref="AuthController"/>.
-        /// </summary>
-        /// <param name="authFacade">Фасад для операций аутентификации</param>
         public AuthController(AuthFacade authFacade)
         {
             _authFacade = authFacade ?? throw new ArgumentNullException(nameof(authFacade));
         }
 
-        /// <summary>
-        /// Выполняет аутентификацию пользователя в системе.
-        /// </summary>
-        /// <param name="dto">Данные для входа (логин и пароль)</param>
-        /// <returns>Данные пользователя при успешной авторизации или ошибку</returns>
-        /// <response code="200">Успешный вход</response>
-        /// <response code="400">Некорректные данные</response>
-        /// <response code="401">Неверный логин или пароль</response>
         [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
@@ -46,33 +31,61 @@ namespace ClassBook.Controllers
                 return Unauthorized("Неверный логин или пароль");
 
             var claims = new List<Claim>
-    {
-        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-        new Claim(ClaimTypes.Name, user.Login),
-        new Claim(ClaimTypes.Role, user.Role.Name)
-    };
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Login),
+                new Claim(ClaimTypes.Role, user.Role.Name)
+            };
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             var principal = new ClaimsPrincipal(identity);
 
-            // Устанавливаем куки
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 principal,
                 new AuthenticationProperties
                 {
-                    IsPersistent = true, // сохранять после закрытия браузера
+                    IsPersistent = true,
                     ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7)
                 });
 
-            return Ok(new { user.Id, user.Login, role = user.Role.Name });
+            return Ok(BuildLoginResponse(user));
         }
 
-        /// <summary>
-        /// Формирует объект ответа при успешной авторизации.
-        /// </summary>
-        /// <param name="user">Авторизованный пользователь</param>
-        /// <returns>Анонимный объект с данными пользователя</returns>
+        [Authorize]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return Ok(new { message = "Выход выполнен" });
+        }
+
+        [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                return Unauthorized("Не удалось определить пользователя");
+
+            try
+            {
+                var user = await _authFacade.ChangePasswordAsync(userId, dto.CurrentPassword, dto.NewPassword);
+                return Ok(BuildLoginResponse(user));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
         private static object BuildLoginResponse(User user)
         {
             return new
@@ -80,26 +93,23 @@ namespace ClassBook.Controllers
                 user.Id,
                 user.Login,
                 user.FullName,
-                Role = user.Role.Name,
+                role = user.Role.Name,
                 user.IsActive,
-                CreatedAt = user.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                user.MustChangePassword,
+                createdAt = user.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
             };
         }
     }
 
-    /// <summary>
-    /// DTO для аутентификации пользователя
-    /// </summary>
     public class LoginDto
     {
-        /// <summary>
-        /// Логин пользователя
-        /// </summary>
         public string Login { get; set; } = null!;
-
-        /// <summary>
-        /// Пароль пользователя
-        /// </summary>
         public string Password { get; set; } = null!;
+    }
+
+    public class ChangePasswordDto
+    {
+        public string CurrentPassword { get; set; } = null!;
+        public string NewPassword { get; set; } = null!;
     }
 }

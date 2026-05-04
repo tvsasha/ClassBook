@@ -262,7 +262,7 @@
 </div>
 
 <script>
-const API_BASE = 'https://localhost:7062/api';
+const API_BASE = `${window.location.origin}/api`;
 let scheduleFilter = 'upcoming';
 
 function getTodayStart() {
@@ -323,6 +323,11 @@ function getStoredCurrentUser() {
             setTimeout(() => {
                 window.location.href = 'login.html';
             }, 100);
+            return;
+        }
+
+        if (currentUser.mustChangePassword) {
+            window.location.href = 'change-password.html';
             return;
         }
 
@@ -606,7 +611,7 @@ function showError(message) {
 // Обработчик выхода
 document.getElementById('logoutBtn').addEventListener('click', async () => {
     try {
-        const res = await fetch('https://localhost:7062/api/auth/logout', {
+        const res = await fetch(`${API_BASE}/auth/logout`, {
             method: 'POST',
             credentials: 'include'
         });

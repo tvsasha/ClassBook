@@ -1,9 +1,9 @@
+using ClassBook.Domain.Entities;
 using ClassBook.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace ClassBook.Controllers
 {
@@ -23,19 +23,25 @@ namespace ClassBook.Controllers
             return int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId) ? userId : 0;
         }
 
-        /// <summary>
-        /// Получить моё расписание (для ученика, привязанного к User)
-        /// </summary>
+        private async Task<Student?> GetCurrentStudentAsync(bool includeClass = false)
+        {
+            var query = _db.Students.AsQueryable();
+
+            if (includeClass)
+                query = query.Include(s => s.Class);
+
+            return await query.FirstOrDefaultAsync(s => s.UserId == GetUserId());
+        }
+
         [HttpGet("me/schedule")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMySchedule()
         {
             try
             {
-                // Получить студента по User ID (если ученик зарегистрирован как Student)
-                var student = await _db.Students.FirstOrDefaultAsync(s => s.StudentId == GetUserId());
+                var student = await GetCurrentStudentAsync();
                 if (student == null)
-                    return NotFound("Ученик не найден");
+                    return NotFound("Карточка ученика не привязана к учетной записи");
 
                 var schedule = await _db.Lessons
                     .Where(l => l.ClassId == student.ClassId)
@@ -67,21 +73,18 @@ namespace ClassBook.Controllers
             }
         }
 
-        /// <summary>
-        /// Получить мои оценки
-        /// </summary>
         [HttpGet("me/grades")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMyGrades()
         {
             try
             {
-                var userId = GetUserId();
+                var student = await GetCurrentStudentAsync();
+                if (student == null)
+                    return NotFound("Карточка ученика не привязана к учетной записи");
 
-                // Здесь можно доставить grades для конкретного ученика
-                // Предполагаем, что StudentId может совпадать с UserId для простоты
                 var grades = await _db.Grades
-                    .Where(g => g.StudentId == userId)
+                    .Where(g => g.StudentId == student.StudentId)
                     .Include(g => g.Lesson)
                     .ThenInclude(l => l.Subject)
                     .ThenInclude(s => s.Teacher)
@@ -105,18 +108,15 @@ namespace ClassBook.Controllers
             }
         }
 
-        /// <summary>
-        /// Получить мои домашние задания
-        /// </summary>
         [HttpGet("me/homework")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMyHomework()
         {
             try
             {
-                var student = await _db.Students.FirstOrDefaultAsync(s => s.StudentId == GetUserId());
+                var student = await GetCurrentStudentAsync();
                 if (student == null)
-                    return NotFound("Ученик не найден");
+                    return NotFound("Карточка ученика не привязана к учетной записи");
 
                 var homework = await _db.Lessons
                     .Where(l => l.ClassId == student.ClassId && !string.IsNullOrEmpty(l.Homework))
@@ -142,19 +142,18 @@ namespace ClassBook.Controllers
             }
         }
 
-        /// <summary>
-        /// Получить мою посещаемость
-        /// </summary>
         [HttpGet("me/attendance")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMyAttendance()
         {
             try
             {
-                var userId = GetUserId();
+                var student = await GetCurrentStudentAsync();
+                if (student == null)
+                    return NotFound("Карточка ученика не привязана к учетной записи");
 
                 var attendance = await _db.Attendances
-                    .Where(a => a.StudentId == userId)
+                    .Where(a => a.StudentId == student.StudentId)
                     .Include(a => a.Lesson)
                     .ThenInclude(l => l.Subject)
                     .OrderByDescending(a => a.Lesson.Date)
@@ -177,24 +176,22 @@ namespace ClassBook.Controllers
             }
         }
 
-        /// <summary>
-        /// Получить информацию о моём классе
-        /// </summary>
         [HttpGet("me/class")]
         [Authorize(Roles = "Ученик,Администратор")]
         public async Task<IActionResult> GetMyClassInfo()
         {
             try
             {
-                var student = await _db.Students
-                    .Where(s => s.StudentId == GetUserId())
-                    .Include(s => s.Class)
-                    .FirstOrDefaultAsync();
-
+                var student = await GetCurrentStudentAsync(includeClass: true);
                 if (student == null)
-                    return NotFound("Ученик не найден");
+                    return NotFound("Карточка ученика не привязана к учетной записи");
 
-                return Ok(new { student.StudentId, Name = $"{student.FirstName} {student.LastName}", Class = student.Class.Name });
+                return Ok(new
+                {
+                    student.StudentId,
+                    Name = $"{student.FirstName} {student.LastName}",
+                    Class = student.Class.Name
+                });
             }
             catch (Exception ex)
             {

@@ -9,9 +9,11 @@
         public Role Role { get; set; } = null!;
         public string FullName { get; set; } = null!;
         public bool IsActive { get; set; } = true;
+        public bool MustChangePassword { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public ICollection<Subject>? Subjects { get; set; }
         public ICollection<Lesson>? Lessons { get; set; }
+        public Student? Student { get; set; }
         /// <summary>
         /// Навигация: для родителей - их дети
         /// </summary>

@@ -41,6 +41,7 @@ namespace ClassBook.Infrastructure.Data
                 entity.Property(u => u.PasswordHash).IsRequired();
                 entity.Property(u => u.FullName).IsRequired().HasMaxLength(150);
                 entity.Property(u => u.IsActive).IsRequired();
+                entity.Property(u => u.MustChangePassword).IsRequired();
                 entity.Property(u => u.CreatedAt).IsRequired();
 
                 entity.HasOne(u => u.Role)
@@ -79,6 +80,13 @@ namespace ClassBook.Infrastructure.Data
                 entity.HasKey(s => s.StudentId);
                 entity.Property(s => s.FirstName).IsRequired().HasMaxLength(50);
                 entity.Property(s => s.LastName).IsRequired().HasMaxLength(50);
+                entity.HasIndex(s => s.UserId).IsUnique().HasFilter("[UserId] IS NOT NULL");
+
+                entity.HasOne(s => s.User)
+                      .WithOne(u => u.Student)
+                      .HasForeignKey<Student>(s => s.UserId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
                 entity.HasMany(s => s.Grades).WithOne(g => g.Student)
                       .HasForeignKey(g => g.StudentId)
                       .OnDelete(DeleteBehavior.Restrict);

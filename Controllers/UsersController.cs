@@ -50,6 +50,7 @@ namespace ClassBook.Controllers
                     RoleId = u.RoleId,
                     RoleName = u.Role.Name,
                     u.IsActive,
+                    u.MustChangePassword,
                     u.CreatedAt
                 })
                 .ToListAsync();
@@ -101,6 +102,7 @@ namespace ClassBook.Controllers
                 RoleId = user.RoleId,
                 RoleName = user.Role.Name,
                 user.IsActive,
+                user.MustChangePassword,
                 user.CreatedAt
             });
         }
@@ -132,6 +134,7 @@ namespace ClassBook.Controllers
                 PasswordHash = _hasher.Hash(dto.Password),
                 RoleId = dto.RoleId,
                 IsActive = true,
+                MustChangePassword = true,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -143,7 +146,8 @@ namespace ClassBook.Controllers
                 user.Id,
                 user.Login,
                 user.FullName,
-                user.RoleId
+                user.RoleId,
+                user.MustChangePassword
             });
         }
 
@@ -179,7 +183,10 @@ namespace ClassBook.Controllers
             }
 
             if (!string.IsNullOrEmpty(dto.Password))
+            {
                 user.PasswordHash = _hasher.Hash(dto.Password);
+                user.MustChangePassword = true;
+            }
 
             if (dto.IsActive.HasValue)
                 user.IsActive = dto.IsActive.Value;

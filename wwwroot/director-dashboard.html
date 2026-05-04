@@ -286,7 +286,7 @@
 </div>
 
 <script>
-const API_BASE = 'https://localhost:7062/api';
+const API_BASE = `${window.location.origin}/api`;
 
 // Проверка авторизации при загрузке
 (function checkAuthOnLoad() {
@@ -321,6 +321,11 @@ const API_BASE = 'https://localhost:7062/api';
         if (!currentUser) {
             console.log('director-dashboard.html: currentUser is null/undefined');
             throw new Error('Невалидные данные пользователя');
+        }
+
+        if (currentUser.mustChangePassword) {
+            window.location.href = 'change-password.html';
+            return;
         }
         
         const userRole = currentUser.role || currentUser.roleName;

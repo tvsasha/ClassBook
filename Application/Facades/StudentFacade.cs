@@ -1,4 +1,5 @@
-﻿using ClassBook.Domain.Entities;
+using ClassBook.Domain.Entities;
+using ClassBook.Domain.Interfaces;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -13,20 +14,17 @@ namespace ClassBook.Application.Facades
     public class StudentFacade
     {
         private readonly AppDbContext _db;
+        private readonly IPasswordHasher _hasher;
 
-        public StudentFacade(AppDbContext db)
+        public StudentFacade(AppDbContext db, IPasswordHasher hasher)
         {
             _db = db ?? throw new ArgumentNullException(nameof(db));
+            _hasher = hasher ?? throw new ArgumentNullException(nameof(hasher));
         }
 
         /// <summary>
-        /// Создаёт нового ученика.
+        /// Создаёт новую карточку ученика без учетной записи.
         /// </summary>
-        /// <param name="firstName">Имя</param>
-        /// <param name="lastName">Фамилия</param>
-        /// <param name="birthDate">Дата рождения</param>
-        /// <param name="classId">ID класса (опционально)</param>
-        /// <returns>Созданный ученик</returns>
         public async Task<Student> CreateStudentAsync(string firstName, string lastName, DateTime birthDate, int? classId = null)
         {
             if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
@@ -37,8 +35,8 @@ namespace ClassBook.Application.Facades
 
             var student = new Student
             {
-                FirstName = firstName,
-                LastName = lastName,
+                FirstName = firstName.Trim(),
+                LastName = lastName.Trim(),
                 BirthDate = birthDate,
                 ClassId = classId ?? 0
             };
@@ -51,7 +49,8 @@ namespace ClassBook.Application.Facades
         public async Task<Student> UpdateStudentAsync(int id, string firstName, string lastName, DateTime birthDate, int? classId)
         {
             var student = await _db.Students.FindAsync(id);
-            if (student == null) throw new KeyNotFoundException("Ученик не найден");
+            if (student == null)
+                throw new KeyNotFoundException("Ученик не найден");
 
             if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
                 throw new ArgumentException("Имя и фамилия обязательны");
@@ -59,8 +58,8 @@ namespace ClassBook.Application.Facades
             if (classId.HasValue && !await _db.Classes.AnyAsync(c => c.ClassId == classId))
                 throw new KeyNotFoundException("Класс не найден");
 
-            student.FirstName = firstName;
-            student.LastName = lastName;
+            student.FirstName = firstName.Trim();
+            student.LastName = lastName.Trim();
             student.BirthDate = birthDate;
             student.ClassId = classId ?? 0;
 
@@ -69,10 +68,54 @@ namespace ClassBook.Application.Facades
         }
 
         /// <summary>
+        /// Создает учетную запись для существующей карточки ученика.
+        /// </summary>
+        public async Task<User> CreateStudentAccountAsync(int studentId, string login, string password)
+        {
+            if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
+                throw new ArgumentException("Логин и временный пароль обязательны");
+
+            var student = await _db.Students
+                .Include(s => s.User)
+                .FirstOrDefaultAsync(s => s.StudentId == studentId);
+
+            if (student == null)
+                throw new KeyNotFoundException("Ученик не найден");
+
+            if (student.UserId.HasValue)
+                throw new ArgumentException("Для этого ученика уже создана учетная запись");
+
+            var normalizedLogin = login.Trim();
+            if (await _db.Users.AnyAsync(u => u.Login == normalizedLogin))
+                throw new ArgumentException("Логин уже занят");
+
+            var studentRole = await _db.Roles.FirstOrDefaultAsync(r => r.Name == "Ученик");
+            if (studentRole == null)
+                throw new KeyNotFoundException("Роль 'Ученик' не найдена");
+
+            var user = new User
+            {
+                Login = normalizedLogin,
+                FullName = $"{student.LastName} {student.FirstName}".Trim(),
+                PasswordHash = _hasher.Hash(password),
+                RoleId = studentRole.Id,
+                IsActive = true,
+                MustChangePassword = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+
+            student.UserId = user.Id;
+            await _db.SaveChangesAsync();
+
+            return user;
+        }
+
+        /// <summary>
         /// Получает список учеников по классу.
         /// </summary>
-        /// <param name="classId">ID класса</param>
-        /// <returns>Список учеников</returns>
         public async Task<IEnumerable<object>> GetStudentsByClassAsync(int classId)
         {
             if (!await _db.Classes.AnyAsync(c => c.ClassId == classId))
@@ -83,18 +126,21 @@ namespace ClassBook.Application.Facades
                 .Select(s => new
                 {
                     s.StudentId,
+                    s.UserId,
+                    HasAccount = s.UserId.HasValue,
                     s.FirstName,
                     s.LastName,
-                    s.BirthDate
+                    s.BirthDate,
+                    s.ClassId
                 })
                 .OrderBy(s => s.LastName)
+                .ThenBy(s => s.FirstName)
                 .ToListAsync();
         }
 
         /// <summary>
-        /// Получает ВСЕх учеников с информацией о классе (для админ-панели).
+        /// Получает всех учеников с информацией о классе.
         /// </summary>
-        /// <returns>Список всех учеников</returns>
         public async Task<IEnumerable<object>> GetAllStudentsAsync()
         {
             return await _db.Students
@@ -102,6 +148,8 @@ namespace ClassBook.Application.Facades
                 .Select(s => new
                 {
                     s.StudentId,
+                    s.UserId,
+                    HasAccount = s.UserId.HasValue,
                     s.FirstName,
                     s.LastName,
                     s.BirthDate,
@@ -138,52 +186,28 @@ namespace ClassBook.Application.Facades
         }
 
         /// <summary>
-        /// Привязывает студента к родителю.
+        /// Привязывает ученика к родителю.
         /// </summary>
-        /// <param name="parentId">ID родителя (User с ролью Родитель)</param>
-        /// <param name="studentId">ID студента</param>
         public async Task AttachStudentToParentAsync(int parentId, int studentId)
         {
-            Console.WriteLine($"[AttachStudentToParentAsync] Попытка привязать студента {studentId} к родителю {parentId}");
-            
-            // Проверяем, что родитель существует и имеет роль "Родитель"
             var parent = await _db.Users.FirstOrDefaultAsync(u => u.Id == parentId);
             if (parent == null)
-            {
-                Console.WriteLine($"[AttachStudentToParentAsync] Родитель {parentId} не найден");
                 throw new KeyNotFoundException("Родитель не найден");
-            }
 
-            Console.WriteLine($"[AttachStudentToParentAsync] Найден родитель: {parent.FullName} (RoleId: {parent.RoleId})");
-
-            // Получаем ID роли "Родитель" (обычно это ID 4)
             var parentRole = await _db.Roles.FirstOrDefaultAsync(r => r.Name == "Родитель");
             if (parentRole == null || parent.RoleId != parentRole.Id)
-            {
-                Console.WriteLine($"[AttachStudentToParentAsync] Пользователь {parentId} не является родителем (ожидалось RoleId {parentRole?.Id}, получено {parent.RoleId})");
                 throw new ArgumentException("Пользователь не является родителем");
-            }
 
-            // Проверяем, что студент существует
             var student = await _db.Students.FindAsync(studentId);
             if (student == null)
-            {
-                Console.WriteLine($"[AttachStudentToParentAsync] Студент {studentId} не найден");
                 throw new KeyNotFoundException("Студент не найден");
-            }
 
-            Console.WriteLine($"[AttachStudentToParentAsync] Найден студент: {student.FirstName} {student.LastName}");
-
-            // Проверяем, что связь еще не создана
             var existingLink = await _db.StudentParents
                 .FirstOrDefaultAsync(sp => sp.StudentId == studentId && sp.ParentId == parentId);
-            if (existingLink != null)
-            {
-                Console.WriteLine($"[AttachStudentToParentAsync] Связь уже существует (StudentParentId: {existingLink.StudentParentId})");
-                throw new ArgumentException("Этот студент уже привязан к этому родителю");
-            }
 
-            // Создаем связь
+            if (existingLink != null)
+                throw new ArgumentException("Этот студент уже привязан к этому родителю");
+
             var studentParent = new StudentParent
             {
                 StudentId = studentId,
@@ -191,12 +215,8 @@ namespace ClassBook.Application.Facades
                 CreatedAt = DateTime.UtcNow
             };
 
-            Console.WriteLine($"[AttachStudentToParentAsync] Создаем новую связь StudentParent");
-            
             _db.StudentParents.Add(studentParent);
             await _db.SaveChangesAsync();
-            
-            Console.WriteLine($"[AttachStudentToParentAsync] ✓ Связь успешно создана и сохранена в БД");
         }
     }
 }

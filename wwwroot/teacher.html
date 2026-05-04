@@ -266,7 +266,7 @@
 </div>
 
 <script>
-    const apiUrl = "https://localhost:7062/api";
+    const apiUrl = `${window.location.origin}/api`;
     let currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "null");
     let currentTab = "lessons";
     let editingLessonId = null;
@@ -282,6 +282,11 @@
             console.log("Доступ запрещён. Требуется авторизация.");
             sessionStorage.setItem("isRedirecting", "true");
             window.location.href = "login.html";
+            return;
+        }
+
+        if (currentUser.mustChangePassword) {
+            window.location.href = "change-password.html";
             return;
         }
         

@@ -80,7 +80,7 @@
 </div>
 
 <script>
-    const apiUrl = "https://localhost:7062/api";
+    const apiUrl = `${window.location.origin}/api`;
 
     function getStoredCurrentUser() {
         const currentUserStr = sessionStorage.getItem("currentUser");
@@ -96,6 +96,16 @@
             return null;
         }
     }
+
+    function getTargetPageForRole(userRole) {
+        if (userRole === "Администратор") return "index.html";
+        if (userRole === "Учитель") return "teacher.html";
+        if (userRole === "Ученик") return "student-portal.html";
+        if (userRole === "Родитель") return "parent-portal.html";
+        if (userRole === "Менеджер расписания") return "raspisanie.html";
+        if (userRole === "Директор") return "director-dashboard.html";
+        return null;
+    }
     
     // Если уже авторизован, перенаправляем на соответствующую страницу
     (function checkAuthOnLoad() {
@@ -109,26 +119,16 @@
                 console.log("login.html: parsed currentUser:", JSON.stringify(currentUser, null, 2));
                 if (currentUser && (currentUser.role || currentUser.roleName)) {
                     const userRole = currentUser.role || currentUser.roleName;
+                    if (currentUser.mustChangePassword) {
+                        window.location.href = "change-password.html";
+                        return;
+                    }
                     console.log("Уже авторизован, роль:", userRole);
                     if (window.location.pathname.includes('login.html')) {
-                        if (userRole === "Администратор") {
-                            console.log("Редирект на index.html");
-                            window.location.href = "index.html";
-                        } else if (userRole === "Учитель") {
-                            console.log("Редирект на teacher.html");
-                            window.location.href = "teacher.html";
-                        } else if (userRole === "Ученик") {
-                            console.log("Редирект на student-portal.html");
-                            window.location.href = "student-portal.html";
-                        } else if (userRole === "Родитель") {
-                            console.log("Редирект на parent-portal.html");
-                            window.location.href = "parent-portal.html";
-                        } else if (userRole === "Менеджер расписания") {
-                            console.log("Редирект на raspisanie.html");
-                            window.location.href = "raspisanie.html";
-                        } else if (userRole === "Директор") {
-                            console.log("Редирект на director-dashboard.html");
-                            window.location.href = "director-dashboard.html";
+                        const targetPage = getTargetPageForRole(userRole);
+                        if (targetPage) {
+                            console.log("Редирект на", targetPage);
+                            window.location.href = targetPage;
                         } else {
                             console.log("Неизвестная роль:", userRole);
                             sessionStorage.removeItem("currentUser");
@@ -200,24 +200,15 @@
             
             // Используем более длительную задержку, чтобы данные успели синхронизироваться
             setTimeout(() => {
-                if (userRole === "Администратор") {
-                    console.log("→ Переход на index.html");
-                    window.location.href = "index.html";
-                } else if (userRole === "Учитель") {
-                    console.log("→ Переход на teacher.html");
-                    window.location.href = "teacher.html";
-                } else if (userRole === "Ученик") {
-                    console.log("→ Переход на student-portal.html");
-                    window.location.href = "student-portal.html";
-                } else if (userRole === "Родитель") {
-                    console.log("→ Переход на parent-portal.html");
-                    window.location.href = "parent-portal.html";
-                } else if (userRole === "Менеджер расписания") {
-                    console.log("→ Переход на raspisanie.html для роли:", userRole);
-                    window.location.href = "raspisanie.html";
-                } else if (userRole === "Директор") {
-                    console.log("→ Переход на director-dashboard.html");
-                    window.location.href = "director-dashboard.html";
+                if (data.mustChangePassword) {
+                    window.location.href = "change-password.html";
+                    return;
+                }
+
+                const targetPage = getTargetPageForRole(userRole);
+                if (targetPage) {
+                    console.log("→ Переход на", targetPage);
+                    window.location.href = targetPage;
                 } else {
                     errorEl.textContent = "Неизвестная роль: " + (userRole || "не определена") + ". Свяжитесь с администратором.";
                     console.error("Неизвестная роль:", userRole);

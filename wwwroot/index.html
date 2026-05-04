@@ -121,7 +121,7 @@
 </div>
 
 <script>
-    const apiUrl = "https://localhost:7062/api";
+    const apiUrl = `${window.location.origin}/api`;
 
     let currentUser = JSON.parse(sessionStorage.getItem("currentUser") || "null");
     let currentTab = "users";
@@ -131,6 +131,10 @@
     let allRoles = [];  // Для фильтрации по ролям
 
     console.log("currentUser:", currentUser);
+
+    function redirectToForcedPasswordChange() {
+        window.location.href = "change-password.html";
+    }
 
     // Функция для создания заголовков
     function getHeaders() {
@@ -143,6 +147,11 @@
             console.log("Перенаправление на логин, т.к. нет авторизации");
             sessionStorage.setItem("isRedirecting", "true");
             window.location.href = "login.html";
+            return;
+        }
+
+        if (currentUser.mustChangePassword) {
+            redirectToForcedPasswordChange();
             return;
         }
         
@@ -268,11 +277,23 @@
     const copyPasswordBtn = document.getElementById("copyPasswordBtn");
     let attachedStudentExists = false;
 
+    async function ensureUsersLoaded() {
+        if (allUsers.length > 0) {
+            return;
+        }
+
+        const res = await fetch(`${apiUrl}/users`, { credentials: "include", headers: getHeaders() });
+        if (res.ok) {
+            allUsers = await res.json();
+        }
+    }
+
     function resetModal() {
         modalFirstName.value = "";
         modalLastName.value = "";
         modalBirthDate.value = "";
         modalName.value = "";
+        modalName.readOnly = false;
         modalLogin.value = "";
         modalPassword.value = "";
         modalPassword.type = "password";
@@ -354,6 +375,17 @@
     }
 
     function suggestLogin() {
+        if (editType === "student-account") {
+            const fullName = modalName.value.trim();
+            const normalized = fullName.replace(/\s*\(.+\)\s*$/, '');
+            const parts = normalized.split(/\s+/).filter(Boolean);
+            const lastName = transliterateToAscii(parts[0] || normalized) || 'student';
+            const firstInitial = transliterateToAscii((parts[1] || '').slice(0, 1));
+            const baseLogin = `student.${lastName}${firstInitial ? `.${firstInitial}` : ''}`;
+            modalLogin.value = buildUniqueLogin(baseLogin);
+            return;
+        }
+
         const fullName = modalName.value.trim();
         const roleId = modalRole.value;
         if (!fullName || !roleId) {
@@ -545,6 +577,24 @@
                     try { modalClass.value = classFilter.value; } catch (e) { /* ignore */ }
                 }
             }
+        } else if (type === "student-account") {
+            modalTitle.textContent = "Выдать доступ ученику";
+            modalName.classList.remove("hidden");
+            modalLogin.classList.remove("hidden");
+            modalPassword.classList.remove("hidden");
+            passwordTools.classList.remove("hidden");
+            credentialTools.classList.remove("hidden");
+            credentialHint.classList.remove("hidden");
+            modalName.placeholder = "Карточка ученика";
+            modalName.value = item?.fullName || "";
+            modalName.readOnly = true;
+            modalLogin.placeholder = "Логин ученика *";
+            modalPassword.placeholder = "Временный пароль *";
+            credentialHint.textContent = "Сначала создается карточка ученика, затем отдельно выдается учетная запись с временным паролем. После первого входа ученик обязан сменить пароль.";
+            generateTemporaryPassword();
+            if (item?.suggestedLogin) {
+                modalLogin.value = item.suggestedLogin;
+            }
         } else if (type === "subject") {
             modalTitle.textContent = item ? "Редактировать предмет" : "Новый предмет";
             modalName.classList.remove("hidden");
@@ -638,6 +688,12 @@
             if (!firstName || !lastName || !birth || !classId) { modalError.textContent = "Все поля обязательны"; return; }
             body = { FirstName: firstName, LastName: lastName, BirthDate: birth, ClassId: Number(classId) };
             url = editId ? `${apiUrl}/admin/students/${editId}` : `${apiUrl}/admin/students`;
+        } else if (editType === "student-account") {
+            const login = modalLogin.value.trim();
+            const password = modalPassword.value.trim();
+            if (!login || !password) { modalError.textContent = "Логин и временный пароль обязательны"; return; }
+            body = { login, password };
+            url = `${apiUrl}/admin/students/${editId}/account`;
         } else if (editType === "subject") {
             const name = modalName.value.trim();
             const teacherId = modalTeacher.value;
@@ -759,21 +815,34 @@
     // Загрузка учеников по классу
     async function loadStudentsByClass(classId) {
         try {
+            await ensureUsersLoaded();
             const res = await fetch(`${apiUrl}/admin/students/${classId}`, { credentials: "include", headers: getHeaders() });
             if (!res.ok) throw new Error();
             const data = await res.json();
             const list = document.getElementById('studentsList');
             list.innerHTML = '';
             data.forEach(s => {
+                const studentFullName = `${s.lastName} ${s.firstName}`.trim();
+                const className = document.getElementById('classFilter')?.selectedOptions?.[0]?.textContent || '';
+                const suggestedLogin = buildUniqueLogin(`student.${transliterateToAscii(s.lastName || 'student')}${s.firstName ? `.${transliterateToAscii((s.firstName || '').slice(0, 1))}` : ''}`);
                 const li = document.createElement('li');
                 li.innerHTML = `
-                    <span>${s.lastName} ${s.firstName} (${new Date(s.birthDate).toLocaleDateString()})</span>
+                    <span>${studentFullName} (${new Date(s.birthDate).toLocaleDateString()})${s.hasAccount ? ' · доступ выдан' : ' · без учётной записи'}</span>
                     <div style="display:flex; gap:8px;">
+                        ${s.hasAccount ? '' : '<button class="issue-btn" style="background:#198754;color:white;">Выдать доступ</button>'}
                         <button class="edit-btn">Редактировать</button>
                         <button class="delete-btn" style="background:#dc3545;color:white;">Удалить</button>
                     </div>`;
+                const issueBtn = li.querySelector('.issue-btn');
                 const editBtn = li.querySelector('.edit-btn');
                 const deleteBtn = li.querySelector('.delete-btn');
+                if (issueBtn) {
+                    issueBtn.addEventListener('click', () => openModal('student-account', {
+                        id: s.studentId,
+                        fullName: `${studentFullName}${className ? ` (${className})` : ''}`,
+                        suggestedLogin
+                    }));
+                }
                 editBtn.addEventListener('click', () => openModal('student', { id: s.studentId, firstName: s.firstName, lastName: s.lastName, birthDate: s.birthDate, classId: s.classId }));
                 deleteBtn.addEventListener('click', async () => {
                     if (!confirm(`Удалить ученика ${s.lastName} ${s.firstName}?`)) return;

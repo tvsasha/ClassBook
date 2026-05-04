@@ -347,7 +347,7 @@
 </div>
 
 <script>
-const API_BASE = 'https://localhost:7062/api';
+const API_BASE = `${window.location.origin}/api`;
 const DAY_NAMES = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница'];
 
 let metadata = { classes: [], subjects: [], teachers: [], slots: [] };
@@ -378,6 +378,11 @@ function checkAuth() {
     if (!currentUser) {
         sessionStorage.setItem('isRedirecting', 'true');
         window.location.href = 'login.html';
+        return false;
+    }
+
+    if (currentUser.mustChangePassword) {
+        window.location.href = 'change-password.html';
         return false;
     }
 

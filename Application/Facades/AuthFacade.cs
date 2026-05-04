@@ -1,13 +1,12 @@
-﻿// Application/Facades/AuthFacade.cs
 using ClassBook.Domain.Entities;
 using ClassBook.Domain.Interfaces;
-using Microsoft.EntityFrameworkCore;
 using ClassBook.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace ClassBook.Application.Facades
 {
     /// <summary>
-    /// Фасад для операций аутентификации и регистрации пользователей.
+    /// Фасад для операций аутентификации и управления паролями.
     /// </summary>
     public class AuthFacade
     {
@@ -16,16 +15,13 @@ namespace ClassBook.Application.Facades
 
         public AuthFacade(AppDbContext db, IPasswordHasher hasher)
         {
-            _db = db;
-            _hasher = hasher;
+            _db = db ?? throw new ArgumentNullException(nameof(db));
+            _hasher = hasher ?? throw new ArgumentNullException(nameof(hasher));
         }
 
         /// <summary>
         /// Выполняет вход пользователя в систему.
         /// </summary>
-        /// <param name="login">Логин</param>
-        /// <param name="password">Пароль</param>
-        /// <returns>Пользователь, если авторизация успешна; иначе null</returns>
         public async Task<User?> LoginAsync(string login, string password)
         {
             if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
@@ -42,14 +38,37 @@ namespace ClassBook.Application.Facades
         }
 
         /// <summary>
+        /// Меняет пароль текущего пользователя.
+        /// </summary>
+        public async Task<User> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
+        {
+            if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+                throw new ArgumentException("Текущий и новый пароль обязательны");
+
+            if (newPassword.Length < 8)
+                throw new ArgumentException("Новый пароль должен содержать не менее 8 символов");
+
+            var user = await _db.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+
+            if (user == null)
+                throw new KeyNotFoundException("Пользователь не найден");
+
+            if (!_hasher.Verify(currentPassword, user.PasswordHash))
+                throw new InvalidOperationException("Текущий пароль указан неверно");
+
+            user.PasswordHash = _hasher.Hash(newPassword);
+            user.MustChangePassword = false;
+
+            await _db.SaveChangesAsync();
+            return user;
+        }
+
+        /// <summary>
         /// Регистрирует нового пользователя.
         /// </summary>
-        /// <param name="login">Логин</param>
-        /// <param name="fullName">Полное имя</param>
-        /// <param name="password">Пароль</param>
-        /// <param name="roleId">ID роли</param>
-        /// <returns>Созданный пользователь</returns>
-        public async Task<User> RegisterAsync(string login, string fullName, string password, int roleId)
+        public async Task<User> RegisterAsync(string login, string fullName, string password, int roleId, bool mustChangePassword = false)
         {
             if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(password))
                 throw new ArgumentException("Все поля обязательны");
@@ -62,11 +81,12 @@ namespace ClassBook.Application.Facades
 
             var user = new User
             {
-                Login = login,
-                FullName = fullName,
+                Login = login.Trim(),
+                FullName = fullName.Trim(),
                 PasswordHash = _hasher.Hash(password),
                 RoleId = roleId,
                 IsActive = true,
+                MustChangePassword = mustChangePassword,
                 CreatedAt = DateTime.UtcNow
             };
 

@@ -6,6 +6,7 @@ using ClassBook.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using System.IO;
+using System.Security.Claims;
 
 namespace ClassBook
 {
@@ -79,6 +80,12 @@ namespace ClassBook
 
             var app = builder.Build();
 
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                db.Database.Migrate();
+            }
+
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
@@ -86,10 +93,45 @@ namespace ClassBook
             }
             app.UseDefaultFiles();
             app.UseStaticFiles();
-            app.UseCors("AllowAll");           
-            app.UseAuthentication();
-            app.UseAuthorization();
             app.UseHttpsRedirection();
+            app.UseCors("AllowAll");
+            app.UseAuthentication();
+
+            app.Use(async (context, next) =>
+            {
+                var path = context.Request.Path.Value ?? string.Empty;
+                var isApiRequest = path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase);
+                var isAllowedApi = path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+                    || path.Equals("/api/auth/logout", StringComparison.OrdinalIgnoreCase)
+                    || path.Equals("/api/auth/change-password", StringComparison.OrdinalIgnoreCase);
+
+                if (isApiRequest && !isAllowedApi && context.User.Identity?.IsAuthenticated == true)
+                {
+                    var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    if (int.TryParse(userIdClaim, out var userId))
+                    {
+                        var db = context.RequestServices.GetRequiredService<AppDbContext>();
+                        var mustChangePassword = await db.Users
+                            .Where(u => u.Id == userId && u.IsActive)
+                            .Select(u => u.MustChangePassword)
+                            .FirstOrDefaultAsync();
+
+                        if (mustChangePassword)
+                        {
+                            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                            await context.Response.WriteAsJsonAsync(new
+                            {
+                                message = "Необходимо сменить временный пароль перед дальнейшей работой."
+                            });
+                            return;
+                        }
+                    }
+                }
+
+                await next();
+            });
+
+            app.UseAuthorization();
             app.MapControllers();
 
             app.Run();

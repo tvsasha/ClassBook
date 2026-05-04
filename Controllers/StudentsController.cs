@@ -1,4 +1,4 @@
-﻿using ClassBook.Application.Facades;
+using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
@@ -24,6 +24,31 @@ namespace ClassBook.Controllers
             {
                 var student = await _facade.CreateStudentAsync(dto.FirstName, dto.LastName, dto.BirthDate, dto.ClassId);
                 return Ok(student);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        [HttpPost("{studentId}/account")]
+        public async Task<IActionResult> CreateStudentAccount(int studentId, [FromBody] CreateStudentAccountDto dto)
+        {
+            try
+            {
+                var user = await _facade.CreateStudentAccountAsync(studentId, dto.Login, dto.Password);
+                return Ok(new
+                {
+                    user.Id,
+                    user.Login,
+                    user.FullName,
+                    user.MustChangePassword,
+                    message = "Учетная запись ученика создана"
+                });
             }
             catch (ArgumentException ex)
             {
@@ -123,6 +148,12 @@ namespace ClassBook.Controllers
         public string LastName { get; set; } = null!;
         public DateTime BirthDate { get; set; }
         public int? ClassId { get; set; }
+    }
+
+    public class CreateStudentAccountDto
+    {
+        public string Login { get; set; } = null!;
+        public string Password { get; set; } = null!;
     }
 
     public class AttachStudentToParentDto
