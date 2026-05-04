@@ -237,6 +237,114 @@ namespace ClassBook.Application.Facades
             await _db.SaveChangesAsync();
         }
 
+        public async Task<List<PortalScheduleEntryDto>> GetScheduleForUserAsync(int userId)
+        {
+            var student = await GetCurrentStudentAsync(userId);
+            var schedule = await _db.Lessons
+                .Where(l => l.ClassId == student.ClassId)
+                .Include(l => l.Subject)
+                .Include(l => l.Teacher)
+                .Include(l => l.Schedule)
+                .OrderBy(l => l.Date)
+                .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
+                .Select(l => new PortalScheduleEntryDto
+                {
+                    LessonId = l.LessonId,
+                    Subject = l.Subject.Name,
+                    Teacher = l.Teacher.FullName,
+                    Date = l.Date,
+                    Topic = l.Topic,
+                    Homework = l.Homework,
+                    ScheduleId = l.ScheduleId,
+                    LessonNumber = l.Schedule != null ? l.Schedule.LessonNumber : (int?)null,
+                    StartTime = l.Schedule != null ? l.Schedule.StartTime.ToString(@"hh\:mm") : null,
+                    EndTime = l.Schedule != null ? l.Schedule.EndTime.ToString(@"hh\:mm") : null
+                })
+                .ToListAsync();
+
+            return schedule;
+        }
+
+        public async Task<List<PortalGradeEntryDto>> GetGradesForUserAsync(int userId)
+        {
+            var student = await GetCurrentStudentAsync(userId);
+            return await _db.Grades
+                .Where(g => g.StudentId == student.StudentId)
+                .Include(g => g.Lesson)
+                .ThenInclude(l => l.Subject)
+                .ThenInclude(s => s.Teacher)
+                .OrderByDescending(g => g.Lesson.Date)
+                .Select(g => new PortalGradeEntryDto
+                {
+                    GradeId = g.GradeId,
+                    Subject = g.Lesson.Subject.Name,
+                    Teacher = g.Lesson.Subject.Teacher.FullName,
+                    Value = g.Value,
+                    Date = g.Lesson.Date,
+                    Topic = g.Lesson.Topic
+                })
+                .ToListAsync();
+        }
+
+        public async Task<List<PortalHomeworkEntryDto>> GetHomeworkForUserAsync(int userId)
+        {
+            var student = await GetCurrentStudentAsync(userId);
+            return await _db.Lessons
+                .Where(l => l.ClassId == student.ClassId && !string.IsNullOrEmpty(l.Homework))
+                .Include(l => l.Subject)
+                .Include(l => l.Teacher)
+                .OrderByDescending(l => l.Date)
+                .Select(l => new PortalHomeworkEntryDto
+                {
+                    LessonId = l.LessonId,
+                    Subject = l.Subject.Name,
+                    Teacher = l.Teacher.FullName,
+                    Date = l.Date,
+                    Topic = l.Topic,
+                    Homework = l.Homework!
+                })
+                .ToListAsync();
+        }
+
+        public async Task<List<PortalAttendanceEntryDto>> GetAttendanceForUserAsync(int userId)
+        {
+            var student = await GetCurrentStudentAsync(userId);
+            return await _db.Attendances
+                .Where(a => a.StudentId == student.StudentId)
+                .Include(a => a.Lesson)
+                .ThenInclude(l => l.Subject)
+                .OrderByDescending(a => a.Lesson.Date)
+                .Select(a => new PortalAttendanceEntryDto
+                {
+                    LessonId = a.LessonId,
+                    AttendanceId = a.AttendanceId,
+                    Subject = a.Lesson.Subject.Name,
+                    Status = a.Status,
+                    StatusLabel = a.Status == 1
+                        ? "Присутствовал"
+                        : (a.Status == 0 ? "Отсутствовал" : "Отсутствовал по уважительной причине"),
+                    Date = a.Lesson.Date,
+                    Topic = a.Lesson.Topic
+                })
+                .ToListAsync();
+        }
+
+        public async Task<PortalStudentInfoDto> GetClassInfoForUserAsync(int userId)
+        {
+            var student = await GetCurrentStudentAsync(userId, includeClass: true);
+            return new PortalStudentInfoDto
+            {
+                StudentId = student.StudentId,
+                FirstName = student.FirstName,
+                LastName = student.LastName,
+                BirthDate = student.BirthDate,
+                Class = new PortalClassDto
+                {
+                    Name = student.Class?.Name ?? "Класс не определен"
+                }
+            };
+        }
+
         private static AdminStudentDto MapStudent(Student student, string? className)
         {
             return new AdminStudentDto
@@ -250,6 +358,19 @@ namespace ClassBook.Application.Facades
                 ClassId = student.ClassId,
                 ClassName = className
             };
+        }
+
+        private async Task<Student> GetCurrentStudentAsync(int userId, bool includeClass = false)
+        {
+            var query = _db.Students.AsQueryable();
+            if (includeClass)
+                query = query.Include(s => s.Class);
+
+            var student = await query.FirstOrDefaultAsync(s => s.UserId == userId);
+            if (student == null)
+                throw new KeyNotFoundException("Карточка ученика не привязана к учетной записи");
+
+            return student;
         }
     }
 }

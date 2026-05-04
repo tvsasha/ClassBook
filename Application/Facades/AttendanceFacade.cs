@@ -1,4 +1,5 @@
 ﻿// Application/Facades/AttendanceFacade.cs
+using ClassBook.Application.DTOs;
 using ClassBook.Domain.Entities;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -62,26 +63,24 @@ namespace ClassBook.Application.Facades
         /// </summary>
         /// <param name="lessonId">Идентификатор урока</param>
         /// <returns>Список отметок с данными ученика</returns>
-        public async Task<IEnumerable<object>> GetAttendanceForLessonAsync(int lessonId)
+        public async Task<IEnumerable<LessonAttendanceDto>> GetAttendanceForLessonAsync(int lessonId)
         {
-            // 1. Проверяем существование урока (можно оставить, но лучше через AnyAsync)
             var lessonExists = await _db.Lessons.AnyAsync(l => l.LessonId == lessonId);
             if (!lessonExists)
                 throw new KeyNotFoundException("Урок не найден");
 
-            // 2. Загружаем данные с защитой от NULL
             return await _db.Attendances
                 .Where(a => a.LessonId == lessonId)
                 .Include(a => a.Student)
-                .Select(a => new
+                .Select(a => new LessonAttendanceDto
                 {
-                    a.AttendanceId,
-                    a.StudentId,
+                    AttendanceId = a.AttendanceId,
+                    StudentId = a.StudentId,
                     StudentName = a.Student != null
                         ? (a.Student.FirstName + " " + a.Student.LastName)
                         : "Ученик не найден",
-                    a.Status,
-                    a.LessonId
+                    Status = a.Status,
+                    LessonId = a.LessonId
                 })
                 .OrderBy(a => a.StudentName)
                 .ToListAsync();

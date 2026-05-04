@@ -1,9 +1,6 @@
-using ClassBook.Domain.Entities;
-using ClassBook.Infrastructure.Data;
-using ClassBook.Application.DTOs;
+using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 
@@ -13,28 +10,18 @@ namespace ClassBook.Controllers
     [Route("api/student")]
     public class StudentController : ApiControllerBase
     {
-        private readonly AppDbContext _db;
+        private readonly StudentFacade _studentFacade;
         private readonly ILogger<StudentController> _logger;
 
-        public StudentController(AppDbContext db, ILogger<StudentController> logger)
+        public StudentController(StudentFacade studentFacade, ILogger<StudentController> logger)
         {
-            _db = db;
+            _studentFacade = studentFacade;
             _logger = logger;
         }
 
         private int GetUserId()
         {
             return int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId) ? userId : 0;
-        }
-
-        private async Task<Student?> GetCurrentStudentAsync(bool includeClass = false)
-        {
-            var query = _db.Students.AsQueryable();
-
-            if (includeClass)
-                query = query.Include(s => s.Class);
-
-            return await query.FirstOrDefaultAsync(s => s.UserId == GetUserId());
         }
 
         /// <summary>
@@ -47,33 +34,11 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var student = await GetCurrentStudentAsync();
-                if (student == null)
-                    return NotFoundError("Карточка ученика не привязана к учетной записи");
-
-                var schedule = await _db.Lessons
-                    .Where(l => l.ClassId == student.ClassId)
-                    .Include(l => l.Subject)
-                    .Include(l => l.Teacher)
-                    .Include(l => l.Schedule)
-                    .OrderBy(l => l.Date)
-                    .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
-                    .Select(l => new PortalScheduleEntryDto
-                    {
-                        LessonId = l.LessonId,
-                        Subject = l.Subject.Name,
-                        Teacher = l.Teacher.FullName,
-                        Date = l.Date,
-                        Topic = l.Topic,
-                        Homework = l.Homework,
-                        ScheduleId = l.ScheduleId,
-                        LessonNumber = l.Schedule != null ? l.Schedule.LessonNumber : (int?)null,
-                        StartTime = l.Schedule != null ? l.Schedule.StartTime.ToString(@"hh\:mm") : null,
-                        EndTime = l.Schedule != null ? l.Schedule.EndTime.ToString(@"hh\:mm") : null
-                    })
-                    .ToListAsync();
-
-                return Ok(schedule);
+                return Ok(await _studentFacade.GetScheduleForUserAsync(GetUserId()));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -92,28 +57,11 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var student = await GetCurrentStudentAsync();
-                if (student == null)
-                    return NotFoundError("Карточка ученика не привязана к учетной записи");
-
-                var grades = await _db.Grades
-                    .Where(g => g.StudentId == student.StudentId)
-                    .Include(g => g.Lesson)
-                    .ThenInclude(l => l.Subject)
-                    .ThenInclude(s => s.Teacher)
-                    .OrderByDescending(g => g.Lesson.Date)
-                    .Select(g => new PortalGradeEntryDto
-                    {
-                        GradeId = g.GradeId,
-                        Subject = g.Lesson.Subject.Name,
-                        Teacher = g.Lesson.Subject.Teacher.FullName,
-                        Value = g.Value,
-                        Date = g.Lesson.Date,
-                        Topic = g.Lesson.Topic
-                    })
-                    .ToListAsync();
-
-                return Ok(grades);
+                return Ok(await _studentFacade.GetGradesForUserAsync(GetUserId()));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -132,27 +80,11 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var student = await GetCurrentStudentAsync();
-                if (student == null)
-                    return NotFoundError("Карточка ученика не привязана к учетной записи");
-
-                var homework = await _db.Lessons
-                    .Where(l => l.ClassId == student.ClassId && !string.IsNullOrEmpty(l.Homework))
-                    .Include(l => l.Subject)
-                    .Include(l => l.Teacher)
-                    .OrderByDescending(l => l.Date)
-                    .Select(l => new PortalHomeworkEntryDto
-                    {
-                        LessonId = l.LessonId,
-                        Subject = l.Subject.Name,
-                        Teacher = l.Teacher.FullName,
-                        Date = l.Date,
-                        Topic = l.Topic,
-                        Homework = l.Homework!
-                    })
-                    .ToListAsync();
-
-                return Ok(homework);
+                return Ok(await _studentFacade.GetHomeworkForUserAsync(GetUserId()));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -171,28 +103,11 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var student = await GetCurrentStudentAsync();
-                if (student == null)
-                    return NotFoundError("Карточка ученика не привязана к учетной записи");
-
-                var attendance = await _db.Attendances
-                    .Where(a => a.StudentId == student.StudentId)
-                    .Include(a => a.Lesson)
-                    .ThenInclude(l => l.Subject)
-                    .OrderByDescending(a => a.Lesson.Date)
-                    .Select(a => new PortalAttendanceEntryDto
-                    {
-                        LessonId = a.LessonId,
-                        AttendanceId = a.AttendanceId,
-                        Subject = a.Lesson.Subject.Name,
-                        Status = a.Status,
-                        StatusLabel = a.Status == 1 ? "Присутствовал" : (a.Status == 0 ? "Отсутствовал" : "Отсутствовал по уважительной причине"),
-                        Date = a.Lesson.Date,
-                        Topic = a.Lesson.Topic
-                    })
-                    .ToListAsync();
-
-                return Ok(attendance);
+                return Ok(await _studentFacade.GetAttendanceForUserAsync(GetUserId()));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -211,21 +126,11 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var student = await GetCurrentStudentAsync(includeClass: true);
-                if (student == null)
-                    return NotFoundError("Карточка ученика не привязана к учетной записи");
-
-                return Ok(new PortalStudentInfoDto
-                {
-                    StudentId = student.StudentId,
-                    FirstName = student.FirstName,
-                    LastName = student.LastName,
-                    BirthDate = student.BirthDate,
-                    Class = new PortalClassDto
-                    {
-                        Name = student.Class.Name
-                    }
-                });
+                return Ok(await _studentFacade.GetClassInfoForUserAsync(GetUserId()));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
             }
             catch (Exception ex)
             {

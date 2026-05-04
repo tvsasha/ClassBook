@@ -1,10 +1,8 @@
-﻿using ClassBook.Application.Facades;
-using ClassBook.Infrastructure.Data;
+using ClassBook.Application.DTOs;
+using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace ClassBook.Controllers
 {
@@ -13,15 +11,12 @@ namespace ClassBook.Controllers
     public class LessonController : ApiControllerBase
     {
         private readonly LessonFacade _facade;
-        private readonly AppDbContext _db;
 
-        public LessonController(LessonFacade facade, AppDbContext db)
+        public LessonController(LessonFacade facade)
         {
             _facade = facade;
-            _db = db;
         }
 
-        // GET: api/lessons — все уроки (для админа)
         /// <summary>
         /// Возвращает полный список уроков для административного режима.
         /// </summary>
@@ -30,11 +25,9 @@ namespace ClassBook.Controllers
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> GetAll()
         {
-            var lessons = await _facade.GetAllLessonsAsync();
-            return Ok(lessons);
+            return Ok(await _facade.GetAllLessonsAsync());
         }
 
-        // POST: api/lessons — создание урока
         /// <summary>
         /// Создаёт новый урок с привязкой к классу, предмету и преподавателю.
         /// </summary>
@@ -46,43 +39,8 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var currentUserIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                int.TryParse(currentUserIdClaim, out var currentUserId);
-
-                var lesson = await _facade.CreateLessonAsync(
-                    dto.SubjectId,
-                    dto.ClassId,
-                    dto.TeacherId,
-                    dto.Topic,
-                    dto.Date,
-                    dto.Homework,
-                    currentUserId > 0 ? currentUserId : null
-                );
-
-                // Загружаем данные одним запросом
-                var result = await _db.Lessons
-                    .Include(l => l.Subject)
-                    .Include(l => l.Class)
-                    .Include(l => l.Teacher)
-                    .Where(l => l.LessonId == lesson.LessonId)
-                    .Select(l => new LessonResponse
-                    {
-                        LessonId = l.LessonId,
-                        SubjectId = l.SubjectId,
-                        SubjectName = l.Subject.Name,
-                        ClassId = l.ClassId,
-                        ClassName = l.Class.Name,
-                        TeacherId = l.TeacherId,
-                        TeacherName = l.Teacher.FullName,
-                        Topic = l.Topic,
-                        Date = l.Date,
-                        Homework = l.Homework
-                    })
-                    .FirstOrDefaultAsync();
-
-                if (result == null)
-                    return InternalServerError("Не удалось загрузить созданный урок");
-
+                var currentUserId = TryGetCurrentUserId();
+                var result = await _facade.CreateLessonAsync(dto.SubjectId, dto.ClassId, dto.TeacherId, dto.Topic, dto.Date, dto.Homework, currentUserId);
                 return CreatedAtAction(nameof(GetAll), new { id = result.LessonId }, result);
             }
             catch (InvalidOperationException ex)
@@ -93,9 +51,12 @@ namespace ClassBook.Controllers
             {
                 return NotFoundError(ex.Message);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
         }
 
-        // PUT: api/lessons/{id} — обновление урока (админ/учитель)
         /// <summary>
         /// Обновляет существующий урок. Учитель может изменять только свои уроки.
         /// </summary>
@@ -108,45 +69,18 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var lesson = await _db.Lessons.FindAsync(id);
-                if (lesson == null) return NotFoundError("Урок не найден");
+                var lesson = await _facade.GetLessonByIdAsync(id);
+                if (lesson == null)
+                    return NotFoundError("Урок не найден");
 
-                var currentUserIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                if (!int.TryParse(currentUserIdClaim, out var currentUserId))
-                {
+                var currentUserId = TryGetCurrentUserId();
+                if (!currentUserId.HasValue)
                     return UnauthorizedError("Не удалось определить пользователя");
-                }
 
-                if (User.IsInRole("Учитель") && lesson.TeacherId != currentUserId)
-                {
+                if (User.IsInRole("Учитель") && lesson.TeacherId != currentUserId.Value)
                     return ForbiddenError("Вы можете редактировать только свои уроки");
-                }
 
-                var updated = await _facade.UpdateLessonAsync(id, dto.SubjectId, dto.ClassId, dto.TeacherId, dto.Topic, dto.Date, dto.Homework, currentUserId);
-
-                var result = await _db.Lessons
-                    .Include(l => l.Subject)
-                    .Include(l => l.Class)
-                    .Include(l => l.Teacher)
-                    .Where(l => l.LessonId == id)
-                    .Select(l => new LessonResponse
-                    {
-                        LessonId = l.LessonId,
-                        SubjectId = l.SubjectId,
-                        SubjectName = l.Subject.Name,
-                        ClassId = l.ClassId,
-                        ClassName = l.Class.Name,
-                        TeacherId = l.TeacherId,
-                        TeacherName = l.Teacher.FullName,
-                        Topic = l.Topic,
-                        Date = l.Date,
-                        Homework = l.Homework
-                    })
-                    .FirstOrDefaultAsync();
-
-                if (result == null)
-                    return InternalServerError("Не удалось загрузить обновленный урок");
-
+                var result = await _facade.UpdateLessonAsync(id, dto.SubjectId, dto.ClassId, dto.TeacherId, dto.Topic, dto.Date, dto.Homework, currentUserId);
                 return Ok(result);
             }
             catch (KeyNotFoundException ex)
@@ -163,7 +97,6 @@ namespace ClassBook.Controllers
             }
         }
 
-        // DELETE: api/lessons/{lessonId} — удаление урока (Учитель/Админ)
         /// <summary>
         /// Удаляет урок. Учитель может удалять только собственные уроки.
         /// </summary>
@@ -179,13 +112,11 @@ namespace ClassBook.Controllers
                 if (lesson == null)
                     return NotFoundError("Урок не найден");
 
-                var currentUserIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                if (!int.TryParse(currentUserIdClaim, out var currentUserId))
-                {
+                var currentUserId = TryGetCurrentUserId();
+                if (!currentUserId.HasValue)
                     return UnauthorizedError("Не удалось определить пользователя");
-                }
 
-                if (User.IsInRole("Учитель") && lesson.TeacherId != currentUserId)
+                if (User.IsInRole("Учитель") && lesson.TeacherId != currentUserId.Value)
                     return ForbiddenError("Вы можете удалять только свои уроки");
 
                 await _facade.DeleteLessonAsync(lessonId, currentUserId);
@@ -196,31 +127,12 @@ namespace ClassBook.Controllers
                 return NotFoundError(ex.Message);
             }
         }
-    }
 
-    // DTO для создания/обновления урока
-    public class CreateLessonRequest
-    {
-        public int SubjectId { get; set; }
-        public int ClassId { get; set; }
-        public int TeacherId { get; set; }
-        public string Topic { get; set; } = null!;
-        public DateTime Date { get; set; }
-        public string? Homework { get; set; }
-    }
-
-    // DTO для ответа (без циклов)
-    public class LessonResponse
-    {
-        public int LessonId { get; set; }
-        public int SubjectId { get; set; }
-        public string SubjectName { get; set; } = null!;
-        public int ClassId { get; set; }
-        public string ClassName { get; set; } = null!;
-        public int TeacherId { get; set; }
-        public string TeacherName { get; set; } = null!;
-        public string Topic { get; set; } = null!;
-        public DateTime Date { get; set; }
-        public string? Homework { get; set; }
+        private int? TryGetCurrentUserId()
+        {
+            return int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUserId)
+                ? currentUserId
+                : null;
+        }
     }
 }

@@ -61,7 +61,7 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Добавляет оценку ученику за урок.
         /// </summary>
-        public async Task<Grade> AddGradeAsync(int lessonId, int studentId, int value, int? userId = null)
+        public async Task<GradeDto> AddGradeAsync(int lessonId, int studentId, int value, int? userId = null)
         {
             if (value < 1 || value > 5)
                 throw new ArgumentException("Оценка должна быть от 1 до 5");
@@ -90,10 +90,10 @@ namespace ClassBook.Application.Facades
 
             if (userId.HasValue)
             {
-                await _auditFacade.LogActionAsync(userId.Value, "Grade", grade.GradeId, "Create", null, new { grade.LessonId, grade.StudentId, grade.Value });
+                await _auditFacade.LogActionAsync(userId.Value, "Grade", grade.GradeId, "Create", null, BuildGradeAuditDto(grade));
             }
 
-            return grade;
+            return MapGrade(grade);
         }
 
         /// <summary>
@@ -114,16 +114,32 @@ namespace ClassBook.Application.Facades
 
             if (userId.HasValue)
             {
-                await _auditFacade.LogActionAsync(userId.Value, "Grade", gradeId, "Update", new { Value = oldValue }, new { Value = newValue });
+                await _auditFacade.LogActionAsync(userId.Value, "Grade", gradeId, "Update", new GradeAuditDto { GradeId = gradeId, Value = oldValue }, new GradeAuditDto { GradeId = gradeId, Value = newValue });
             }
         }
 
-        public async Task<IEnumerable<Grade>> GetAllGradesByTeacherAsync(int teacherId)
+        public async Task<IEnumerable<TeacherGradeListItemDto>> GetAllGradesByTeacherAsync(int teacherId)
         {
             return await _db.Grades
                 .Include(g => g.Student)
                 .Include(g => g.Lesson)
                 .Where(g => g.Lesson.TeacherId == teacherId)
+                .OrderByDescending(g => g.Lesson.Date)
+                .Select(g => new TeacherGradeListItemDto
+                {
+                    LessonId = g.LessonId,
+                    StudentId = g.StudentId,
+                    Value = g.Value,
+                    Student = g.Student != null ? new TeacherGradeStudentDto
+                    {
+                        FullName = $"{g.Student.FirstName} {g.Student.LastName}"
+                    } : null,
+                    Lesson = g.Lesson != null ? new TeacherGradeLessonDto
+                    {
+                        Id = g.Lesson.LessonId,
+                        Date = g.Lesson.Date
+                    } : null
+                })
                 .ToListAsync();
         }
 
@@ -136,7 +152,7 @@ namespace ClassBook.Application.Facades
             if (grade == null)
                 throw new KeyNotFoundException("Оценка не найдена");
 
-            var oldValues = new { grade.GradeId, grade.LessonId, grade.StudentId, grade.Value };
+            var oldValues = BuildGradeAuditDto(grade);
 
             _db.Grades.Remove(grade);
             await _db.SaveChangesAsync();
@@ -152,12 +168,46 @@ namespace ClassBook.Application.Facades
         /// </summary>
         /// <param name="lessonId">Идентификатор урока</param>
         /// <returns>Список оценок с данными ученика</returns>
-        public async Task<IEnumerable<Grade>> GetGradesForLessonAsync(int lessonId)
+        public async Task<IEnumerable<GradeDto>> GetGradesForLessonAsync(int lessonId)
         {
             return await _db.Grades
                 .Where(g => g.LessonId == lessonId)
                 .Include(g => g.Student)
+                .Select(g => new GradeDto
+                {
+                    GradeId = g.GradeId,
+                    LessonId = g.LessonId,
+                    StudentId = g.StudentId,
+                    Value = g.Value,
+                    Student = g.Student != null ? new StudentGradeOwnerDto
+                    {
+                        StudentId = g.Student.StudentId,
+                        FullName = $"{g.Student.FirstName} {g.Student.LastName}"
+                    } : null
+                })
                 .ToListAsync();
+        }
+
+        private static GradeDto MapGrade(Grade grade)
+        {
+            return new GradeDto
+            {
+                GradeId = grade.GradeId,
+                LessonId = grade.LessonId,
+                StudentId = grade.StudentId,
+                Value = grade.Value
+            };
+        }
+
+        private static GradeAuditDto BuildGradeAuditDto(Grade grade)
+        {
+            return new GradeAuditDto
+            {
+                GradeId = grade.GradeId,
+                LessonId = grade.LessonId,
+                StudentId = grade.StudentId,
+                Value = grade.Value
+            };
         }
     }
 }

@@ -1,10 +1,9 @@
-﻿using ClassBook.Application.Facades;
-using ClassBook.Domain.Entities;
+using ClassBook.Application.DTOs;
+using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace ClassBook.Controllers
 {
@@ -39,14 +38,7 @@ namespace ClassBook.Controllers
             {
                 var userId = GetUserId();
                 var grade = await _facade.AddGradeAsync(dto.LessonId, dto.StudentId, dto.Value, userId > 0 ? userId : null);
-                var result = new GradeDto
-                {
-                    GradeId = grade.GradeId,
-                    LessonId = grade.LessonId,
-                    StudentId = grade.StudentId,
-                    Value = grade.Value
-                };
-                return CreatedAtAction(nameof(AddGrade), new { id = grade.GradeId }, result);
+                return CreatedAtAction(nameof(AddGrade), new { id = grade.GradeId }, grade);
             }
             catch (ArgumentException ex)
             {
@@ -72,23 +64,7 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var grades = await _facade.GetGradesForLessonAsync(lessonId);
-                var result = grades.Cast<Grade>()
-                    .Select(g => new GradeDto
-                    {
-                        GradeId = g.GradeId,
-                        LessonId = g.LessonId,
-                        StudentId = g.StudentId,
-                        Value = g.Value,
-                        Student = g.Student != null ? new StudentDto
-                        {
-                            StudentId = g.Student.StudentId,
-                            FullName = $"{g.Student.FirstName} {g.Student.LastName}"
-                        } : null
-                    })
-                    .ToList();
-
-                return Ok(result);
+                return Ok(await _facade.GetGradesForLessonAsync(lessonId));
             }
             catch (KeyNotFoundException ex)
             {
@@ -106,25 +82,7 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var grades = await _facade.GetAllGradesByTeacherAsync(teacherId);
-
-                var result = grades.Select(g => new
-                {
-                    lessonId = g.LessonId,
-                    studentId = g.StudentId,
-                    value = g.Value,
-                    student = g.Student != null ? new
-                    {
-                        fullName = $"{g.Student.FirstName} {g.Student.LastName}"
-                    } : null,
-                    lesson = g.Lesson != null ? new
-                    {
-                        id = g.Lesson.LessonId,
-                        date = g.Lesson.Date
-                    } : null
-                });
-
-                return Ok(result);
+                return Ok(await _facade.GetAllGradesByTeacherAsync(teacherId));
             }
             catch (Exception ex)
             {
@@ -132,6 +90,7 @@ namespace ClassBook.Controllers
                 return InternalServerError("Не удалось загрузить оценки преподавателя");
             }
         }
+
         /// <summary>
         /// Возвращает список учеников урока вместе с уже поставленными оценками.
         /// </summary>
@@ -140,8 +99,7 @@ namespace ClassBook.Controllers
         [HttpGet("lesson/{lessonId}/students")]
         public async Task<IActionResult> GetStudentsWithGrades(int lessonId)
         {
-            var result = await _facade.GetStudentsWithGradesAsync(lessonId);
-            return Ok(result);
+            return Ok(await _facade.GetStudentsWithGradesAsync(lessonId));
         }
 
         /// <summary>
@@ -168,28 +126,5 @@ namespace ClassBook.Controllers
                 return InternalServerError("Не удалось удалить оценку");
             }
         }
-    }
-
-    public class AddGradeRequest
-    {
-        public int LessonId { get; set; }
-        public int StudentId { get; set; }
-        public int Value { get; set; }
-    }
-
-
-    public class GradeDto
-    {
-        public int GradeId { get; set; }
-        public int LessonId { get; set; }
-        public int StudentId { get; set; }
-        public int Value { get; set; }
-        public StudentDto? Student { get; set; }
-    }
-
-    public class StudentDto
-    {
-        public int StudentId { get; set; }
-        public string FullName { get; set; } = string.Empty;
     }
 }

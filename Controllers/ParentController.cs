@@ -1,3 +1,4 @@
+using ClassBook.Application.DTOs;
 using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -286,8 +287,4 @@ namespace ClassBook.Controllers
         }
     }
 
-    public class AddParentRequest
-    {
-        public int ParentId { get; set; }
-    }
 }

@@ -1,10 +1,7 @@
-﻿using ClassBook.Domain.Entities;
-using ClassBook.Infrastructure.Data;
 using ClassBook.Application.DTOs;
+using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace ClassBook.Controllers
 {
@@ -13,11 +10,11 @@ namespace ClassBook.Controllers
     [Authorize(Policy = "AdminOnly")]
     public class ClassesController : ApiControllerBase
     {
-        private readonly AppDbContext _db;
+        private readonly ClassFacade _classFacade;
 
-        public ClassesController(AppDbContext db)
+        public ClassesController(ClassFacade classFacade)
         {
-            _db = db;
+            _classFacade = classFacade;
         }
 
         /// <summary>
@@ -27,14 +24,7 @@ namespace ClassBook.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var classes = await _db.Classes
-                .Select(c => new ClassListItemDto
-                {
-                    ClassId = c.ClassId,
-                    Name = c.Name
-                })
-                .ToListAsync();
-            return Ok(classes);
+            return Ok(await _classFacade.GetAllClassesAsync());
         }
 
         /// <summary>
@@ -45,19 +35,18 @@ namespace ClassBook.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateClass([FromBody] CreateClassDto dto)
         {
-            var classEntity = new Class
+            try
             {
-                Name = dto.Name
-            };
-
-            _db.Classes.Add(classEntity);
-            await _db.SaveChangesAsync();
-
-            return Ok(new ClassListItemDto
+                return Ok(await _classFacade.CreateClassAsync(dto.Name));
+            }
+            catch (ArgumentException ex)
             {
-                ClassId = classEntity.ClassId,
-                Name = classEntity.Name
-            });
+                return BadRequestError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
         }
 
         /// <summary>
@@ -68,28 +57,19 @@ namespace ClassBook.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteClass(int id)
         {
-            var classEntity = await _db.Classes.FindAsync(id);
-            if (classEntity == null)
-                return NotFoundError("Класс не найден");
-
-            // Проверка на связанные данные
-            if (await _db.Students.AnyAsync(s => s.ClassId == id) ||
-                await _db.Lessons.AnyAsync(l => l.ClassId == id))
+            try
             {
-                return BadRequestError("Нельзя удалить класс с привязанными учениками или уроками");
+                await _classFacade.DeleteClassAsync(id);
+                return NoContent();
             }
-
-            _db.Classes.Remove(classEntity);
-            await _db.SaveChangesAsync();
-
-            return NoContent();
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
         }
     }
-
-    public class CreateClassDto
-    {
-        public string Name { get; set; } = null!; // например "10А"
-    }
-   
-    
 }

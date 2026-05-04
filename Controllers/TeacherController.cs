@@ -1,9 +1,8 @@
-﻿using ClassBook.Application.Facades;
-using ClassBook.Domain.Entities;
+using ClassBook.Application.DTOs;
+using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace ClassBook.Controllers
 {
@@ -35,8 +34,6 @@ namespace ClassBook.Controllers
             _attendanceFacade = attendanceFacade;
         }
 
-        // ── Просмотр данных ─────────────────────────────────────────────────────────────────────────────
-
         /// <summary>
         /// Возвращает список предметов преподавателя или выбранного преподавателя для администратора.
         /// </summary>
@@ -46,8 +43,7 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> GetSubjects(int? teacherId = null)
         {
             var effectiveTeacherId = teacherId ?? GetCurrentUserId();
-            var subjects = await _subjectFacade.GetSubjectsForTeacherAsync(effectiveTeacherId);
-            return Ok(subjects);
+            return Ok(await _subjectFacade.GetSubjectsForTeacherAsync(effectiveTeacherId));
         }
 
         /// <summary>
@@ -59,8 +55,7 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> GetClasses(int? teacherId = null)
         {
             var effectiveTeacherId = teacherId ?? GetCurrentUserId();
-            var classes = await _classFacade.GetClassesForTeacherAsync(effectiveTeacherId);
-            return Ok(classes);
+            return Ok(await _classFacade.GetClassesForTeacherAsync(effectiveTeacherId));
         }
 
         /// <summary>
@@ -73,8 +68,7 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var students = await _studentFacade.GetStudentsByClassAsync(classId);
-                return Ok(students);
+                return Ok(await _studentFacade.GetStudentsByClassAsync(classId));
             }
             catch (KeyNotFoundException ex)
             {
@@ -91,11 +85,8 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> GetLessons(int? teacherId = null)
         {
             var effectiveTeacherId = teacherId ?? GetCurrentUserId();
-            var lessons = await _lessonFacade.GetLessonsForTeacherAsync(effectiveTeacherId);
-            return Ok(lessons);
+            return Ok(await _lessonFacade.GetLessonsForTeacherAsync(effectiveTeacherId));
         }
-
-        // ── Создание урока ──────────────────────────────────────────────────────────────────────────────
 
         /// <summary>
         /// Создаёт новый урок от имени преподавателя или администратора.
@@ -111,27 +102,8 @@ namespace ClassBook.Controllers
                 if (dto.TeacherId != currentUserId && !User.IsInRole("Администратор"))
                     return ForbiddenError("Вы можете создавать только свои уроки");
 
-                var lesson = await _lessonFacade.CreateLessonAsync(
-                    dto.SubjectId,
-                    dto.ClassId,
-                    dto.TeacherId,
-                    dto.Topic,
-                    dto.Date,
-                    dto.Homework
-                );
-
-                var response = new
-                {
-                    lesson.LessonId,
-                    lesson.SubjectId,
-                    lesson.ClassId,
-                    lesson.TeacherId,
-                    lesson.Topic,
-                    lesson.Date,
-                    lesson.Homework
-                };
-
-                return CreatedAtAction(nameof(GetLessons), new { id = lesson.LessonId }, response);
+                var lesson = await _lessonFacade.CreateLessonAsync(dto.SubjectId, dto.ClassId, dto.TeacherId, dto.Topic, dto.Date, dto.Homework);
+                return CreatedAtAction(nameof(GetLessons), new { id = lesson.LessonId }, lesson);
             }
             catch (InvalidOperationException ex)
             {
@@ -141,9 +113,12 @@ namespace ClassBook.Controllers
             {
                 return NotFoundError(ex.Message);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
         }
 
-        // ── Удаление урока для учителя/админа ───────────────────────────────────────────────────────────
         /// <summary>
         /// Обновляет существующий урок.
         /// </summary>
@@ -163,16 +138,7 @@ namespace ClassBook.Controllers
                 if (existingLesson.TeacherId != currentUserId && !User.IsInRole("Администратор"))
                     return ForbiddenError("Вы можете редактировать только свои уроки");
 
-                var updatedLesson = await _lessonFacade.UpdateLessonAsync(
-                    lessonId,
-                    dto.SubjectId,
-                    dto.ClassId,
-                    dto.TeacherId,
-                    dto.Topic,
-                    dto.Date,
-                    dto.Homework
-                );
-
+                var updatedLesson = await _lessonFacade.UpdateLessonAsync(lessonId, dto.SubjectId, dto.ClassId, dto.TeacherId, dto.Topic, dto.Date, dto.Homework);
                 return Ok(updatedLesson);
             }
             catch (KeyNotFoundException ex)
@@ -216,11 +182,6 @@ namespace ClassBook.Controllers
             }
         }
 
-        // ── Удаление урока из панели учителя ────────────────────────────────────────────────────────
-        
-
-        // ── Оценки и посещаемость ──────────────────────────────────────────────────────────────────────
-
         /// <summary>
         /// Выставляет оценку ученику через преподавательский режим.
         /// </summary>
@@ -248,10 +209,6 @@ namespace ClassBook.Controllers
             }
         }
 
-        
-
-        // Было: api/teacher/attendance
-        // Стало: api/teacher/attendance/mark
         /// <summary>
         /// Отмечает посещаемость ученика на уроке.
         /// </summary>
@@ -275,42 +232,13 @@ namespace ClassBook.Controllers
             }
         }
 
-        // ── Вспомогательные методы ─────────────────────────────────────────────────────────────────────
-
         private int GetCurrentUserId()
         {
             var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
-            {
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
                 throw new UnauthorizedAccessException("ID пользователя не найден");
-            }
+
             return userId;
         }
-    }
-
-
-    // DTO-шки остаются без изменений
-    public class CreateLessonDto
-    {
-        public int SubjectId { get; set; }
-        public int ClassId { get; set; }
-        public int TeacherId { get; set; }
-        public string Topic { get; set; } = null!;
-        public DateTime Date { get; set; }
-        public string? Homework { get; set; }
-    }
-
-    public class AddGradeDto
-    {
-        public int LessonId { get; set; }
-        public int StudentId { get; set; }
-        public int Value { get; set; }
-    }
-
-    public class MarkAttendanceDto
-    {
-        public int LessonId { get; set; }
-        public int StudentId { get; set; }
-        public byte Status { get; set; }
     }
 }

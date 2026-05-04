@@ -1,4 +1,5 @@
 ﻿// Controllers/AttendanceController.cs
+using ClassBook.Application.DTOs;
 using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -57,13 +58,4 @@ namespace ClassBook.Controllers
         }
     }
 
-    /// <summary>
-    /// DTO для отметки посещаемости
-    /// </summary>
-    public class MarkAttendanceRequest
-    {
-        public int LessonId { get; set; }
-        public int StudentId { get; set; }
-        public byte Status { get; set; }
-    }
 }

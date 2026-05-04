@@ -80,6 +80,7 @@ namespace ClassBook
             builder.Services.AddScoped<ScheduleFacade>();
             builder.Services.AddScoped<ParentFacade>();
             builder.Services.AddScoped<AnalyticsFacade>();
+            builder.Services.AddScoped<RoleFacade>();
 
             builder.Services.AddCors(options =>
             {

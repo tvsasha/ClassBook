@@ -116,15 +116,4 @@ namespace ClassBook.Controllers
         }
     }
 
-    public class LoginDto
-    {
-        public string Login { get; set; } = null!;
-        public string Password { get; set; } = null!;
-    }
-
-    public class ChangePasswordDto
-    {
-        public string CurrentPassword { get; set; } = null!;
-        public string NewPassword { get; set; } = null!;
-    }
 }

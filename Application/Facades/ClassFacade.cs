@@ -18,15 +18,52 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Создаёт новый класс.
         /// </summary>
-        public async Task<Class> CreateClassAsync(string name)
+        public async Task<IEnumerable<ClassListItemDto>> GetAllClassesAsync()
+        {
+            return await _db.Classes
+                .OrderBy(c => c.Name)
+                .Select(c => new ClassListItemDto
+                {
+                    ClassId = c.ClassId,
+                    Name = c.Name
+                })
+                .ToListAsync();
+        }
+
+        public async Task<ClassListItemDto> CreateClassAsync(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Название класса обязательно");
 
-            var classEntity = new Class { Name = name };
+            var normalizedName = name.Trim();
+            if (await _db.Classes.AnyAsync(c => c.Name == normalizedName))
+                throw new InvalidOperationException("Класс с таким названием уже существует");
+
+            var classEntity = new Class { Name = normalizedName };
             _db.Classes.Add(classEntity);
             await _db.SaveChangesAsync();
-            return classEntity;
+
+            return new ClassListItemDto
+            {
+                ClassId = classEntity.ClassId,
+                Name = classEntity.Name
+            };
+        }
+
+        public async Task DeleteClassAsync(int classId)
+        {
+            var classEntity = await _db.Classes.FindAsync(classId);
+            if (classEntity == null)
+                throw new KeyNotFoundException("Класс не найден");
+
+            if (await _db.Students.AnyAsync(s => s.ClassId == classId) ||
+                await _db.Lessons.AnyAsync(l => l.ClassId == classId))
+            {
+                throw new InvalidOperationException("Нельзя удалить класс с привязанными учениками или уроками");
+            }
+
+            _db.Classes.Remove(classEntity);
+            await _db.SaveChangesAsync();
         }
 
         public async Task<IEnumerable<ClassListItemDto>> GetClassesForTeacherAsync(int teacherId)
