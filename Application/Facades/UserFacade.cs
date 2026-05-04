@@ -1,6 +1,5 @@
 ﻿// Application/Facades/UserFacade.cs
 using ClassBook.Application.DTOs;
-using ClassBook.Domain.Entities;
 using ClassBook.Domain.Interfaces;
 using ClassBook.Domain.Constants;
 using ClassBook.Infrastructure.Data;
@@ -29,6 +28,7 @@ namespace ClassBook.Application.Facades
         {
             return await _db.Users
                 .Include(u => u.Role)
+                .OrderBy(u => u.FullName)
                 .Select(u => new UserListItemDto
                 {
                     Id = u.Id,
@@ -37,6 +37,7 @@ namespace ClassBook.Application.Facades
                     RoleId = u.RoleId,
                     RoleName = u.Role.Name,
                     IsActive = u.IsActive,
+                    MustChangePassword = u.MustChangePassword,
                     CreatedAt = u.CreatedAt
                 })
                 .ToListAsync();
@@ -73,57 +74,206 @@ namespace ClassBook.Application.Facades
                 RoleId = user.RoleId,
                 RoleName = user.Role.Name,
                 IsActive = user.IsActive,
+                MustChangePassword = user.MustChangePassword,
                 CreatedAt = user.CreatedAt
+            };
+        }
+
+        /// <summary>
+        /// Создаёт пользователя общего административного потока.
+        /// </summary>
+        public async Task<UserCreateResultDto> CreateUserAsync(CreateUserDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Login) ||
+                string.IsNullOrWhiteSpace(dto.Password) ||
+                string.IsNullOrWhiteSpace(dto.FullName))
+            {
+                throw new ArgumentException("Логин, пароль и ФИО обязательны");
+            }
+
+            if (await _db.Users.AnyAsync(u => u.Login == dto.Login))
+                throw new InvalidOperationException("Логин уже занят");
+
+            if (dto.RoleId < 1 || dto.RoleId > 6)
+                throw new ArgumentException("Недопустимая роль");
+
+            var role = await _db.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId);
+            if (role == null)
+                throw new InvalidOperationException("Роль не найдена");
+
+            if (role.Name == "Родитель")
+                throw new InvalidOperationException("Новые учетные записи родителей создавайте только из карточки конкретного ученика");
+
+            if (role.Name == "Ученик")
+                throw new InvalidOperationException("Новые учетные записи учеников создавайте только из карточки конкретного ученика");
+
+            var user = new Domain.Entities.User
+            {
+                Login = dto.Login.Trim(),
+                FullName = dto.FullName.Trim(),
+                PasswordHash = _hasher.Hash(dto.Password),
+                RoleId = role.Id,
+                IsActive = true,
+                MustChangePassword = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+
+            return new UserCreateResultDto
+            {
+                User = await GetRequiredUserDtoAsync(user.Id),
+                AuditValues = BuildUserAuditDto(user)
             };
         }
 
         /// <summary>
         /// Обновляет пользователя.
         /// </summary>
-        public async Task UpdateUserAsync(int id, string? login, string? fullName, string? password, int? roleId, bool? isActive)
+        public async Task<UserUpdateResultDto> UpdateUserAsync(int id, UpdateUserDto dto)
         {
-            var user = await _db.Users.FindAsync(id);
-            if (user == null) throw new KeyNotFoundException("Пользователь не найден");
+            var user = await _db.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null)
+                throw new KeyNotFoundException("Пользователь не найден");
 
-            if (!string.IsNullOrEmpty(login) && login != user.Login)
+            var currentRoleName = user.Role?.Name ?? string.Empty;
+            var oldValues = BuildUserAuditDto(user);
+
+            if (!string.IsNullOrWhiteSpace(dto.Login) && dto.Login != user.Login)
             {
-                if (await _db.Users.AnyAsync(u => u.Login == login))
-                    throw new InvalidOperationException("Логин занят");
-                user.Login = login;
+                if (await _db.Users.AnyAsync(u => u.Login == dto.Login))
+                    throw new InvalidOperationException("Логин уже занят");
+                user.Login = dto.Login.Trim();
             }
 
-            if (!string.IsNullOrEmpty(fullName)) user.FullName = fullName;
-            if (roleId.HasValue && roleId != user.RoleId)
+            if (!string.IsNullOrWhiteSpace(dto.FullName))
+                user.FullName = dto.FullName.Trim();
+
+            if (dto.RoleId.HasValue && dto.RoleId != user.RoleId)
             {
-                // Проверяем что роль существует в БД (1-6)
-                if (roleId < 1 || roleId > 6)
-                    throw new InvalidOperationException("Недопустимая роль");
-                user.RoleId = roleId.Value;
+                if (dto.RoleId < 1 || dto.RoleId > 6)
+                    throw new ArgumentException("Недопустимая роль");
+
+                var targetRole = await _db.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId.Value);
+                if (targetRole == null)
+                    throw new InvalidOperationException("Роль не найдена");
+
+                var targetRoleName = targetRole.Name;
+                var touchesStrictRole =
+                    currentRoleName == "Родитель" ||
+                    currentRoleName == "Ученик" ||
+                    targetRoleName == "Родитель" ||
+                    targetRoleName == "Ученик";
+
+                if (touchesStrictRole)
+                {
+                    throw new InvalidOperationException("Менять роль на 'Родитель' или 'Ученик' и обратно через общую форму пользователей нельзя. Используйте карточку ученика и специализированные сценарии выдачи доступа.");
+                }
+
+                user.RoleId = targetRole.Id;
+                user.Role = targetRole;
             }
-            if (!string.IsNullOrEmpty(password))
+
+            if (!string.IsNullOrWhiteSpace(dto.Password))
             {
-                user.PasswordHash = _hasher.Hash(password);
+                user.PasswordHash = _hasher.Hash(dto.Password);
                 user.MustChangePassword = true;
             }
-            if (isActive.HasValue) user.IsActive = isActive.Value;
+
+            if (dto.IsActive.HasValue)
+                user.IsActive = dto.IsActive.Value;
 
             await _db.SaveChangesAsync();
+
+            return new UserUpdateResultDto
+            {
+                User = await GetRequiredUserDtoAsync(user.Id),
+                OldValues = oldValues,
+                NewValues = BuildUserAuditDto(user, !string.IsNullOrWhiteSpace(dto.Password))
+            };
         }
 
         /// <summary>
-        /// Удаляет пользователя.
+        /// Возвращает учеников выбранного родителя.
         /// </summary>
-        public async Task DeleteUserAsync(int id)
+        public async Task<List<ParentStudentListItemDto>> GetParentStudentsAsync(int parentId)
+        {
+            var parent = await _db.Users
+                .Include(u => u.Role)
+                .Include(u => u.StudentParents!)
+                .ThenInclude(sp => sp.Student)
+                .ThenInclude(s => s.Class)
+                .FirstOrDefaultAsync(u => u.Id == parentId);
+
+            if (parent == null)
+                throw new KeyNotFoundException("Родитель не найден");
+
+            if (parent.Role.Name != "Родитель")
+                throw new InvalidOperationException("Пользователь не является родителем");
+
+            return (parent.StudentParents ?? [])
+                .Select(sp => new ParentStudentListItemDto
+                {
+                    StudentId = sp.Student.StudentId,
+                    FirstName = sp.Student.FirstName,
+                    LastName = sp.Student.LastName,
+                    BirthDate = sp.Student.BirthDate,
+                    ClassId = sp.Student.ClassId,
+                    ClassName = sp.Student.Class?.Name ?? "не определен"
+                })
+                .ToList();
+        }
+
+        /// <summary>
+         /// Удаляет пользователя.
+        /// </summary>
+        public async Task<UserDeleteResultDto> DeleteUserAsync(int id)
         {
             var user = await _db.Users.FindAsync(id);
-            if (user == null) throw new KeyNotFoundException("Пользователь не найден");
+            if (user == null)
+                throw new KeyNotFoundException("Пользователь не найден");
 
             if (await _db.Subjects.AnyAsync(s => s.TeacherId == id) ||
                 await _db.Lessons.AnyAsync(l => l.TeacherId == id))
-                throw new InvalidOperationException("Нельзя удалить учителя с привязанными предметами/уроками");
+            {
+                throw new InvalidOperationException("Нельзя удалить учителя с привязанными предметами или уроками");
+            }
+
+            var oldValues = BuildUserAuditDto(user);
 
             _db.Users.Remove(user);
             await _db.SaveChangesAsync();
+
+            return new UserDeleteResultDto
+            {
+                UserId = id,
+                OldValues = oldValues
+            };
+        }
+
+        private async Task<UserListItemDto> GetRequiredUserDtoAsync(int id)
+        {
+            var user = await GetUserByIdAsync(id);
+            if (user == null)
+                throw new KeyNotFoundException("Пользователь не найден");
+
+            return user;
+        }
+
+        private static UserMutationAuditDto BuildUserAuditDto(Domain.Entities.User user, bool passwordReset = false)
+        {
+            return new UserMutationAuditDto
+            {
+                Login = user.Login,
+                FullName = user.FullName,
+                RoleId = user.RoleId,
+                IsActive = user.IsActive,
+                MustChangePassword = user.MustChangePassword,
+                PasswordReset = passwordReset
+            };
         }
     }
 }
