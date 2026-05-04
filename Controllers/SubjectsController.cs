@@ -1,11 +1,7 @@
-﻿using ClassBook.Application.Facades;
 using ClassBook.Application.DTOs;
+using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ClassBook.Infrastructure.Data;
-using ClassBook.Domain.Constants;
-using ClassBook.Domain.Entities;
 
 namespace ClassBook.Controllers
 {
@@ -14,25 +10,24 @@ namespace ClassBook.Controllers
     [Authorize(Policy = "AdminOnly")]
     public class SubjectsController : ApiControllerBase
     {
-        private readonly AppDbContext _db;
         private readonly SubjectFacade _subjectFacade;
 
-        public SubjectsController(AppDbContext db, SubjectFacade subjectFacade)
+        public SubjectsController(SubjectFacade subjectFacade)
         {
-            _db = db;
             _subjectFacade = subjectFacade;
         }
 
         /// <summary>
-        /// Получает классы, в которых преподаётся предмет (с учителем).
+        /// Получает классы, в которых преподаётся предмет.
         /// </summary>
+        /// <param name="subjectId">Идентификатор предмета.</param>
+        /// <returns>Список классов и привязанных преподавателей.</returns>
         [HttpGet("{subjectId}/classes")]
         public async Task<IActionResult> GetClassesForSubject(int subjectId)
         {
             try
             {
-                var classes = await _subjectFacade.GetClassesForSubjectAsync(subjectId);
-                return Ok(classes);
+                return Ok(await _subjectFacade.GetClassesForSubjectAsync(subjectId));
             }
             catch (KeyNotFoundException ex)
             {
@@ -43,96 +38,74 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Получает все предметы.
         /// </summary>
+        /// <returns>Список предметов с преподавателями.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var subjects = await _db.Subjects
-                .Include(s => s.Teacher)
-                .Select(s => new
-                {
-                    s.SubjectId,
-                    s.Name,
-                    s.TeacherId,
-                    TeacherName = s.Teacher != null ? s.Teacher.FullName : "Не назначен"
-                })
-                .ToListAsync();
-
-            return Ok(subjects);
+            return Ok(await _subjectFacade.GetAllSubjectsAsync());
         }
 
         /// <summary>
         /// Создаёт новый предмет.
         /// </summary>
+        /// <param name="dto">Название предмета и преподаватель.</param>
+        /// <returns>Созданный предмет.</returns>
         [HttpPost]
         public async Task<IActionResult> CreateSubject([FromBody] CreateSubjectDto dto)
         {
-            if (string.IsNullOrWhiteSpace(dto.Name))
-                return BadRequestError("Название предмета обязательно");
-
-            var teacher = await _db.Users
-                .FirstOrDefaultAsync(u => u.Id == dto.TeacherId && u.RoleId == SystemRoleIds.Teacher);
-
-            if (teacher == null)
-                return BadRequestError("Учитель не найден или это не учитель");
-
-            var subject = await _subjectFacade.CreateSubjectAsync(dto.Name, dto.TeacherId);
-
-            return Ok(new SubjectAdminResponseDto
+            try
             {
-                SubjectId = subject.SubjectId,
-                Name = subject.Name,
-                TeacherName = teacher.FullName
-            });
+                return Ok(await _subjectFacade.CreateSubjectAsync(dto.Name, dto.TeacherId));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
         }
 
         /// <summary>
         /// Обновляет предмет.
         /// </summary>
+        /// <param name="id">Идентификатор предмета.</param>
+        /// <param name="dto">Новые данные предмета.</param>
+        /// <returns>Обновленный предмет.</returns>
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateSubject(int id, [FromBody] CreateSubjectDto dto)
         {
-            if (string.IsNullOrWhiteSpace(dto.Name))
-                return BadRequestError("Название предмета обязательно");
-
-            var subject = await _db.Subjects.FindAsync(id);
-            if (subject == null)
-                return NotFoundError("Предмет не найден");
-
-            var teacher = await _db.Users
-                .FirstOrDefaultAsync(u => u.Id == dto.TeacherId && u.RoleId == SystemRoleIds.Teacher);
-
-            if (teacher == null)
-                return BadRequestError("Учитель не найден или это не учитель");
-
-            subject.Name = dto.Name;
-            subject.TeacherId = dto.TeacherId;
-
-            await _db.SaveChangesAsync();
-
-            return Ok(new SubjectAdminResponseDto
+            try
             {
-                SubjectId = subject.SubjectId,
-                Name = subject.Name,
-                TeacherName = teacher.FullName
-            });
+                return Ok(await _subjectFacade.UpdateSubjectAsync(id, dto.Name, dto.TeacherId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
         }
 
         /// <summary>
         /// Прикрепляет учителя к предмету.
         /// </summary>
+        /// <param name="subjectId">Идентификатор предмета.</param>
+        /// <param name="dto">Идентификатор преподавателя.</param>
+        /// <returns>Результат привязки.</returns>
         [HttpPost("{subjectId}/teachers")]
         public async Task<IActionResult> AttachTeacherToSubject(int subjectId, [FromBody] AttachTeacherDto dto)
         {
             try
             {
-                await _subjectFacade.AttachTeacherToSubjectAsync(subjectId, dto.TeacherId);
-                var teacher = await _db.Users.FindAsync(dto.TeacherId);
-                return Ok(new MessageResponseDto
-                {
-                    Message = teacher == null
-                        ? "Учитель успешно прикреплён"
-                        : $"Учитель успешно прикреплён: {teacher.FullName}"
-                });
+                return Ok(await _subjectFacade.AttachTeacherToSubjectAsync(subjectId, dto.TeacherId));
             }
             catch (KeyNotFoundException ex)
             {
@@ -147,31 +120,24 @@ namespace ClassBook.Controllers
         /// <summary>
         /// Удаляет предмет.
         /// </summary>
+        /// <param name="id">Идентификатор предмета.</param>
+        /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteSubject(int id)
         {
-            var subject = await _db.Subjects.FindAsync(id);
-            if (subject == null)
-                return NotFoundError("Предмет не найден");
-
-            if (await _db.Lessons.AnyAsync(l => l.SubjectId == id))
-                return BadRequestError("Нельзя удалить предмет, к которому привязаны уроки");
-
-            _db.Subjects.Remove(subject);
-            await _db.SaveChangesAsync();
-
-            return NoContent();
+            try
+            {
+                await _subjectFacade.DeleteSubjectAsync(id);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
         }
-    }
-
-    public class CreateSubjectDto
-    {
-        public string Name { get; set; } = null!;
-        public int TeacherId { get; set; }
-    }
-
-    public class AttachTeacherDto
-    {
-        public int TeacherId { get; set; }
     }
 }

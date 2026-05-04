@@ -1,3 +1,4 @@
+using ClassBook.Application.DTOs;
 using ClassBook.Domain.Entities;
 using ClassBook.Domain.Interfaces;
 using ClassBook.Infrastructure.Data;
@@ -25,7 +26,7 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Создаёт новую карточку ученика без учетной записи.
         /// </summary>
-        public async Task<Student> CreateStudentAsync(string firstName, string lastName, DateTime birthDate, int? classId = null)
+        public async Task<AdminStudentDto> CreateStudentAsync(string firstName, string lastName, DateTime birthDate, int? classId = null)
         {
             if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
                 throw new ArgumentException("Имя и фамилия обязательны");
@@ -43,10 +44,10 @@ namespace ClassBook.Application.Facades
 
             _db.Students.Add(student);
             await _db.SaveChangesAsync();
-            return student;
+            return MapStudent(student, null);
         }
 
-        public async Task<Student> UpdateStudentAsync(int id, string firstName, string lastName, DateTime birthDate, int? classId)
+        public async Task<AdminStudentDto> UpdateStudentAsync(int id, string firstName, string lastName, DateTime birthDate, int? classId)
         {
             var student = await _db.Students.FindAsync(id);
             if (student == null)
@@ -64,13 +65,23 @@ namespace ClassBook.Application.Facades
             student.ClassId = classId ?? 0;
 
             await _db.SaveChangesAsync();
-            return student;
+
+            string? className = null;
+            if (student.ClassId > 0)
+            {
+                className = await _db.Classes
+                    .Where(c => c.ClassId == student.ClassId)
+                    .Select(c => c.Name)
+                    .FirstOrDefaultAsync();
+            }
+
+            return MapStudent(student, className);
         }
 
         /// <summary>
         /// Создает учетную запись для существующей карточки ученика.
         /// </summary>
-        public async Task<User> CreateStudentAccountAsync(int studentId, string login, string password)
+        public async Task<IssuedStudentAccountDto> CreateStudentAccountAsync(int studentId, string login, string password)
         {
             if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
                 throw new ArgumentException("Логин и временный пароль обязательны");
@@ -110,28 +121,35 @@ namespace ClassBook.Application.Facades
             student.UserId = user.Id;
             await _db.SaveChangesAsync();
 
-            return user;
+            return new IssuedStudentAccountDto
+            {
+                Id = user.Id,
+                Login = user.Login,
+                FullName = user.FullName,
+                MustChangePassword = user.MustChangePassword,
+                Message = "Учетная запись ученика создана"
+            };
         }
 
         /// <summary>
         /// Получает список учеников по классу.
         /// </summary>
-        public async Task<IEnumerable<object>> GetStudentsByClassAsync(int classId)
+        public async Task<IEnumerable<AdminStudentDto>> GetStudentsByClassAsync(int classId)
         {
             if (!await _db.Classes.AnyAsync(c => c.ClassId == classId))
                 throw new KeyNotFoundException("Класс не найден");
 
             return await _db.Students
                 .Where(s => s.ClassId == classId)
-                .Select(s => new
+                .Select(s => new AdminStudentDto
                 {
-                    s.StudentId,
-                    s.UserId,
+                    StudentId = s.StudentId,
+                    UserId = s.UserId,
                     HasAccount = s.UserId.HasValue,
-                    s.FirstName,
-                    s.LastName,
-                    s.BirthDate,
-                    s.ClassId
+                    FirstName = s.FirstName,
+                    LastName = s.LastName,
+                    BirthDate = s.BirthDate,
+                    ClassId = s.ClassId
                 })
                 .OrderBy(s => s.LastName)
                 .ThenBy(s => s.FirstName)
@@ -141,20 +159,20 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Получает всех учеников с информацией о классе.
         /// </summary>
-        public async Task<IEnumerable<object>> GetAllStudentsAsync()
+        public async Task<IEnumerable<AdminStudentDto>> GetAllStudentsAsync()
         {
             return await _db.Students
                 .Include(s => s.Class)
-                .Select(s => new
+                .Select(s => new AdminStudentDto
                 {
-                    s.StudentId,
-                    s.UserId,
+                    StudentId = s.StudentId,
+                    UserId = s.UserId,
                     HasAccount = s.UserId.HasValue,
-                    s.FirstName,
-                    s.LastName,
-                    s.BirthDate,
-                    s.ClassId,
-                    Class = s.Class != null ? new { s.Class.ClassId, s.Class.Name } : null
+                    FirstName = s.FirstName,
+                    LastName = s.LastName,
+                    BirthDate = s.BirthDate,
+                    ClassId = s.ClassId,
+                    ClassName = s.Class != null ? s.Class.Name : null
                 })
                 .OrderBy(s => s.LastName)
                 .ThenBy(s => s.FirstName)
@@ -217,6 +235,21 @@ namespace ClassBook.Application.Facades
 
             _db.StudentParents.Add(studentParent);
             await _db.SaveChangesAsync();
+        }
+
+        private static AdminStudentDto MapStudent(Student student, string? className)
+        {
+            return new AdminStudentDto
+            {
+                StudentId = student.StudentId,
+                UserId = student.UserId,
+                HasAccount = student.UserId.HasValue,
+                FirstName = student.FirstName,
+                LastName = student.LastName,
+                BirthDate = student.BirthDate,
+                ClassId = student.ClassId,
+                ClassName = className
+            };
         }
     }
 }

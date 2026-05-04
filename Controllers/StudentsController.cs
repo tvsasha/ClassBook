@@ -45,12 +45,12 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "Student", student.StudentId, "Create", null, new
+                    await _auditFacade.LogActionAsync(currentUserId, "Student", student.StudentId, "Create", null, new StudentAuditDto
                     {
-                        student.FirstName,
-                        student.LastName,
-                        student.BirthDate,
-                        student.ClassId
+                        FirstName = student.FirstName,
+                        LastName = student.LastName,
+                        BirthDate = student.BirthDate,
+                        ClassId = student.ClassId
                     });
                 }
                 return Ok(student);
@@ -80,22 +80,15 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "User", user.Id, "IssueStudentAccess", null, new
+                    await _auditFacade.LogActionAsync(currentUserId, "User", user.Id, "IssueStudentAccess", null, new StudentAccessAuditDto
                     {
                         StudentId = studentId,
-                        user.Login,
-                        user.FullName,
-                        user.MustChangePassword
+                        Login = user.Login,
+                        FullName = user.FullName,
+                        MustChangePassword = user.MustChangePassword
                     });
                 }
-                return Ok(new
-                {
-                    user.Id,
-                    user.Login,
-                    user.FullName,
-                    user.MustChangePassword,
-                    message = "Учетная запись ученика создана"
-                });
+                return Ok(user);
             }
             catch (ArgumentException ex)
             {
@@ -122,21 +115,21 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "User", parent.Id, "IssueParentAccess", null, new
+                    await _auditFacade.LogActionAsync(currentUserId, "User", parent.Id, "IssueParentAccess", null, new StudentAccessAuditDto
                     {
                         StudentId = studentId,
-                        parent.Login,
-                        parent.FullName,
-                        parent.MustChangePassword
+                        Login = parent.Login,
+                        FullName = parent.FullName,
+                        MustChangePassword = parent.MustChangePassword
                     });
                 }
-                return Ok(new
+                return Ok(new IssuedParentAccountDto
                 {
-                    parent.Id,
-                    parent.Login,
-                    parent.FullName,
-                    parent.MustChangePassword,
-                    message = "Учетная запись родителя создана и привязана к ученику"
+                    Id = parent.Id,
+                    Login = parent.Login,
+                    FullName = parent.FullName,
+                    MustChangePassword = parent.MustChangePassword,
+                    Message = "Учетная запись родителя создана и привязана к ученику"
                 });
             }
             catch (ArgumentException ex)
@@ -189,14 +182,14 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "StudentParent", dto.StudentId, "AttachParent", null, new
+                    await _auditFacade.LogActionAsync(currentUserId, "StudentParent", dto.StudentId, "AttachParent", null, new StudentParentLinkAuditDto
                     {
-                        dto.ParentId,
-                        dto.StudentId
+                        ParentId = dto.ParentId,
+                        StudentId = dto.StudentId
                     });
                 }
-            return Ok(new MessageResponseDto { Message = "Ученик успешно привязан к родителю" });
-        }
+                return Ok(new MessageResponseDto { Message = "Ученик успешно привязан к родителю" });
+            }
             catch (ArgumentException ex)
             {
                 return BadRequestError(ex.Message);
@@ -241,12 +234,12 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "Student", id, "Update", null, new
+                    await _auditFacade.LogActionAsync(currentUserId, "Student", id, "Update", null, new StudentAuditDto
                     {
-                        dto.FirstName,
-                        dto.LastName,
-                        dto.BirthDate,
-                        dto.ClassId
+                        FirstName = dto.FirstName,
+                        LastName = dto.LastName,
+                        BirthDate = dto.BirthDate,
+                        ClassId = dto.ClassId
                     });
                 }
                 return Ok(updated);
@@ -275,7 +268,7 @@ namespace ClassBook.Controllers
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)
                 {
-                    await _auditFacade.LogActionAsync(currentUserId, "Student", id, "Delete", new
+                    await _auditFacade.LogActionAsync(currentUserId, "Student", id, "Delete", new StudentDeleteAuditDto
                     {
                         StudentId = id
                     }, null);
@@ -289,30 +282,4 @@ namespace ClassBook.Controllers
         }
     }
 
-    public class CreateStudentDto
-    {
-        public string FirstName { get; set; } = null!;
-        public string LastName { get; set; } = null!;
-        public DateTime BirthDate { get; set; }
-        public int? ClassId { get; set; }
-    }
-
-    public class CreateStudentAccountDto
-    {
-        public string Login { get; set; } = null!;
-        public string Password { get; set; } = null!;
-    }
-
-    public class CreateParentAccountDto
-    {
-        public string FullName { get; set; } = null!;
-        public string Login { get; set; } = null!;
-        public string Password { get; set; } = null!;
-    }
-
-    public class AttachStudentToParentDto
-    {
-        public int ParentId { get; set; }
-        public int StudentId { get; set; }
-    }
 }
