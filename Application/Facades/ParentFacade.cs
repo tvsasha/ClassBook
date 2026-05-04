@@ -344,7 +344,7 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Получает детальную информацию о связи ученик-родитель с полными данными
         /// </summary>
-        public async Task<dynamic?> GetStudentParentDetailAsync(int studentId, int parentId)
+        public async Task<PortalStudentParentDetailDto?> GetStudentParentDetailAsync(int studentId, int parentId)
         {
             var studentParent = await _db.StudentParents
                 .Where(sp => sp.StudentId == studentId && sp.ParentId == parentId)
@@ -356,23 +356,23 @@ namespace ClassBook.Application.Facades
             if (studentParent == null)
                 return null;
 
-            return new
+            return new PortalStudentParentDetailDto
             {
-                studentParent.StudentParentId,
-                Student = new
+                StudentParentId = studentParent.StudentParentId,
+                Student = new PortalStudentReferenceDto
                 {
-                    studentParent.Student.StudentId,
-                    studentParent.Student.FirstName,
-                    studentParent.Student.LastName,
+                    StudentId = studentParent.Student.StudentId,
+                    FirstName = studentParent.Student.FirstName,
+                    LastName = studentParent.Student.LastName,
                     Class = studentParent.Student.Class.Name
                 },
-                Parent = new
+                Parent = new PortalParentReferenceDto
                 {
-                    studentParent.Parent.Id,
-                    studentParent.Parent.FullName,
-                    studentParent.Parent.Login
+                    Id = studentParent.Parent.Id,
+                    FullName = studentParent.Parent.FullName,
+                    Login = studentParent.Parent.Login
                 },
-                studentParent.CreatedAt
+                CreatedAt = studentParent.CreatedAt
             };
         }
     }

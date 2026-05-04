@@ -1,3 +1,4 @@
+using ClassBook.Application.DTOs;
 using ClassBook.Domain.Entities;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -75,7 +76,7 @@ namespace ClassBook.Application.Facades
         /// <summary>
         /// Получает детальную информацию о конкретном логе аудита с разобранным JSON
         /// </summary>
-        public async Task<dynamic?> GetDetailedAuditEntryAsync(int auditLogId)
+        public async Task<AuditEntryDetailDto?> GetDetailedAuditEntryAsync(int auditLogId)
         {
             var log = await _db.AuditLogs
                 .Include(al => al.User)
@@ -84,17 +85,17 @@ namespace ClassBook.Application.Facades
             if (log == null)
                 return null;
 
-            return new
+            return new AuditEntryDetailDto
             {
-                log.AuditLogId,
-                log.UserId,
-                log.User.FullName,
-                log.EntityType,
-                log.EntityId,
-                log.Action,
+                AuditLogId = log.AuditLogId,
+                UserId = log.UserId,
+                FullName = log.User.FullName,
+                EntityType = log.EntityType,
+                EntityId = log.EntityId,
+                Action = log.Action,
                 OldValues = log.OldValues != null ? JsonSerializer.Deserialize<object>(log.OldValues) : null,
                 NewValues = log.NewValues != null ? JsonSerializer.Deserialize<object>(log.NewValues) : null,
-                log.Timestamp
+                Timestamp = log.Timestamp
             };
         }
     }

@@ -1,5 +1,6 @@
 ﻿// Application/Facades/SubjectFacade.cs
 using ClassBook.Domain.Entities;
+using ClassBook.Domain.Constants;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,7 +30,7 @@ namespace ClassBook.Application.Facades
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Название предмета обязательно");
 
-            var teacher = await _db.Users.FirstOrDefaultAsync(u => u.Id == teacherId && u.RoleId == 2);
+            var teacher = await _db.Users.FirstOrDefaultAsync(u => u.Id == teacherId && u.RoleId == SystemRoleIds.Teacher);
             if (teacher == null)
                 throw new InvalidOperationException("Учитель не найден");
 
@@ -64,7 +65,7 @@ namespace ClassBook.Application.Facades
             var subject = await _db.Subjects.FindAsync(subjectId);
             if (subject == null) throw new KeyNotFoundException("Предмет не найден");
 
-            var teacher = await _db.Users.FirstOrDefaultAsync(u => u.Id == teacherId && u.RoleId == 2);
+            var teacher = await _db.Users.FirstOrDefaultAsync(u => u.Id == teacherId && u.RoleId == SystemRoleIds.Teacher);
             if (teacher == null) throw new InvalidOperationException("Учитель не найден");
 
             subject.TeacherId = teacherId;

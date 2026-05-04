@@ -1,3 +1,4 @@
+using ClassBook.Application.Common;
 using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,13 +29,13 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var reportDate = string.IsNullOrEmpty(date) ? DateTime.Now : DateTime.Parse(date);
+                var reportDate = QueryDateParser.ParseDateOrDefault(date, () => DateTime.Now);
                 var report = await _analyticsFacade.GetDailyCompletionReportAsync(reportDate);
                 return Ok(report);
             }
-            catch (FormatException)
+            catch (ArgumentException ex)
             {
-                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -52,20 +53,17 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
-                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
-
-                if (start > end)
-                {
-                    return BadRequestError("Дата начала не может быть позже даты конца");
-                }
-
+                var (start, end) = QueryDateParser.ParseRangeOrDefault(
+                    startDate,
+                    endDate,
+                    () => DateTime.Now.AddMonths(-1),
+                    () => DateTime.Now);
                 var stats = await _analyticsFacade.GetAttendanceStatisticsAsync(start, end);
                 return Ok(stats);
             }
-            catch (FormatException)
+            catch (ArgumentException ex)
             {
-                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -89,20 +87,17 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
-                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
-
-                if (start > end)
-                {
-                    return BadRequestError("Дата начала не может быть позже даты конца");
-                }
-
+                var (start, end) = QueryDateParser.ParseRangeOrDefault(
+                    startDate,
+                    endDate,
+                    () => DateTime.Now.AddMonths(-1),
+                    () => DateTime.Now);
                 var report = await _analyticsFacade.GetProblematicStudentsAsync(start, end, classId, studentId, teacherId);
                 return Ok(report);
             }
-            catch (FormatException)
+            catch (ArgumentException ex)
             {
-                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -123,14 +118,11 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
-                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
-
-                if (start > end)
-                {
-                    return BadRequestError("Дата начала не может быть позже даты конца");
-                }
-
+                var (start, end) = QueryDateParser.ParseRangeOrDefault(
+                    startDate,
+                    endDate,
+                    () => DateTime.Now.AddMonths(-1),
+                    () => DateTime.Now);
                 var report = await _analyticsFacade.GetTeacherProgressAsync(teacherId, start, end);
                 return Ok(report);
             }
@@ -138,9 +130,9 @@ namespace ClassBook.Controllers
             {
                 return NotFoundError(ex.Message);
             }
-            catch (FormatException)
+            catch (ArgumentException ex)
             {
-                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -160,20 +152,17 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
-                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
-
-                if (start > end)
-                {
-                    return BadRequestError("Дата начала не может быть позже даты конца");
-                }
-
+                var (start, end) = QueryDateParser.ParseRangeOrDefault(
+                    startDate,
+                    endDate,
+                    () => DateTime.Now.AddMonths(-1),
+                    () => DateTime.Now);
                 var summary = await _analyticsFacade.GetClassSummaryAsync(start, end);
                 return Ok(summary);
             }
-            catch (FormatException)
+            catch (ArgumentException ex)
             {
-                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -194,13 +183,11 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
-                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
-
-                if (start > end)
-                {
-                    return BadRequestError("Дата начала не может быть позже даты конца");
-                }
+                var (start, end) = QueryDateParser.ParseRangeOrDefault(
+                    startDate,
+                    endDate,
+                    () => DateTime.Now.AddMonths(-1),
+                    () => DateTime.Now);
 
                 if (string.IsNullOrEmpty(entityType))
                 {
@@ -210,9 +197,9 @@ namespace ClassBook.Controllers
                 var logs = await _auditFacade.GetAuditLogByTypeAsync(entityType, start, end);
                 return Ok(logs);
             }
-            catch (FormatException)
+            catch (ArgumentException ex)
             {
-                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError(ex.Message);
             }
             catch (Exception ex)
             {
@@ -233,20 +220,17 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var start = string.IsNullOrEmpty(startDate) ? DateTime.Now.AddMonths(-1) : DateTime.Parse(startDate);
-                var end = string.IsNullOrEmpty(endDate) ? DateTime.Now : DateTime.Parse(endDate);
-
-                if (start > end)
-                {
-                    return BadRequestError("Дата начала не может быть позже даты конца");
-                }
-
+                var (start, end) = QueryDateParser.ParseRangeOrDefault(
+                    startDate,
+                    endDate,
+                    () => DateTime.Now.AddMonths(-1),
+                    () => DateTime.Now);
                 var logs = await _auditFacade.GetUserActionsAsync(userId, start, end);
                 return Ok(logs);
             }
-            catch (FormatException)
+            catch (ArgumentException ex)
             {
-                return BadRequestError("Некорректный формат даты. Используйте формат: YYYY-MM-DD");
+                return BadRequestError(ex.Message);
             }
             catch (Exception ex)
             {

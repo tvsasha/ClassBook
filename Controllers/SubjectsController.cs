@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ClassBook.Infrastructure.Data;
+using ClassBook.Domain.Constants;
 using ClassBook.Domain.Entities;
 
 namespace ClassBook.Controllers
@@ -68,7 +69,7 @@ namespace ClassBook.Controllers
                 return BadRequestError("Название предмета обязательно");
 
             var teacher = await _db.Users
-                .FirstOrDefaultAsync(u => u.Id == dto.TeacherId && u.RoleId == 2);
+                .FirstOrDefaultAsync(u => u.Id == dto.TeacherId && u.RoleId == SystemRoleIds.Teacher);
 
             if (teacher == null)
                 return BadRequestError("Учитель не найден или это не учитель");
@@ -92,7 +93,7 @@ namespace ClassBook.Controllers
                 return NotFoundError("Предмет не найден");
 
             var teacher = await _db.Users
-                .FirstOrDefaultAsync(u => u.Id == dto.TeacherId && u.RoleId == 2);
+                .FirstOrDefaultAsync(u => u.Id == dto.TeacherId && u.RoleId == SystemRoleIds.Teacher);
 
             if (teacher == null)
                 return BadRequestError("Учитель не найден или это не учитель");

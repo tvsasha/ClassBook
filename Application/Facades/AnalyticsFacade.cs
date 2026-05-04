@@ -1,10 +1,7 @@
+using ClassBook.Application.DTOs;
 using ClassBook.Domain.Entities;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace ClassBook.Application.Facades
 {
@@ -17,15 +14,11 @@ namespace ClassBook.Application.Facades
             _db = db;
         }
 
-        /// <summary>
-        /// Ежедневный отчет: кто из учителей заполнил оценки/посещаемость, кто нет
-        /// </summary>
-        public async Task<dynamic> GetDailyCompletionReportAsync(DateTime date)
+        public async Task<DailyCompletionReportDto> GetDailyCompletionReportAsync(DateTime date)
         {
             var startOfDay = date.Date;
             var endOfDay = startOfDay.AddDays(1).AddTicks(-1);
 
-            // Получаем все уроки на эту дату
             var lessonsForDate = await _db.Lessons
                 .Where(l => l.Date >= startOfDay && l.Date <= endOfDay)
                 .Include(l => l.Teacher)
@@ -35,7 +28,7 @@ namespace ClassBook.Application.Facades
                 .Include(l => l.Attendances)
                 .ToListAsync();
 
-            var report = new List<dynamic>();
+            var report = new List<DailyCompletionLessonDto>();
 
             foreach (var lesson in lessonsForDate)
             {
@@ -46,13 +39,13 @@ namespace ClassBook.Application.Facades
                 var gradesCount = lesson.Grades?.Count ?? 0;
                 var attendanceCount = lesson.Attendances?.Count ?? 0;
 
-                report.Add(new
+                report.Add(new DailyCompletionLessonDto
                 {
-                    lesson.LessonId,
-                    lesson.Subject.Name,
+                    LessonId = lesson.LessonId,
+                    Name = lesson.Subject.Name,
                     Teacher = lesson.Teacher.FullName,
                     Class = lesson.Class.Name,
-                    lesson.Date,
+                    Date = lesson.Date,
                     GradesFormed = gradesCount,
                     AttendanceRecorded = attendanceCount,
                     TotalStudents = studentsInClass,
@@ -61,7 +54,7 @@ namespace ClassBook.Application.Facades
                 });
             }
 
-            return new
+            return new DailyCompletionReportDto
             {
                 Date = date.Date,
                 TotalLessons = lessonsForDate.Count,
@@ -71,13 +64,10 @@ namespace ClassBook.Application.Facades
             };
         }
 
-        /// <summary>
-        /// Статистика посещаемости по классам за период
-        /// </summary>
-        public async Task<dynamic> GetAttendanceStatisticsAsync(DateTime startDate, DateTime endDate)
+        public async Task<AttendanceStatisticsReportDto> GetAttendanceStatisticsAsync(DateTime startDate, DateTime endDate)
         {
             var classes = await _db.Classes.ToListAsync();
-            var stats = new List<dynamic>();
+            var stats = new List<AttendanceStatisticsItemDto>();
 
             foreach (var classItem in classes)
             {
@@ -91,27 +81,24 @@ namespace ClassBook.Application.Facades
                 var totalStudents = await _db.Students
                     .CountAsync(s => s.ClassId == classItem.ClassId);
 
-                var presentCount = attendanceRecords.Count(a => a.Status == 1); // 1 = Present
-                var absentCount = attendanceRecords.Count(a => a.Status == 0); // 0 = Absent
-                var excusedCount = attendanceRecords.Count(a => a.Status == 2); // 2 = Excused
+                var presentCount = attendanceRecords.Count(a => a.Status == 1);
+                var absentCount = attendanceRecords.Count(a => a.Status == 0);
+                var excusedCount = attendanceRecords.Count(a => a.Status == 2);
+                var totalRecords = presentCount + absentCount + excusedCount;
 
-                stats.Add(new
+                stats.Add(new AttendanceStatisticsItemDto
                 {
                     ClassName = classItem.Name,
                     TotalStudents = totalStudents,
                     Present = presentCount,
                     Absent = absentCount,
                     Excused = excusedCount,
-                    PresentPercentage = presentCount + absentCount + excusedCount > 0
-                        ? Math.Round((double)presentCount / (presentCount + absentCount + excusedCount) * 100, 2)
-                        : 0,
-                    AbsentPercentage = presentCount + absentCount + excusedCount > 0
-                        ? Math.Round((double)absentCount / (presentCount + absentCount + excusedCount) * 100, 2)
-                        : 0
+                    PresentPercentage = totalRecords > 0 ? Math.Round((double)presentCount / totalRecords * 100, 2) : 0,
+                    AbsentPercentage = totalRecords > 0 ? Math.Round((double)absentCount / totalRecords * 100, 2) : 0
                 });
             }
 
-            return new
+            return new AttendanceStatisticsReportDto
             {
                 StartDate = startDate.Date,
                 EndDate = endDate.Date,
@@ -119,17 +106,20 @@ namespace ClassBook.Application.Facades
             };
         }
 
-        /// <summary>
-        /// Проблемные ученики: многие пропуски или низкие оценки за период
-        /// </summary>
-        public async Task<dynamic> GetProblematicStudentsAsync(DateTime startDate, DateTime endDate,
-            int? classId = null, int? studentId = null, int? teacherId = null)
+        public async Task<ProblematicStudentsReportDto> GetProblematicStudentsAsync(
+            DateTime startDate,
+            DateTime endDate,
+            int? classId = null,
+            int? studentId = null,
+            int? teacherId = null)
         {
-            var students = new List<dynamic>();
+            var students = new List<ProblematicStudentDto>();
 
             var query = _db.Students.AsQueryable();
             if (classId.HasValue)
+            {
                 query = query.Where(s => s.ClassId == classId.Value);
+            }
 
             var filteredStudents = await query
                 .Include(s => s.Class)
@@ -140,40 +130,39 @@ namespace ClassBook.Application.Facades
                 .ToListAsync();
 
             if (studentId.HasValue)
+            {
                 filteredStudents = filteredStudents.Where(s => s.StudentId == studentId.Value).ToList();
+            }
 
             foreach (var student in filteredStudents)
             {
                 var absences = student.Attendances
-                    ?.Where(a => a.Lesson.Date >= startDate && a.Lesson.Date <= endDate && a.Status == 0)
-                    .Count() ?? 0;
+                    ?.Count(a => a.Lesson.Date >= startDate && a.Lesson.Date <= endDate && a.Status == 0) ?? 0;
 
                 var grades = student.Grades
                     ?.Where(g => g.Lesson.Date >= startDate && g.Lesson.Date <= endDate)
-                    .ToList() ?? new List<Grade>();
+                    .ToList() ?? [];
 
                 if (teacherId.HasValue)
+                {
                     grades = grades.Where(g => g.Lesson.TeacherId == teacherId.Value).ToList();
+                }
 
                 var avgGrade = grades.Count > 0 ? Math.Round((double)grades.Sum(g => g.Value) / grades.Count, 2) : 0;
-                var lowGradeCount = grades.Count(g => g.Value < 3); // Предполагаем, что 3 - минимально приемлемая оценка
-
+                var lowGradeCount = grades.Count(g => g.Value < 3);
                 var totalAttendance = student.Attendances
-                    ?.Where(a => a.Lesson.Date >= startDate && a.Lesson.Date <= endDate)
-                    .Count() ?? 0;
-
+                    ?.Count(a => a.Lesson.Date >= startDate && a.Lesson.Date <= endDate) ?? 0;
                 var absencePercentage = totalAttendance > 0
                     ? Math.Round((double)absences / totalAttendance * 100, 2)
                     : 0;
 
-                // Считаем проблемным, если много пропусков ИЛИ низкие оценки
                 if (absences >= 5 || lowGradeCount >= 3 || (avgGrade < 3 && avgGrade > 0))
                 {
-                    students.Add(new
+                    students.Add(new ProblematicStudentDto
                     {
-                        student.StudentId,
-                        student.FirstName,
-                        student.LastName,
+                        StudentId = student.StudentId,
+                        FirstName = student.FirstName,
+                        LastName = student.LastName,
                         Class = student.Class.Name,
                         Absences = absences,
                         AbsencePercentage = absencePercentage,
@@ -184,22 +173,23 @@ namespace ClassBook.Application.Facades
                 }
             }
 
-            return new
+            return new ProblematicStudentsReportDto
             {
                 StartDate = startDate.Date,
                 EndDate = endDate.Date,
-                ProblematicStudents = students.OrderByDescending(s => ((dynamic)s).Absences)
+                ProblematicStudents = students
+                    .OrderByDescending(s => s.Absences)
+                    .ToList()
             };
         }
 
-        /// <summary>
-        /// Прогресс учителя: сколько уроков провел, сколько положил оценок/посещаемости
-        /// </summary>
-        public async Task<dynamic> GetTeacherProgressAsync(int teacherId, DateTime startDate, DateTime endDate)
+        public async Task<TeacherProgressReportDto> GetTeacherProgressAsync(int teacherId, DateTime startDate, DateTime endDate)
         {
             var teacher = await _db.Users.FindAsync(teacherId);
             if (teacher == null)
+            {
                 throw new KeyNotFoundException($"Учитель с ID {teacherId} не найден");
+            }
 
             var lessons = await _db.Lessons
                 .Where(l => l.TeacherId == teacherId &&
@@ -217,7 +207,7 @@ namespace ClassBook.Application.Facades
 
             var subjectStats = lessons
                 .GroupBy(l => l.Subject.Name)
-                .Select(g => new
+                .Select(g => new TeacherSubjectProgressDto
                 {
                     Subject = g.Key,
                     LessonCount = g.Count(),
@@ -226,7 +216,7 @@ namespace ClassBook.Application.Facades
                 })
                 .ToList();
 
-            return new
+            return new TeacherProgressReportDto
             {
                 TeacherId = teacher.Id,
                 Teacher = teacher.FullName,
@@ -243,20 +233,17 @@ namespace ClassBook.Application.Facades
             };
         }
 
-        /// <summary>
-        /// Сводка классов: сколько учеников, среднее количество отсутствий, средняя оценка
-        /// </summary>
-        public async Task<dynamic> GetClassSummaryAsync(DateTime startDate, DateTime endDate)
+        public async Task<ClassSummaryReportDto> GetClassSummaryAsync(DateTime startDate, DateTime endDate)
         {
             var classes = await _db.Classes
                 .Include(c => c.Students)
                 .ToListAsync();
 
-            var summary = new List<dynamic>();
+            var summary = new List<ClassSummaryItemDto>();
 
             foreach (var classItem in classes)
             {
-                var students = classItem.Students ?? new List<Student>();
+                var students = classItem.Students ?? [];
                 var avgAbsences = 0.0;
                 var avgGrade = 0.0;
 
@@ -277,7 +264,7 @@ namespace ClassBook.Application.Facades
                     avgGrade = allGrades.Count > 0 ? Math.Round((double)allGrades.Sum(g => g.Value) / allGrades.Count, 2) : 0;
                 }
 
-                summary.Add(new
+                summary.Add(new ClassSummaryItemDto
                 {
                     ClassName = classItem.Name,
                     StudentCount = students.Count,
@@ -286,9 +273,9 @@ namespace ClassBook.Application.Facades
                 });
             }
 
-            return new
+            return new ClassSummaryReportDto
             {
-                Period = $"{startDate.Date} - {endDate.Date}",
+                Period = $"{startDate.Date:yyyy-MM-dd} - {endDate.Date:yyyy-MM-dd}",
                 ClassSummary = summary
             };
         }

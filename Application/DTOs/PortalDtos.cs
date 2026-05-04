@@ -58,4 +58,27 @@ namespace ClassBook.Application.DTOs
         public DateTime Date { get; set; }
         public string? Topic { get; set; }
     }
+
+    public class PortalStudentReferenceDto
+    {
+        public int StudentId { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Class { get; set; } = string.Empty;
+    }
+
+    public class PortalParentReferenceDto
+    {
+        public int Id { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Login { get; set; } = string.Empty;
+    }
+
+    public class PortalStudentParentDetailDto
+    {
+        public int StudentParentId { get; set; }
+        public PortalStudentReferenceDto Student { get; set; } = new();
+        public PortalParentReferenceDto Parent { get; set; } = new();
+        public DateTime CreatedAt { get; set; }
+    }
 }

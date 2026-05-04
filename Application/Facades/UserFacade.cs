@@ -1,6 +1,7 @@
 ﻿// Application/Facades/UserFacade.cs
 using ClassBook.Domain.Entities;
 using ClassBook.Domain.Interfaces;
+using ClassBook.Domain.Constants;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -46,7 +47,7 @@ namespace ClassBook.Application.Facades
         public async Task<IEnumerable<object>> GetTeachersAsync()
         {
             return await _db.Users
-                .Where(u => u.RoleId == 2)
+                .Where(u => u.RoleId == SystemRoleIds.Teacher)
                 .Select(u => new { u.Id, u.FullName, u.Login })
                 .OrderBy(u => u.FullName)
                 .ToListAsync();

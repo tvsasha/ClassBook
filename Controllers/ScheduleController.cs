@@ -1,4 +1,5 @@
 using ClassBook.Application.Facades;
+using ClassBook.Domain.Constants;
 using ClassBook.Domain.Entities;
 using ClassBook.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -132,7 +133,7 @@ namespace ClassBook.Controllers
                 .ToListAsync();
 
             var teachers = await _db.Users
-                .Where(u => u.RoleId == 2)
+                .Where(u => u.RoleId == SystemRoleIds.Teacher)
                 .OrderBy(u => u.FullName)
                 .Select(u => new
                 {
@@ -560,7 +561,7 @@ namespace ClassBook.Controllers
             if (subject == null)
                 return "Предмет не найден";
 
-            var teacherExists = await _db.Users.AnyAsync(u => u.Id == request.TeacherId && u.RoleId == 2);
+            var teacherExists = await _db.Users.AnyAsync(u => u.Id == request.TeacherId && u.RoleId == SystemRoleIds.Teacher);
             if (!teacherExists)
                 return "Преподаватель не найден";
 

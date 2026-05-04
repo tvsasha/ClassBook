@@ -76,7 +76,7 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> GetTeachers()
         {
             var teachers = await _db.Users
-                .Where(u => u.RoleId == 2) // 2 = Учитель
+                .Where(u => u.RoleId == ClassBook.Domain.Constants.SystemRoleIds.Teacher)
                 .Select(u => new
                 {
                     u.Id,

@@ -43,6 +43,7 @@ namespace ClassBook.Infrastructure.Data
                 entity.Property(u => u.IsActive).IsRequired();
                 entity.Property(u => u.MustChangePassword).IsRequired();
                 entity.Property(u => u.CreatedAt).IsRequired();
+                entity.HasIndex(u => u.Login).IsUnique();
 
                 entity.HasOne(u => u.Role)
                       .WithMany(r => r.Users)
