@@ -995,8 +995,10 @@
     async function loadLessons() {
         try {
             let url = `${apiUrl}/lessons`;
-            // если текущий пользователь учитель — загрузим его уроки
-            if (currentUser && currentUser.role === 'Учитель') url = `${apiUrl}/teacher/lessons?teacherId=${currentUser.id}`;
+            const userRole = currentUser ? (currentUser.role || currentUser.roleName) : null;
+            if (userRole === 'Учитель') {
+                url = `${apiUrl}/teacher/lessons?teacherId=${currentUser.id}`;
+            }
             const res = await fetch(url, { credentials: "include", headers: getHeaders() });
             if (!res.ok) throw new Error();
             const data = await res.json();

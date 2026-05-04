@@ -52,7 +52,7 @@ namespace ClassBook.Controllers
             {
                 Console.WriteLine($"[ParentController.GetMyStudents] Exception: {ex.Message}");
                 Console.WriteLine($"[ParentController.GetMyStudents] StackTrace: {ex.StackTrace}");
-                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
+                return StatusCode(500, new { error = "Не удалось загрузить список учеников" });
             }
         }
 

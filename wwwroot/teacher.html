@@ -1031,16 +1031,10 @@
     // Удаление урока
     async function deleteLesson(lessonId) {
         try {
-            let res = await fetch(`${apiUrl}/teacher/lessons/${lessonId}`, {
+            const res = await fetch(`${apiUrl}/teacher/lessons/${lessonId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
-            if (res.status === 404 || res.status === 403) {
-                res = await fetch(`${apiUrl}/lessons/${lessonId}`, {
-                    method: 'DELETE',
-                    credentials: 'include'
-                });
-            }
             if (!res.ok) {
                 const error = await res.text();
                 console.error('Ошибка удаления урока:', error);
