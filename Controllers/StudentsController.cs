@@ -11,10 +11,12 @@ namespace ClassBook.Controllers
     public class AdminStudentController : ControllerBase
     {
         private readonly StudentFacade _facade;
+        private readonly ParentFacade _parentFacade;
 
-        public AdminStudentController(StudentFacade facade)
+        public AdminStudentController(StudentFacade facade, ParentFacade parentFacade)
         {
             _facade = facade;
+            _parentFacade = parentFacade;
         }
 
         [HttpPost]
@@ -51,6 +53,35 @@ namespace ClassBook.Controllers
                 });
             }
             catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        [HttpPost("{studentId}/parent-account")]
+        public async Task<IActionResult> CreateParentAccountForStudent(int studentId, [FromBody] CreateParentAccountDto dto)
+        {
+            try
+            {
+                var parent = await _parentFacade.CreateParentAccountForStudentAsync(studentId, dto.FullName, dto.Login, dto.Password);
+                return Ok(new
+                {
+                    parent.Id,
+                    parent.Login,
+                    parent.FullName,
+                    parent.MustChangePassword,
+                    message = "Учетная запись родителя создана и привязана к ученику"
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
             {
                 return BadRequest(ex.Message);
             }
@@ -152,6 +183,13 @@ namespace ClassBook.Controllers
 
     public class CreateStudentAccountDto
     {
+        public string Login { get; set; } = null!;
+        public string Password { get; set; } = null!;
+    }
+
+    public class CreateParentAccountDto
+    {
+        public string FullName { get; set; } = null!;
         public string Login { get; set; } = null!;
         public string Password { get; set; } = null!;
     }

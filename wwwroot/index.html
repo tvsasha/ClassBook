@@ -386,6 +386,20 @@
             return;
         }
 
+        if (editType === "parent-account") {
+            const fullName = modalName.value.trim();
+            if (!fullName) {
+                return;
+            }
+
+            const parts = fullName.split(/\s+/).filter(Boolean);
+            const lastName = transliterateToAscii(parts[0] || fullName) || 'parent';
+            const firstInitial = transliterateToAscii((parts[1] || '').slice(0, 1));
+            const baseLogin = `parent.${lastName}${firstInitial ? `.${firstInitial}` : ''}.${editId}`;
+            modalLogin.value = buildUniqueLogin(baseLogin);
+            return;
+        }
+
         const fullName = modalName.value.trim();
         const roleId = modalRole.value;
         if (!fullName || !roleId) {
@@ -445,7 +459,7 @@
             const selectedRoleName = parentRole?.name || '';
 
             if (selectedRoleName === 'Родитель') {
-                credentialHint.textContent = 'Для родителя нужно сразу выбрать конкретного ученика. Так ниже риск выдать доступ не тому человеку, особенно если родители с похожими фамилиями.';
+                credentialHint.textContent = 'Новые родительские учётные записи создавайте из карточки конкретного ученика, а не через общую форму пользователей.';
             } else if (selectedRoleName === 'Ученик') {
                 credentialHint.textContent = 'Новые ученические учётные записи через эту форму лучше пока не создавать: текущая серверная модель требует отдельной связки с карточкой ученика.';
             } else {
@@ -595,6 +609,24 @@
             if (item?.suggestedLogin) {
                 modalLogin.value = item.suggestedLogin;
             }
+        } else if (type === "parent-account") {
+            modalTitle.textContent = "Выдать доступ родителю";
+            modalName.classList.remove("hidden");
+            modalLogin.classList.remove("hidden");
+            modalPassword.classList.remove("hidden");
+            passwordTools.classList.remove("hidden");
+            credentialTools.classList.remove("hidden");
+            credentialHint.classList.remove("hidden");
+            modalName.placeholder = "ФИО родителя *";
+            modalLogin.placeholder = "Логин родителя *";
+            modalPassword.placeholder = "Временный пароль *";
+            credentialHint.textContent = `Учётная запись родителя будет сразу привязана к ученику: ${item?.studentFullName || ''}.`;
+            if (item?.parentFullName) {
+                modalName.value = item.parentFullName;
+            }
+            generateTemporaryPassword();
+            modalName.oninput = () => suggestLogin();
+            suggestLogin();
         } else if (type === "subject") {
             modalTitle.textContent = item ? "Редактировать предмет" : "Новый предмет";
             modalName.classList.remove("hidden");
@@ -671,6 +703,10 @@
                 modalError.textContent = "Новые аккаунты учеников пока не создавайте через общую форму пользователей: сначала нужно доработать серверную связь между учеткой и карточкой ученика";
                 return;
             }
+            if (selectedRoleName === 'Родитель' && !editId) {
+                modalError.textContent = "Новые аккаунты родителей создавайте из карточки конкретного ученика, чтобы не выдать доступ не тому ребёнку";
+                return;
+            }
             const requiresStudent = roleMeta.lockStudent;
             if (requiresStudent && !modalStudent.value && !attachedStudentExists) {
                 modalError.textContent = "Для родителя нужно сразу выбрать ученика, чтобы не выдать доступ не тому человеку";
@@ -694,6 +730,13 @@
             if (!login || !password) { modalError.textContent = "Логин и временный пароль обязательны"; return; }
             body = { login, password };
             url = `${apiUrl}/admin/students/${editId}/account`;
+        } else if (editType === "parent-account") {
+            const fullName = modalName.value.trim();
+            const login = modalLogin.value.trim();
+            const password = modalPassword.value.trim();
+            if (!fullName || !login || !password) { modalError.textContent = "ФИО, логин и временный пароль обязательны"; return; }
+            body = { fullName, login, password };
+            url = `${apiUrl}/admin/students/${editId}/parent-account`;
         } else if (editType === "subject") {
             const name = modalName.value.trim();
             const teacherId = modalTeacher.value;
@@ -830,10 +873,12 @@
                     <span>${studentFullName} (${new Date(s.birthDate).toLocaleDateString()})${s.hasAccount ? ' · доступ выдан' : ' · без учётной записи'}</span>
                     <div style="display:flex; gap:8px;">
                         ${s.hasAccount ? '' : '<button class="issue-btn" style="background:#198754;color:white;">Выдать доступ</button>'}
+                        <button class="issue-parent-btn" style="background:#0d6efd;color:white;">Выдать доступ родителю</button>
                         <button class="edit-btn">Редактировать</button>
                         <button class="delete-btn" style="background:#dc3545;color:white;">Удалить</button>
                     </div>`;
                 const issueBtn = li.querySelector('.issue-btn');
+                const issueParentBtn = li.querySelector('.issue-parent-btn');
                 const editBtn = li.querySelector('.edit-btn');
                 const deleteBtn = li.querySelector('.delete-btn');
                 if (issueBtn) {
@@ -841,6 +886,12 @@
                         id: s.studentId,
                         fullName: `${studentFullName}${className ? ` (${className})` : ''}`,
                         suggestedLogin
+                    }));
+                }
+                if (issueParentBtn) {
+                    issueParentBtn.addEventListener('click', () => openModal('parent-account', {
+                        id: s.studentId,
+                        studentFullName: `${studentFullName}${className ? ` (${className})` : ''}`
                     }));
                 }
                 editBtn.addEventListener('click', () => openModal('student', { id: s.studentId, firstName: s.firstName, lastName: s.lastName, birthDate: s.birthDate, classId: s.classId }));

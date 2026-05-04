@@ -1,4 +1,5 @@
 using ClassBook.Domain.Entities;
+using ClassBook.Domain.Interfaces;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -11,10 +12,63 @@ namespace ClassBook.Application.Facades
     public class ParentFacade
     {
         private readonly AppDbContext _db;
+        private readonly IPasswordHasher _hasher;
 
-        public ParentFacade(AppDbContext db)
+        public ParentFacade(AppDbContext db, IPasswordHasher hasher)
         {
             _db = db;
+            _hasher = hasher;
+        }
+
+        /// <summary>
+        /// Создает учетную запись родителя сразу из контекста конкретного ученика
+        /// и тут же привязывает ее к этому ученику.
+        /// </summary>
+        public async Task<User> CreateParentAccountForStudentAsync(int studentId, string fullName, string login, string password)
+        {
+            if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
+                throw new ArgumentException("ФИО, логин и временный пароль обязательны");
+
+            var student = await _db.Students
+                .Include(s => s.Class)
+                .FirstOrDefaultAsync(s => s.StudentId == studentId);
+
+            if (student == null)
+                throw new KeyNotFoundException("Ученик не найден");
+
+            var normalizedLogin = login.Trim();
+            if (await _db.Users.AnyAsync(u => u.Login == normalizedLogin))
+                throw new InvalidOperationException("Логин уже занят");
+
+            var parentRole = await _db.Roles.FirstOrDefaultAsync(r => r.Name == "Родитель");
+            if (parentRole == null)
+                throw new KeyNotFoundException("Роль 'Родитель' не найдена");
+
+            var parent = new User
+            {
+                Login = normalizedLogin,
+                FullName = fullName.Trim(),
+                PasswordHash = _hasher.Hash(password),
+                RoleId = parentRole.Id,
+                IsActive = true,
+                MustChangePassword = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.Users.Add(parent);
+            await _db.SaveChangesAsync();
+
+            var studentParent = new StudentParent
+            {
+                StudentId = studentId,
+                ParentId = parent.Id,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.StudentParents.Add(studentParent);
+            await _db.SaveChangesAsync();
+
+            return parent;
         }
 
         /// <summary>
