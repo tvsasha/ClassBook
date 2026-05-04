@@ -204,6 +204,143 @@ namespace ClassBook.Application.Facades
                 .AnyAsync(sp => sp.ParentId == parentId && sp.StudentId == studentId);
         }
 
+        public async Task<List<dynamic>> GetStudentScheduleAsync(int studentId)
+        {
+            var studentClassId = await _db.Students
+                .Where(s => s.StudentId == studentId)
+                .Select(s => (int?)s.ClassId)
+                .FirstOrDefaultAsync();
+
+            if (!studentClassId.HasValue)
+                throw new KeyNotFoundException("Ученик не найден");
+
+            var schedule = await _db.Lessons
+                .Where(l => l.ClassId == studentClassId.Value)
+                .Include(l => l.Subject)
+                .Include(l => l.Teacher)
+                .Include(l => l.Schedule)
+                .OrderBy(l => l.Date)
+                .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
+                .Select(l => new
+                {
+                    l.LessonId,
+                    Subject = l.Subject.Name,
+                    Teacher = l.Teacher.FullName,
+                    l.Date,
+                    l.Topic,
+                    l.Homework,
+                    l.ScheduleId,
+                    LessonNumber = l.Schedule != null ? l.Schedule.LessonNumber : (int?)null,
+                    StartTime = l.Schedule != null ? l.Schedule.StartTime.ToString(@"hh\:mm") : null,
+                    EndTime = l.Schedule != null ? l.Schedule.EndTime.ToString(@"hh\:mm") : null
+                })
+                .Cast<dynamic>()
+                .ToListAsync();
+
+            return schedule;
+        }
+
+        public async Task<List<dynamic>> GetStudentGradesAsync(int studentId)
+        {
+            var studentExists = await _db.Students.AnyAsync(s => s.StudentId == studentId);
+            if (!studentExists)
+                throw new KeyNotFoundException("Ученик не найден");
+
+            var grades = await _db.Grades
+                .Where(g => g.StudentId == studentId)
+                .Include(g => g.Lesson)
+                .ThenInclude(l => l.Subject)
+                .OrderBy(g => g.Lesson.Date)
+                .Select(g => new
+                {
+                    g.GradeId,
+                    Subject = g.Lesson.Subject.Name,
+                    g.Value,
+                    Date = g.Lesson.Date,
+                    Topic = g.Lesson.Topic
+                })
+                .Cast<dynamic>()
+                .ToListAsync();
+
+            return grades;
+        }
+
+        public async Task<List<dynamic>> GetStudentHomeworkAsync(int studentId)
+        {
+            var studentClassId = await _db.Students
+                .Where(s => s.StudentId == studentId)
+                .Select(s => (int?)s.ClassId)
+                .FirstOrDefaultAsync();
+
+            if (!studentClassId.HasValue)
+                throw new KeyNotFoundException("Ученик не найден");
+
+            var homework = await _db.Lessons
+                .Where(l => l.ClassId == studentClassId.Value && !string.IsNullOrEmpty(l.Homework))
+                .Include(l => l.Subject)
+                .Include(l => l.Teacher)
+                .OrderBy(l => l.Date)
+                .Select(l => new
+                {
+                    l.LessonId,
+                    Subject = l.Subject.Name,
+                    Teacher = l.Teacher.FullName,
+                    l.Date,
+                    l.Topic,
+                    l.Homework
+                })
+                .Cast<dynamic>()
+                .ToListAsync();
+
+            return homework;
+        }
+
+        public async Task<List<dynamic>> GetStudentAttendanceAsync(int studentId)
+        {
+            var studentAddedDate = await _db.StudentParents
+                .Where(sp => sp.StudentId == studentId)
+                .OrderBy(sp => sp.CreatedAt)
+                .Select(sp => (DateTime?)sp.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            var student = await _db.Students
+                .FirstOrDefaultAsync(s => s.StudentId == studentId);
+
+            if (student == null)
+                throw new KeyNotFoundException("Ученик не найден");
+
+            var lessons = await _db.Lessons
+                .Where(l => l.ClassId == student.ClassId && (!studentAddedDate.HasValue || l.Date >= studentAddedDate.Value))
+                .Include(l => l.Subject)
+                .OrderBy(l => l.Date)
+                .ToListAsync();
+
+            var attendanceRecords = await _db.Attendances
+                .Where(a => a.StudentId == studentId)
+                .ToListAsync();
+
+            return lessons.Select(lesson =>
+            {
+                var attendance = attendanceRecords.FirstOrDefault(a => a.LessonId == lesson.LessonId);
+
+                return (dynamic)new
+                {
+                    LessonId = lesson.LessonId,
+                    AttendanceId = attendance?.AttendanceId,
+                    Subject = lesson.Subject.Name,
+                    Status = attendance?.Status,
+                    StatusLabel = attendance == null
+                        ? "Не отмечено"
+                        : (attendance.Status == 1 ? "Присутствовал"
+                            : (attendance.Status == 0 ? "Отсутствовал"
+                                : (attendance.Status == 2 ? "Опоздание"
+                                    : "Отсутствовал по уважительной причине"))),
+                    Date = lesson.Date,
+                    Topic = lesson.Topic
+                };
+            }).OrderByDescending(l => l.Date).ToList();
+        }
+
         /// <summary>
         /// Получает детальную информацию о связи ученик-родитель с полными данными
         /// </summary>

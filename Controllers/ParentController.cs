@@ -1,8 +1,6 @@
 using ClassBook.Application.Facades;
-using ClassBook.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -13,21 +11,23 @@ namespace ClassBook.Controllers
     public class ParentController : ControllerBase
     {
         private readonly ParentFacade _parentFacade;
-        private readonly LessonFacade _lessonFacade;
-        private readonly GradeFacade _gradeFacade;
-        private readonly AppDbContext _db;
 
-        public ParentController(ParentFacade parentFacade, LessonFacade lessonFacade, GradeFacade gradeFacade, AppDbContext db)
+        public ParentController(ParentFacade parentFacade)
         {
             _parentFacade = parentFacade;
-            _lessonFacade = lessonFacade;
-            _gradeFacade = gradeFacade;
-            _db = db;
         }
 
         private int GetUserId()
         {
             return int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId) ? userId : 0;
+        }
+
+        private static IActionResult InternalServerError(string message)
+        {
+            return new ObjectResult(new { error = message })
+            {
+                StatusCode = StatusCodes.Status500InternalServerError
+            };
         }
 
         /// <summary>
@@ -52,7 +52,7 @@ namespace ClassBook.Controllers
             {
                 Console.WriteLine($"[ParentController.GetMyStudents] Exception: {ex.Message}");
                 Console.WriteLine($"[ParentController.GetMyStudents] StackTrace: {ex.StackTrace}");
-                return StatusCode(500, new { error = "Не удалось загрузить список учеников" });
+                return InternalServerError("Не удалось загрузить список учеников");
             }
         }
 
@@ -75,42 +75,19 @@ namespace ClassBook.Controllers
                 {
                     return Forbid("У вас нет доступа к этому ученику");
                 }
-
-                var studentClassId = await _db.Students
-                    .Where(s => s.StudentId == studentId)
-                    .Select(s => (int?)s.ClassId)
-                    .FirstOrDefaultAsync();
-
-                if (!studentClassId.HasValue)
-                    return NotFound("Ученик не найден");
-
-                var schedule = await _db.Lessons
-                    .Where(l => l.ClassId == studentClassId.Value)
-                    .Include(l => l.Subject)
-                    .Include(l => l.Teacher)
-                    .Include(l => l.Schedule)
-                    .OrderBy(l => l.Date)
-                    .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
-                    .Select(l => new
-                    {
-                        l.LessonId,
-                        l.Subject.Name,
-                        l.Teacher.FullName,
-                        l.Date,
-                        l.Topic,
-                        l.Homework,
-                        l.ScheduleId,
-                        LessonNumber = l.Schedule != null ? l.Schedule.LessonNumber : (int?)null,
-                        StartTime = l.Schedule != null ? l.Schedule.StartTime.ToString(@"hh\:mm") : null,
-                        EndTime = l.Schedule != null ? l.Schedule.EndTime.ToString(@"hh\:mm") : null
-                    })
-                    .ToListAsync();
+                var schedule = await _parentFacade.GetStudentScheduleAsync(studentId);
 
                 return Ok(schedule);
             }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[ParentController.GetStudentSchedule] Exception: {ex.Message}");
+                Console.WriteLine($"[ParentController.GetStudentSchedule] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить расписание ученика");
             }
         }
 
@@ -133,27 +110,19 @@ namespace ClassBook.Controllers
                 {
                     return Forbid("У вас нет доступа к этому ученику");
                 }
-
-                var grades = await _db.Grades
-                    .Where(g => g.StudentId == studentId)
-                    .Include(g => g.Lesson)
-                    .ThenInclude(l => l.Subject)
-                    .OrderBy(g => g.Lesson.Date)
-                    .Select(g => new
-                    {
-                        g.GradeId,
-                        Subject = g.Lesson.Subject.Name,
-                        g.Value,
-                        Date = g.Lesson.Date,
-                        Topic = g.Lesson.Topic
-                    })
-                    .ToListAsync();
+                var grades = await _parentFacade.GetStudentGradesAsync(studentId);
 
                 return Ok(grades);
             }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[ParentController.GetStudentGrades] Exception: {ex.Message}");
+                Console.WriteLine($"[ParentController.GetStudentGrades] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить оценки ученика");
             }
         }
 
@@ -176,36 +145,19 @@ namespace ClassBook.Controllers
                 {
                     return Forbid("У вас нет доступа к этому ученику");
                 }
-
-                var studentClassId = await _db.Students
-                    .Where(s => s.StudentId == studentId)
-                    .Select(s => (int?)s.ClassId)
-                    .FirstOrDefaultAsync();
-
-                if (!studentClassId.HasValue)
-                    return NotFound("Ученик не найден");
-
-                var homework = await _db.Lessons
-                    .Where(l => l.ClassId == studentClassId.Value && !string.IsNullOrEmpty(l.Homework))
-                    .Include(l => l.Subject)
-                    .Include(l => l.Teacher)
-                    .OrderBy(l => l.Date)
-                    .Select(l => new
-                    {
-                        l.LessonId,
-                        Subject = l.Subject.Name,
-                        Teacher = l.Teacher.FullName,
-                        l.Date,
-                        l.Topic,
-                        l.Homework
-                    })
-                    .ToListAsync();
+                var homework = await _parentFacade.GetStudentHomeworkAsync(studentId);
 
                 return Ok(homework);
             }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[ParentController.GetStudentHomework] Exception: {ex.Message}");
+                Console.WriteLine($"[ParentController.GetStudentHomework] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить домашние задания ученика");
             }
         }
 
@@ -228,75 +180,19 @@ namespace ClassBook.Controllers
                 {
                     return Forbid("У вас нет доступа к этому ученику");
                 }
-
-                Console.WriteLine($"[ParentController.GetStudentAttendance] studentId={studentId}");
-                
-                // Получаем дату добавления ученика в систему
-                var studentAddedDate = await _db.StudentParents
-                    .Where(sp => sp.StudentId == studentId)
-                    .OrderBy(sp => sp.CreatedAt)
-                    .Select(sp => sp.CreatedAt)
-                    .FirstOrDefaultAsync();
-
-                Console.WriteLine($"[ParentController.GetStudentAttendance] Student added date: {studentAddedDate}");
-
-                // Получаем ученика и его класс
-                var student = await _db.Students
-                    .Include(s => s.Class)
-                    .FirstOrDefaultAsync(s => s.StudentId == studentId);
-
-                if (student == null)
-                    return NotFound("Ученик не найден");
-
-                // Получаем все уроки класса со времени добавления ученика
-                var lessons = await _db.Lessons
-                    .Where(l => l.ClassId == student.ClassId && l.Date >= studentAddedDate)
-                    .Include(l => l.Subject)
-                    .OrderBy(l => l.Date)
-                    .ToListAsync();
-
-                Console.WriteLine($"[ParentController.GetStudentAttendance] Found {lessons.Count} lessons since {studentAddedDate}");
-
-                // Получаем посещаемость ученика
-                var attendanceRecords = await _db.Attendances
-                    .Where(a => a.StudentId == studentId)
-                    .ToListAsync();
-
-                // Объединяем: для каждого урока показываем посещаемость или "Не отмечено"
-                var result = lessons.Select(lesson =>
-                {
-                    var attendance = attendanceRecords.FirstOrDefault(a => a.LessonId == lesson.LessonId);
-                    
-                    return new
-                    {
-                        LessonId = lesson.LessonId,
-                        AttendanceId = attendance?.AttendanceId,
-                        Subject = lesson.Subject.Name,
-                        Status = attendance?.Status,
-                        StatusLabel = attendance == null 
-                            ? "Не отмечено" 
-                            : (attendance.Status == 1 ? "Присутствовал" 
-                                : (attendance.Status == 0 ? "Отсутствовал" 
-                                    : (attendance.Status == 2 ? "Опоздание" 
-                                        : "Отсутствовал по уважительной причине"))),
-                        Date = lesson.Date,
-                        Topic = lesson.Topic
-                    };
-                }).OrderByDescending(l => l.Date).ToList();
-
-                Console.WriteLine($"[ParentController.GetStudentAttendance] Returning {result.Count} records");
-                foreach (var r in result.Take(10))
-                {
-                    Console.WriteLine($"  - {r.Subject} ({r.StatusLabel}) {r.Date}");
-                }
+                var result = await _parentFacade.GetStudentAttendanceAsync(studentId);
 
                 return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[ParentController.GetStudentAttendance] Exception: {ex.Message}");
                 Console.WriteLine($"[ParentController.GetStudentAttendance] StackTrace: {ex.StackTrace}");
-                return BadRequest(ex.Message);
+                return InternalServerError("Не удалось загрузить посещаемость ученика");
             }
         }
 
@@ -314,11 +210,11 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new { error = ex.Message });
             }
         }
 
@@ -336,7 +232,9 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                Console.WriteLine($"[ParentController.GetStudentParents] Exception: {ex.Message}");
+                Console.WriteLine($"[ParentController.GetStudentParents] StackTrace: {ex.StackTrace}");
+                return InternalServerError("Не удалось загрузить список родителей ученика");
             }
         }
 
@@ -354,7 +252,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
             }
         }
     }

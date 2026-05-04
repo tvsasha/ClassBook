@@ -42,15 +42,15 @@ namespace ClassBook.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new { error = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new { error = ex.Message });
             }
         }
 
@@ -79,7 +79,7 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
             }
         }
 
@@ -110,7 +110,9 @@ namespace ClassBook.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ex.Message);
+                Console.WriteLine($"[GradeController.GetAllGrades] Exception: {ex.Message}");
+                Console.WriteLine($"[GradeController.GetAllGrades] StackTrace: {ex.StackTrace}");
+                return StatusCode(500, new { error = "Не удалось загрузить оценки преподавателя" });
             }
         }
         [HttpGet("lesson/{lessonId}/students")]
@@ -131,11 +133,13 @@ namespace ClassBook.Controllers
             }
             catch (KeyNotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ex.Message);
+                Console.WriteLine($"[GradeController.DeleteGrade] Exception: {ex.Message}");
+                Console.WriteLine($"[GradeController.DeleteGrade] StackTrace: {ex.StackTrace}");
+                return StatusCode(500, new { error = "Не удалось удалить оценку" });
             }
         }
     }
