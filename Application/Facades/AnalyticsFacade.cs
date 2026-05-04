@@ -133,9 +133,9 @@ namespace ClassBook.Application.Facades
 
             var filteredStudents = await query
                 .Include(s => s.Class)
-                .Include(s => s.Attendances)
+                .Include(s => s.Attendances!)
                 .ThenInclude(a => a.Lesson)
-                .Include(s => s.Grades)
+                .Include(s => s.Grades!)
                 .ThenInclude(g => g.Lesson)
                 .ToListAsync();
 

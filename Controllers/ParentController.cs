@@ -76,8 +76,16 @@ namespace ClassBook.Controllers
                     return Forbid("У вас нет доступа к этому ученику");
                 }
 
+                var studentClassId = await _db.Students
+                    .Where(s => s.StudentId == studentId)
+                    .Select(s => (int?)s.ClassId)
+                    .FirstOrDefaultAsync();
+
+                if (!studentClassId.HasValue)
+                    return NotFound("Ученик не найден");
+
                 var schedule = await _db.Lessons
-                    .Where(l => l.Class.Students.Any(s => s.StudentId == studentId))
+                    .Where(l => l.ClassId == studentClassId.Value)
                     .Include(l => l.Subject)
                     .Include(l => l.Teacher)
                     .Include(l => l.Schedule)
@@ -169,8 +177,16 @@ namespace ClassBook.Controllers
                     return Forbid("У вас нет доступа к этому ученику");
                 }
 
+                var studentClassId = await _db.Students
+                    .Where(s => s.StudentId == studentId)
+                    .Select(s => (int?)s.ClassId)
+                    .FirstOrDefaultAsync();
+
+                if (!studentClassId.HasValue)
+                    return NotFound("Ученик не найден");
+
                 var homework = await _db.Lessons
-                    .Where(l => l.Class.Students.Any(s => s.StudentId == studentId) && !string.IsNullOrEmpty(l.Homework))
+                    .Where(l => l.ClassId == studentClassId.Value && !string.IsNullOrEmpty(l.Homework))
                     .Include(l => l.Subject)
                     .Include(l => l.Teacher)
                     .OrderBy(l => l.Date)

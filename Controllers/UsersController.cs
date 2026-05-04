@@ -235,7 +235,7 @@ namespace ClassBook.Controllers
             // Проверяем что пользователь существует и является родителем
             var parent = await _db.Users
                 .Include(u => u.Role)
-                .Include(u => u.StudentParents)
+                .Include(u => u.StudentParents!)
                 .ThenInclude(sp => sp.Student)
                 .ThenInclude(s => s.Class)
                 .FirstOrDefaultAsync(u => u.Id == parentId);

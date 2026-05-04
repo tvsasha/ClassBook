@@ -71,6 +71,9 @@ namespace ClassBook.Controllers
                     })
                     .FirstOrDefaultAsync();
 
+                if (result == null)
+                    return StatusCode(500, "Не удалось загрузить созданный урок");
+
                 return CreatedAtAction(nameof(GetAll), new { id = result.LessonId }, result);
             }
             catch (InvalidOperationException ex)
@@ -125,6 +128,9 @@ namespace ClassBook.Controllers
                         Homework = l.Homework
                     })
                     .FirstOrDefaultAsync();
+
+                if (result == null)
+                    return StatusCode(500, "Не удалось загрузить обновленный урок");
 
                 return Ok(result);
             }

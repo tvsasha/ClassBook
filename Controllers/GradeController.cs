@@ -154,12 +154,12 @@ namespace ClassBook.Controllers
         public int LessonId { get; set; }
         public int StudentId { get; set; }
         public int Value { get; set; }
-        public StudentDto Student { get; set; }
+        public StudentDto? Student { get; set; }
     }
 
     public class StudentDto
     {
         public int StudentId { get; set; }
-        public string FullName { get; set; }
+        public string FullName { get; set; } = string.Empty;
     }
 }
