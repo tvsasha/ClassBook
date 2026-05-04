@@ -207,7 +207,16 @@
     });
 
     // ВЫХОД
-    document.getElementById("logoutBtn").addEventListener("click", () => {
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+        try {
+            await fetch(`${apiUrl}/auth/logout`, {
+                method: "POST",
+                credentials: "include"
+            });
+        } catch (error) {
+            console.warn("Ошибка при выходе с сервера:", error);
+        }
+
         sessionStorage.removeItem("currentUser");
         sessionStorage.removeItem("isRedirecting");
         sessionStorage.removeItem("redirectInProgress");
@@ -717,6 +726,18 @@
             }
             if (selectedRoleName === 'Родитель' && !editId) {
                 modalError.textContent = "Новые аккаунты родителей создавайте из карточки конкретного ученика, чтобы не выдать доступ не тому ребёнку";
+                return;
+            }
+            const existingUser = editId ? allUsers.find(user => Number(user.id) === Number(editId)) : null;
+            const existingRoleName = existingUser?.roleName || '';
+            const touchesStrictRole =
+                selectedRoleName === 'Ученик' ||
+                selectedRoleName === 'Родитель' ||
+                existingRoleName === 'Ученик' ||
+                existingRoleName === 'Родитель';
+            const isRoleChanged = editId && existingRoleName && existingRoleName !== selectedRoleName;
+            if (touchesStrictRole && isRoleChanged) {
+                modalError.textContent = "Переводить учетную запись в роли ученика или родителя через общую форму нельзя. Используйте карточку ученика и специализированную выдачу доступа.";
                 return;
             }
             const requiresStudent = roleMeta.lockStudent;

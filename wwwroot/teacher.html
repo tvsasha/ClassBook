@@ -332,7 +332,16 @@
     }
 
     // Выход
-    document.getElementById("logoutBtn").addEventListener("click", () => {
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+        try {
+            await fetch(`${apiUrl}/auth/logout`, {
+                method: "POST",
+                credentials: "include"
+            });
+        } catch (error) {
+            console.warn("Ошибка при выходе с сервера:", error);
+        }
+
         sessionStorage.removeItem("currentUser");
         sessionStorage.removeItem("isRedirecting");
         sessionStorage.removeItem("redirectInProgress");

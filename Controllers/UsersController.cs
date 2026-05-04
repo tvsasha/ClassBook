@@ -127,12 +127,22 @@ namespace ClassBook.Controllers
             if (dto.RoleId < 1 || dto.RoleId > 6)
                 return BadRequest("Недопустимая роль");
 
+            var role = await _db.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId);
+            if (role == null)
+                return BadRequest("Роль не найдена");
+
+            if (role.Name == "Родитель")
+                return BadRequest("Новые учетные записи родителей создавайте только из карточки конкретного ученика");
+
+            if (role.Name == "Ученик")
+                return BadRequest("Новые учетные записи учеников создавайте только из карточки конкретного ученика");
+
             var user = new User
             {
                 Login = dto.Login,
                 FullName = dto.FullName,
                 PasswordHash = _hasher.Hash(dto.Password),
-                RoleId = dto.RoleId,
+                RoleId = role.Id,
                 IsActive = true,
                 MustChangePassword = true,
                 CreatedAt = DateTime.UtcNow
@@ -160,9 +170,13 @@ namespace ClassBook.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateUserDto dto)
         {
-            var user = await _db.Users.FindAsync(id);
+            var user = await _db.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
                 return NotFound("Пользователь не найден");
+
+            var currentRoleName = user.Role?.Name ?? string.Empty;
 
             if (!string.IsNullOrEmpty(dto.Login) && dto.Login != user.Login)
             {
@@ -179,7 +193,22 @@ namespace ClassBook.Controllers
                 // Проверяем что роль существует в БД (1-6)
                 if (dto.RoleId < 1 || dto.RoleId > 6)
                     return BadRequest("Недопустимая роль");
-                user.RoleId = dto.RoleId.Value;
+
+                var targetRole = await _db.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId.Value);
+                if (targetRole == null)
+                    return BadRequest("Роль не найдена");
+
+                var targetRoleName = targetRole.Name;
+                var touchesStrictRole =
+                    currentRoleName == "Родитель" ||
+                    currentRoleName == "Ученик" ||
+                    targetRoleName == "Родитель" ||
+                    targetRoleName == "Ученик";
+
+                if (touchesStrictRole)
+                    return BadRequest("Менять роль на 'Родитель' или 'Ученик' и обратно через общую форму пользователей нельзя. Используйте карточку ученика и специализированные сценарии выдачи доступа.");
+
+                user.RoleId = targetRole.Id;
             }
 
             if (!string.IsNullOrEmpty(dto.Password))

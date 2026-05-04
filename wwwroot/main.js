@@ -1,4 +1,16 @@
-const apiUrl = "https://localhost:7062/api"; // или твой актуальный URL
+function resolveApiBase() {
+    const { hostname, port, origin } = window.location;
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+    const liveServerPorts = new Set(["5500", "5501", "5502", "5503", "5504", "5505"]);
+
+    if (isLocalHost && liveServerPorts.has(port)) {
+        return "http://localhost:5156/api";
+    }
+
+    return `${origin}/api`;
+}
+
+const apiUrl = resolveApiBase();
 
 let currentUser = null;
 
@@ -25,6 +37,7 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
     try {
         const res = await fetch(`${apiUrl}/auth/login`, {
             method: "POST",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ login, password })
         });
@@ -39,7 +52,7 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
         authBlock.style.display = "none";
         userControls.style.display = "flex";
 
-        if (currentUser.role === "Администратор") {
+        if ((currentUser.role || currentUser.roleName) === "Администратор") {
             createBtn.style.display = "block";
         }
 
@@ -84,7 +97,7 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 // ===== ЗАГРУЗКА ПОЛЬЗОВАТЕЛЕЙ =====
 async function loadUsers() {
     try {
-        const res = await fetch(`${apiUrl}/users`);
+        const res = await fetch(`${apiUrl}/users`, { credentials: "include" });
         if (!res.ok) throw new Error("Не удалось загрузить пользователей");
 
         const users = await res.json();
@@ -93,8 +106,8 @@ async function loadUsers() {
         users.forEach(u => {
             const li = document.createElement("li");
             li.className = "user-card";
-            li.innerHTML = `<strong>${u.login}</strong> (${u.role})`;
-            if (currentUser.role === "Администратор") {
+            li.innerHTML = `<strong>${u.login}</strong> (${u.roleName || u.role || "Неизвестная роль"})`;
+            if ((currentUser.role || currentUser.roleName) === "Администратор") {
                 li.onclick = () => openEdit(u);
             }
             usersList.appendChild(li);
@@ -137,7 +150,7 @@ async function loadRoles(selectId) {
     select.innerHTML = '<option value="">Загрузка...</option>';
 
     try {
-        const res = await fetch(`${apiUrl}/roles`);
+        const res = await fetch(`${apiUrl}/roles`, { credentials: "include" });
         if (!res.ok) throw new Error();
 
         const roles = await res.json();
@@ -171,15 +184,16 @@ document.getElementById("saveUserBtn").addEventListener("click", async () => {
         return;
     }
 
-    const body = { login, roleId: Number(roleId) };
+    const body = { login, fullName: login, roleId: Number(roleId) };
     if (password) body.password = password;
 
-    const url = selectedUser ? `${apiUrl}/users/${selectedUser.id}` : `${apiUrl}/auth/register`;
+    const url = selectedUser ? `${apiUrl}/users/${selectedUser.id}` : `${apiUrl}/users`;
     const method = selectedUser ? "PUT" : "POST";
 
     try {
         const res = await fetch(url, {
             method,
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
         });
