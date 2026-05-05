@@ -35,6 +35,7 @@
 
 <div class="controls">
     <button id="logoutBtn" style="background:#dc3545;color:white;">Выйти</button>
+    <button id="directorDashboardBtn" style="background:#6f42c1;color:white;">Отчёты директора</button>
 </div>
 
     <div class="tabs">
@@ -222,6 +223,10 @@
         sessionStorage.removeItem("redirectInProgress");
         sessionStorage.removeItem("authError");
         window.location.href = "login.html";
+    });
+
+    document.getElementById("directorDashboardBtn").addEventListener("click", () => {
+        window.location.href = "director-dashboard.html";
     });
 
     // МОДАЛКА

@@ -348,16 +348,15 @@ const API_BASE = resolveApiBase();
             throw new Error('Отсутствует свойство role/roleName');
         }
         
-        // Проверяем, что роль соответствует странице
-        if (userRole !== 'Директор') {
-            console.log('director-dashboard.html: роль "' + userRole + '" не совпадает с "Директор", перенаправляем');
+        // Backend-политика DirectorOnly допускает директора и администратора.
+        const allowedRoles = ['Директор', 'Администратор'];
+        if (!allowedRoles.includes(userRole)) {
+            console.log('director-dashboard.html: роль "' + userRole + '" не имеет доступа к отчётам директора, перенаправляем');
             
             sessionStorage.setItem("isRedirecting", "true");
             
             setTimeout(() => {
-                if (userRole === 'Администратор') {
-                    window.location.href = 'index.html';
-                } else if (userRole === 'Учитель') {
+                if (userRole === 'Учитель') {
                     window.location.href = 'teacher.html';
                 } else if (userRole === 'Ученик') {
                     window.location.href = 'student-portal.html';
