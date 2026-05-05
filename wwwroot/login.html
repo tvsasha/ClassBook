@@ -45,6 +45,15 @@
             margin-top: 10px;
         }
         button:hover { background: #0056b3; }
+        .react-link {
+            display: block;
+            margin-top: 12px;
+            text-align: center;
+            color: #0f7c66;
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+        .react-link:hover { text-decoration: underline; }
         .error { color: red; text-align: center; margin-top: 10px; }
         .consent-row {
             display: flex;
@@ -75,6 +84,7 @@
             <span>Я соглашаюсь на обработку персональных данных в рамках работы системы ClassBook.</span>
         </label>
         <button id="loginBtn" type="submit">Войти</button>
+        <a class="react-link" href="/app/">Открыть новый React-вход</a>
         <p id="loginError" class="error"></p>
     </form>
 </div>

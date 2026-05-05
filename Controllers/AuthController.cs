@@ -71,6 +71,24 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
+        /// Возвращает данные текущего пользователя по активной cookie-сессии.
+        /// </summary>
+        /// <returns>Данные авторизованного пользователя.</returns>
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> Me()
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                return UnauthorizedError("Не удалось определить пользователя");
+
+            var user = await _authFacade.GetUserByIdAsync(userId);
+            if (user == null)
+                return UnauthorizedError("Пользователь не найден или отключён");
+
+            return Ok(BuildLoginResponse(user));
+        }
+
+        /// <summary>
         /// Меняет пароль текущего пользователя и снимает флаг обязательной смены временного пароля.
         /// </summary>
         /// <param name="dto">Текущий и новый пароль пользователя.</param>

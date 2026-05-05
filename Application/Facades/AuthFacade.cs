@@ -46,6 +46,13 @@ namespace ClassBook.Application.Facades
             return user;
         }
 
+        public async Task<User?> GetUserByIdAsync(int userId)
+        {
+            return await _db.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+        }
+
         /// <summary>
         /// Меняет пароль текущего пользователя.
         /// </summary>

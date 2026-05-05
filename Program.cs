@@ -99,6 +99,8 @@ namespace ClassBook
                             "http://127.0.0.1:5503",
                             "http://127.0.0.1:5504",
                             "http://127.0.0.1:5505",
+                            "http://localhost:5173",
+                            "http://127.0.0.1:5173",
                             "https://localhost:7062"
                         )
                         .AllowAnyMethod()
