@@ -7,7 +7,7 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins: [react()],
-    base: isDevServer ? "/" : "/app/",
+    base: isDevServer ? "/" : "./",
     build: {
       outDir: resolve(__dirname, "../wwwroot/app"),
       emptyOutDir: true
