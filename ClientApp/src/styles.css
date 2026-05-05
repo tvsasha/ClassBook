@@ -478,6 +478,10 @@ select {
   padding: 18px;
 }
 
+.lesson-form {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 .inline-form .field {
   margin: 0;
 }
@@ -558,6 +562,80 @@ td {
   color: var(--accent-strong);
 }
 
+.split-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 14px;
+}
+
+.picker-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.wide-field {
+  max-width: 520px;
+  margin: 0;
+}
+
+.journal-list {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.journal-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 180px 190px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(24, 32, 38, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.journal-row select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.info-card {
+  min-height: 150px;
+  padding: 18px;
+  border: 1px solid rgba(24, 32, 38, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.info-card span {
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+}
+
+.info-card strong {
+  display: block;
+  margin: 8px 0;
+}
+
+.info-card p,
+.empty-text {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 @media (max-width: 920px) {
   .app-shell {
     padding: 18px;
@@ -579,7 +657,11 @@ td {
   .app-layout,
   .module-grid,
   .metric-grid,
-  .inline-form {
+  .inline-form,
+  .lesson-form,
+  .split-grid,
+  .card-grid,
+  .journal-row {
     grid-template-columns: 1fr;
   }
 

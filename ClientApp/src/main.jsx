@@ -337,13 +337,13 @@ function RouteContent({ route, role, user }) {
     case "director":
       return <DirectorPage role={role} />;
     case "teacher":
-      return <RoleWorkspace title="Кабинет учителя" role={role} apiList={["/teacher/subjects", "/teacher/classes", "/teacher/lessons"]} />;
+      return <TeacherPage role={role} user={user} />;
     case "student":
-      return <RoleWorkspace title="Кабинет ученика" role={role} apiList={["/student/me/schedule", "/student/me/grades", "/student/me/attendance"]} />;
+      return <StudentPage role={role} />;
     case "parent":
-      return <RoleWorkspace title="Кабинет родителя" role={role} apiList={["/parent/students"]} />;
+      return <ParentPage role={role} />;
     case "schedule":
-      return <RoleWorkspace title="Расписание" role={role} apiList={["/schedule/week", "/schedule/editor/metadata"]} />;
+      return <SchedulePage role={role} />;
     default:
       return <DashboardPage user={user} />;
   }
@@ -595,53 +595,554 @@ function DirectorPage({ role }) {
   );
 }
 
-function RoleWorkspace({ title, role, apiList }) {
-  const [result, setResult] = useState([]);
+function TeacherPage({ role, user }) {
+  const allowed = role === "Учитель" || role === "Администратор";
+  const [classes, setClasses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [lessons, setLessons] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [gradesByLesson, setGradesByLesson] = useState({});
+  const [attendanceByLesson, setAttendanceByLesson] = useState({});
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedLessonId, setSelectedLessonId] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lessonForm, setLessonForm] = useState({
+    subjectId: "",
+    classId: "",
+    topic: "",
+    date: new Date().toISOString().slice(0, 10),
+    homework: ""
+  });
 
-  async function loadPreview() {
+  async function loadTeacherData() {
     setLoading(true);
     setMessage("");
     try {
-      const responses = await Promise.allSettled(apiList.map((path) => apiRequest(path)));
-      setResult(responses.map((item, index) => ({
-        path: apiList[index],
-        status: item.status,
-        value: item.status === "fulfilled" ? item.value : item.reason?.message
-      })));
+      const [classData, subjectData, lessonData] = await Promise.all([
+        apiRequest(`/teacher/classes?teacherId=${user.id}`),
+        apiRequest(`/teacher/subjects?teacherId=${user.id}`),
+        apiRequest(`/teacher/lessons?teacherId=${user.id}`)
+      ]);
+      setClasses(classData ?? []);
+      setSubjects(subjectData ?? []);
+      setLessons(lessonData ?? []);
+    } catch (error) {
+      setMessage(error.message || "Не удалось загрузить кабинет учителя");
     } finally {
       setLoading(false);
     }
   }
 
+  useEffect(() => {
+    if (allowed) {
+      loadTeacherData();
+    }
+  }, [allowed]);
+
+  useEffect(() => {
+    if (!selectedClassId) {
+      setStudents([]);
+      return;
+    }
+
+    apiRequest(`/teacher/classes/${selectedClassId}/students`)
+      .then((data) => setStudents(data ?? []))
+      .catch((error) => setMessage(error.message || "Не удалось загрузить учеников класса"));
+  }, [selectedClassId]);
+
+  async function loadLessonMarks(lessonId) {
+    if (!lessonId) {
+      setSelectedLessonId("");
+      return;
+    }
+
+    setSelectedLessonId(lessonId);
+    setLoading(true);
+    setMessage("");
+    try {
+      const [gradeData, attendanceData] = await Promise.all([
+        apiRequest(`/teacher/grades/${lessonId}`),
+        apiRequest(`/teacher/attendance/${lessonId}`)
+      ]);
+      setGradesByLesson((current) => ({ ...current, [lessonId]: gradeData ?? [] }));
+      setAttendanceByLesson((current) => ({ ...current, [lessonId]: attendanceData ?? [] }));
+    } catch (error) {
+      setMessage(error.message || "Не удалось загрузить журнал урока");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createLesson(event) {
+    event.preventDefault();
+    setMessage("");
+
+    if (!lessonForm.subjectId || !lessonForm.classId || !lessonForm.topic || !lessonForm.date) {
+      setMessage("Заполните предмет, класс, тему и дату урока");
+      return;
+    }
+
+    try {
+      await apiRequest("/teacher/lessons", {
+        method: "POST",
+        body: JSON.stringify({
+          subjectId: Number(lessonForm.subjectId),
+          classId: Number(lessonForm.classId),
+          topic: lessonForm.topic.trim(),
+          date: lessonForm.date,
+          homework: lessonForm.homework.trim()
+        })
+      });
+      setLessonForm({
+        subjectId: "",
+        classId: "",
+        topic: "",
+        date: new Date().toISOString().slice(0, 10),
+        homework: ""
+      });
+      setMessage("Урок создан");
+      await loadTeacherData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось создать урок");
+    }
+  }
+
+  async function saveGrade(studentId, value) {
+    if (!selectedLessonId || !value) {
+      return;
+    }
+
+    try {
+      await apiRequest("/teacher/grades", {
+        method: "POST",
+        body: JSON.stringify({
+          lessonId: Number(selectedLessonId),
+          studentId,
+          value: Number(value)
+        })
+      });
+      await loadLessonMarks(selectedLessonId);
+    } catch (error) {
+      setMessage(error.message || "Не удалось сохранить оценку");
+    }
+  }
+
+  async function saveAttendance(studentId, status) {
+    if (!selectedLessonId) {
+      return;
+    }
+
+    try {
+      await apiRequest("/teacher/attendance", {
+        method: "POST",
+        body: JSON.stringify({
+          lessonId: Number(selectedLessonId),
+          studentId,
+          status: Number(status)
+        })
+      });
+      await loadLessonMarks(selectedLessonId);
+    } catch (error) {
+      setMessage(error.message || "Не удалось сохранить посещаемость");
+    }
+  }
+
+  if (!allowed) {
+    return <AccessWarning title="Кабинет учителя доступен учителю и администратору" />;
+  }
+
+  const selectedClass = classes.find((item) => String(item.classId ?? item.id) === String(selectedClassId));
+  const classLessons = lessons.filter((lesson) => {
+    if (!selectedClassId) {
+      return true;
+    }
+
+    return String(lesson.classId ?? "") === String(selectedClassId)
+      || lesson.className === selectedClass?.name;
+  });
+  const lessonGrades = gradesByLesson[selectedLessonId] ?? [];
+  const lessonAttendance = attendanceByLesson[selectedLessonId] ?? [];
+
   return (
     <section className="page-stack">
       <PageHeader
-        title={title}
-        subtitle={`Текущая роль: ${role}`}
-        text="Эта страница уже находится внутри React-приложения. Детальный перенос интерфейса можно делать по блокам, но переходов на отдельные HTML больше нет."
+        title="Кабинет учителя"
+        subtitle="Уроки, журнал, оценки и посещаемость"
+        text="Страница работает как самостоятельный React-интерфейс: загружает классы и предметы учителя, создает уроки и позволяет заполнять журнал выбранного урока."
       />
-      <button className="primary-button compact" onClick={loadPreview}>
-        Проверить API раздела
-      </button>
       <StatusLine loading={loading} message={message} />
-      <div className="api-list">
-        {apiList.map((path) => (
-          <code key={path}>{path}</code>
-        ))}
-      </div>
-      {result.length > 0 && (
+      <form className="inline-form lesson-form" onSubmit={createLesson}>
+        <label className="field">
+          <span>Предмет</span>
+          <select value={lessonForm.subjectId} onChange={(event) => setLessonForm({ ...lessonForm, subjectId: event.target.value })}>
+            <option value="">Выберите предмет</option>
+            {subjects.map((item) => (
+              <option key={item.subjectId ?? item.id} value={item.subjectId ?? item.id}>{item.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Класс</span>
+          <select value={lessonForm.classId} onChange={(event) => setLessonForm({ ...lessonForm, classId: event.target.value })}>
+            <option value="">Выберите класс</option>
+            {classes.map((item) => (
+              <option key={item.classId ?? item.id} value={item.classId ?? item.id}>{item.name}</option>
+            ))}
+          </select>
+        </label>
+        <Field label="Тема" value={lessonForm.topic} onChange={(value) => setLessonForm({ ...lessonForm, topic: value })} />
+        <Field label="Дата" type="date" value={lessonForm.date} onChange={(value) => setLessonForm({ ...lessonForm, date: value })} />
+        <Field label="Домашнее задание" value={lessonForm.homework} onChange={(value) => setLessonForm({ ...lessonForm, homework: value })} />
+        <button className="primary-button">Создать урок</button>
+      </form>
+      <div className="split-grid">
+        <section className="table-card">
+          <div className="table-title">Выбор класса и урока</div>
+          <div className="picker-panel">
+            <label className="field">
+              <span>Класс</span>
+              <select value={selectedClassId} onChange={(event) => {
+                setSelectedClassId(event.target.value);
+                setSelectedLessonId("");
+              }}>
+                <option value="">Все классы</option>
+                {classes.map((item) => (
+                  <option key={item.classId ?? item.id} value={item.classId ?? item.id}>{item.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Урок</span>
+              <select value={selectedLessonId} onChange={(event) => loadLessonMarks(event.target.value)}>
+                <option value="">Выберите урок</option>
+                {classLessons.map((lesson) => (
+                  <option key={lesson.lessonId} value={lesson.lessonId}>
+                    {lesson.subjectName} · {lesson.topic} · {formatDate(lesson.date)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
         <DataTable
-          title="Результат проверки"
-          columns={["API", "Статус", "Ответ"]}
-          rows={result.map((item) => [
-            item.path,
-            item.status === "fulfilled" ? "OK" : "Ошибка",
-            item.status === "fulfilled" ? summarizeValue(item.value) : item.value
+          title="Последние уроки"
+          columns={["Дата", "Предмет", "Класс", "Тема", "ДЗ"]}
+          rows={lessons.slice(0, 8).map((lesson) => [
+            formatDate(lesson.date),
+            lesson.subjectName,
+            lesson.className,
+            lesson.topic,
+            lesson.homework || "—"
           ])}
         />
-      )}
+      </div>
+      <section className="table-card">
+        <div className="table-title">Журнал выбранного урока</div>
+        <div className="journal-list">
+          {students.length === 0 ? (
+            <p className="empty-text">Выберите класс, чтобы увидеть учеников.</p>
+          ) : students.map((student) => {
+            const grade = lessonGrades.find((item) => item.studentId === student.studentId);
+            const attendance = lessonAttendance.find((item) => item.studentId === student.studentId);
+            return (
+              <div className="journal-row" key={student.studentId}>
+                <strong>{student.lastName} {student.firstName}</strong>
+                <select defaultValue="" onChange={(event) => saveGrade(student.studentId, event.target.value)}>
+                  <option value="">{grade ? `Оценка: ${grade.value}` : "Поставить оценку"}</option>
+                  {[2, 3, 4, 5].map((value) => (
+                    <option key={value} value={value}>{value}</option>
+                  ))}
+                </select>
+                <select value={attendance?.status ?? ""} onChange={(event) => saveAttendance(student.studentId, event.target.value)}>
+                  <option value="">Не отмечено</option>
+                  <option value="1">Присутствовал</option>
+                  <option value="0">Отсутствовал</option>
+                  <option value="2">Опоздал</option>
+                </select>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </section>
+  );
+}
+
+function StudentPage({ role }) {
+  const allowed = role === "Ученик" || role === "Администратор";
+  const [info, setInfo] = useState(null);
+  const [schedule, setSchedule] = useState([]);
+  const [grades, setGrades] = useState([]);
+  const [homework, setHomework] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!allowed) {
+      return;
+    }
+
+    setLoading(true);
+    Promise.all([
+      apiRequest("/student/me/class"),
+      apiRequest("/student/me/schedule"),
+      apiRequest("/student/me/grades"),
+      apiRequest("/student/me/homework"),
+      apiRequest("/student/me/attendance")
+    ])
+      .then(([infoData, scheduleData, gradeData, homeworkData, attendanceData]) => {
+        setInfo(infoData);
+        setSchedule(scheduleData ?? []);
+        setGrades(gradeData ?? []);
+        setHomework(homeworkData ?? []);
+        setAttendance(attendanceData ?? []);
+      })
+      .catch((error) => setMessage(error.message || "Не удалось загрузить кабинет ученика"))
+      .finally(() => setLoading(false));
+  }, [allowed]);
+
+  if (!allowed) {
+    return <AccessWarning title="Кабинет ученика доступен ученику и администратору" />;
+  }
+
+  return (
+    <LearningPage
+      title="Кабинет ученика"
+      subtitle={info ? `${info.name || "Ученик"} · ${info.className || "класс не указан"}` : "Учебная информация"}
+      description="Здесь собраны расписание, оценки, домашние задания и посещаемость текущего ученика."
+      schedule={schedule}
+      grades={grades}
+      homework={homework}
+      attendance={attendance}
+      loading={loading}
+      message={message}
+    />
+  );
+}
+
+function ParentPage({ role }) {
+  const allowed = role === "Родитель" || role === "Администратор";
+  const [students, setStudents] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [schedule, setSchedule] = useState([]);
+  const [grades, setGrades] = useState([]);
+  const [homework, setHomework] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!allowed) {
+      return;
+    }
+
+    setLoading(true);
+    apiRequest("/parent/students")
+      .then((data) => {
+        const list = data ?? [];
+        setStudents(list);
+        if (list.length > 0) {
+          setSelectedStudentId(String(list[0].studentId));
+        }
+      })
+      .catch((error) => setMessage(error.message || "Не удалось загрузить список детей"))
+      .finally(() => setLoading(false));
+  }, [allowed]);
+
+  useEffect(() => {
+    if (!selectedStudentId) {
+      return;
+    }
+
+    setLoading(true);
+    Promise.all([
+      apiRequest(`/parent/student/${selectedStudentId}/schedule`),
+      apiRequest(`/parent/student/${selectedStudentId}/grades`),
+      apiRequest(`/parent/student/${selectedStudentId}/homework`),
+      apiRequest(`/parent/student/${selectedStudentId}/attendance`)
+    ])
+      .then(([scheduleData, gradeData, homeworkData, attendanceData]) => {
+        setSchedule(scheduleData ?? []);
+        setGrades(gradeData ?? []);
+        setHomework(homeworkData ?? []);
+        setAttendance(attendanceData ?? []);
+      })
+      .catch((error) => setMessage(error.message || "Не удалось загрузить данные ученика"))
+      .finally(() => setLoading(false));
+  }, [selectedStudentId]);
+
+  if (!allowed) {
+    return <AccessWarning title="Кабинет родителя доступен родителю и администратору" />;
+  }
+
+  const selectedStudent = students.find((item) => String(item.studentId) === String(selectedStudentId));
+
+  return (
+    <section className="page-stack">
+      <PageHeader
+        title="Кабинет родителя"
+        subtitle={selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : "Выберите ученика"}
+        text="Родитель видит только привязанных учеников. Данные подгружаются из отдельных родительских API без старой страницы."
+      />
+      <StatusLine loading={loading} message={message} />
+      <label className="field wide-field">
+        <span>Ученик</span>
+        <select value={selectedStudentId} onChange={(event) => setSelectedStudentId(event.target.value)}>
+          {students.length === 0 ? (
+            <option value="">Нет привязанных учеников</option>
+          ) : students.map((student) => (
+            <option key={student.studentId} value={student.studentId}>
+              {student.firstName} {student.lastName} · {student.class?.name || student.className || "класс не указан"}
+            </option>
+          ))}
+        </select>
+      </label>
+      <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} />
+    </section>
+  );
+}
+
+function LearningPage({ title, subtitle, description, schedule, grades, homework, attendance, loading, message }) {
+  return (
+    <section className="page-stack">
+      <PageHeader title={title} subtitle={subtitle} text={description} />
+      <StatusLine loading={loading} message={message} />
+      <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} />
+    </section>
+  );
+}
+
+function LearningSections({ schedule, grades, homework, attendance }) {
+  const averageGrade = grades.length
+    ? grades.reduce((sum, item) => sum + Number(item.value ?? 0), 0) / grades.length
+    : 0;
+  const present = attendance.filter((item) => Number(item.status) === 1).length;
+
+  return (
+    <>
+      <div className="metric-grid">
+        <MetricCard label="Уроков в расписании" value={schedule.length} />
+        <MetricCard label="Оценок" value={grades.length} />
+        <MetricCard label="Средний балл" value={formatNumber(averageGrade)} />
+        <MetricCard label="Присутствий" value={present} />
+      </div>
+      <DataTable
+        title="Расписание"
+        columns={["Дата", "Время", "Предмет", "Тема", "Учитель"]}
+        rows={schedule.slice(0, 12).map((lesson) => [
+          formatDate(lesson.date),
+          formatTimeRange(lesson),
+          lesson.subject || lesson.subjectName || lesson.name || "—",
+          lesson.topic || "—",
+          lesson.teacher || lesson.teacherName || "—"
+        ])}
+      />
+      <DataTable
+        title="Оценки"
+        columns={["Дата", "Предмет", "Тема", "Оценка"]}
+        rows={grades.slice(0, 16).map((grade) => [
+          formatDate(grade.date),
+          grade.subject || grade.subjectName || "—",
+          grade.topic || "—",
+          grade.value
+        ])}
+      />
+      <CardGrid
+        title="Домашние задания"
+        items={homework.slice(0, 8).map((item) => ({
+          title: item.subject || item.subjectName || item.name || "Предмет",
+          text: item.homework || item.task || "Домашнее задание не указано",
+          meta: `${formatDate(item.date)} · ${item.topic || "без темы"}`
+        }))}
+      />
+      <DataTable
+        title="Посещаемость"
+        columns={["Дата", "Предмет", "Статус"]}
+        rows={attendance.slice(0, 16).map((item) => [
+          formatDate(item.date),
+          item.subject || item.subjectName || item.name || "—",
+          attendanceLabel(item.status)
+        ])}
+      />
+    </>
+  );
+}
+
+function SchedulePage({ role }) {
+  const allowed = role === "Менеджер расписания" || role === "Администратор" || role === "Директор";
+  const [week, setWeek] = useState([]);
+  const [metadata, setMetadata] = useState(null);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!allowed) {
+      return;
+    }
+
+    setLoading(true);
+    Promise.allSettled([
+      apiRequest("/schedule/week"),
+      apiRequest("/schedule/editor/metadata")
+    ])
+      .then(([weekResult, metadataResult]) => {
+        if (weekResult.status === "fulfilled") {
+          const value = weekResult.value;
+          setWeek(Array.isArray(value) ? value : Object.values(value ?? {}).flat());
+        }
+
+        if (metadataResult.status === "fulfilled") {
+          setMetadata(metadataResult.value);
+        }
+
+        const rejected = [weekResult, metadataResult].find((item) => item.status === "rejected");
+        if (rejected) {
+          setMessage(rejected.reason?.message || "Часть данных расписания не загрузилась");
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [allowed]);
+
+  if (!allowed) {
+    return <AccessWarning title="Расписание доступно менеджеру расписания, директору и администратору" />;
+  }
+
+  return (
+    <section className="page-stack">
+      <PageHeader
+        title="Расписание"
+        subtitle="Неделя и справочники"
+        text="React-страница показывает недельную сетку и справочную информацию для дальнейшего полноценного редактора расписания."
+      />
+      <StatusLine loading={loading} message={message} />
+      <div className="metric-grid">
+        <MetricCard label="Записей недели" value={week.length} />
+        <MetricCard label="Классов" value={metadata?.classes?.length ?? 0} />
+        <MetricCard label="Предметов" value={metadata?.subjects?.length ?? 0} />
+        <MetricCard label="Учителей" value={metadata?.teachers?.length ?? 0} />
+      </div>
+      <DataTable
+        title="Недельное расписание"
+        columns={["День", "Время", "Класс", "Предмет", "Учитель", "Кабинет"]}
+        rows={week.slice(0, 30).map((item) => [
+          item.dayOfWeekName || item.dayOfWeek || formatDate(item.date),
+          formatTimeRange(item),
+          item.className || item.class || "—",
+          item.subjectName || item.subject || "—",
+          item.teacherName || item.teacher || "—",
+          item.room || item.classroom || "—"
+        ])}
+      />
+      <CardGrid
+        title="Справочники"
+        items={[
+          { title: "Классы", text: (metadata?.classes ?? []).map((item) => item.name).join(", ") || "Нет данных", meta: "Для выбора класса" },
+          { title: "Предметы", text: (metadata?.subjects ?? []).map((item) => item.name).join(", ") || "Нет данных", meta: "Для сетки уроков" },
+          { title: "Учителя", text: (metadata?.teachers ?? []).map((item) => item.fullName || item.name).join(", ") || "Нет данных", meta: "Для назначения преподавателя" }
+        ]}
+      />
     </section>
   );
 }
@@ -725,6 +1226,25 @@ function DataTable({ title, columns, rows }) {
   );
 }
 
+function CardGrid({ title, items }) {
+  return (
+    <section className="table-card">
+      <div className="table-title">{title}</div>
+      <div className="card-grid">
+        {items.length === 0 ? (
+          <p className="empty-text">Данных пока нет</p>
+        ) : items.map((item, index) => (
+          <article className="info-card" key={`${title}-${index}`}>
+            <span>{item.meta}</span>
+            <strong>{item.title}</strong>
+            <p>{item.text}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function AccessWarning({ title }) {
   return (
     <section className="page-stack">
@@ -777,16 +1297,42 @@ function formatNumber(value) {
   return Number.isFinite(numeric) ? numeric.toFixed(1) : "0.0";
 }
 
-function summarizeValue(value) {
-  if (Array.isArray(value)) {
-    return `${value.length} записей`;
+function formatDate(value) {
+  if (!value) {
+    return "—";
   }
 
-  if (value && typeof value === "object") {
-    return Object.keys(value).slice(0, 4).join(", ") || "Объект";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("ru-RU");
+}
+
+function formatTimeRange(item) {
+  if (item.startTime && item.endTime) {
+    return `${item.startTime} - ${item.endTime}`;
   }
 
-  return String(value ?? "Пустой ответ");
+  if (item.time) {
+    return item.time;
+  }
+
+  return "—";
+}
+
+function attendanceLabel(status) {
+  const numeric = Number(status);
+  if (numeric === 1) {
+    return "Присутствовал";
+  }
+
+  if (numeric === 0) {
+    return "Отсутствовал";
+  }
+
+  if (numeric === 2) {
+    return "Опоздал";
+  }
+
+  return "Не отмечено";
 }
 
 createRoot(document.getElementById("root")).render(<App />);
