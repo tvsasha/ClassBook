@@ -225,8 +225,8 @@ namespace ClassBook.Controllers
         {
             try
             {
-                var result = await _parentFacade.AddParentToStudentAsync(studentId, request.ParentId);
-                return Ok(result);
+                await _parentFacade.AddParentToStudentAsync(studentId, request.ParentId);
+                return Ok(new MessageResponseDto { Message = "Родитель успешно привязан к ученику" });
             }
             catch (KeyNotFoundException ex)
             {
