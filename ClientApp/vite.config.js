@@ -10,7 +10,18 @@ export default defineConfig(({ command }) => {
     base: isDevServer ? "/" : "./",
     build: {
       outDir: resolve(__dirname, "../wwwroot/app"),
-      emptyOutDir: true
+      emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          entryFileNames: "assets/app.js",
+          chunkFileNames: "assets/[name].js",
+          assetFileNames: (assetInfo) => {
+            return assetInfo.names?.some((name) => name.endsWith(".css"))
+              ? "assets/app.css"
+              : "assets/[name][extname]";
+          }
+        }
+      }
     },
     server: {
       host: "127.0.0.1",

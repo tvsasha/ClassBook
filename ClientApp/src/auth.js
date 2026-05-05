@@ -3,12 +3,12 @@ import { apiRequest } from "./api.js";
 const currentUserKey = "currentUser";
 
 export const roleTargets = {
-  "Администратор": "/index.html",
-  "Учитель": "/teacher.html",
-  "Ученик": "/student-portal.html",
-  "Родитель": "/parent-portal.html",
-  "Менеджер расписания": "/raspisanie.html",
-  "Директор": "/director-dashboard.html"
+  "Администратор": "#/admin",
+  "Учитель": "#/teacher",
+  "Ученик": "#/student",
+  "Родитель": "#/parent",
+  "Менеджер расписания": "#/schedule",
+  "Директор": "#/director"
 };
 
 export function readStoredUser() {
