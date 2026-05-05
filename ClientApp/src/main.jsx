@@ -292,6 +292,7 @@ function ChangePasswordPage({ user, onChanged }) {
 
 function AuthenticatedShell({ route, user, onLogout }) {
   const role = getRole(user);
+  const navItems = getNavItemsForRole(role);
 
   return (
     <main className="app-shell app-layout">
@@ -303,13 +304,9 @@ function AuthenticatedShell({ route, user, onLogout }) {
           <p className="role-badge">{role}</p>
         </div>
         <nav className="app-nav">
-          <NavLink route="home" current={route}>Главная</NavLink>
-          <NavLink route="admin" current={route}>Администрирование</NavLink>
-          <NavLink route="director" current={route}>Отчеты директора</NavLink>
-          <NavLink route="teacher" current={route}>Учитель</NavLink>
-          <NavLink route="student" current={route}>Ученик</NavLink>
-          <NavLink route="parent" current={route}>Родитель</NavLink>
-          <NavLink route="schedule" current={route}>Расписание</NavLink>
+          {navItems.map((item) => (
+            <NavLink key={item.route} route={item.route} current={route}>{item.label}</NavLink>
+          ))}
         </nav>
         <button className="ghost-button" onClick={onLogout}>
           Выйти
@@ -320,6 +317,38 @@ function AuthenticatedShell({ route, user, onLogout }) {
       </section>
     </main>
   );
+}
+
+function getNavItemsForRole(role) {
+  const common = [{ route: "home", label: "Главная" }];
+  const byRole = {
+    "Администратор": [
+      { route: "admin", label: "Администрирование" },
+      { route: "director", label: "Отчеты директора" },
+      { route: "teacher", label: "Журнал учителя" },
+      { route: "student", label: "Дневник ученика" },
+      { route: "parent", label: "Кабинет родителя" },
+      { route: "schedule", label: "Расписание" }
+    ],
+    "Директор": [
+      { route: "director", label: "Отчеты директора" }
+    ],
+    "Учитель": [
+      { route: "teacher", label: "Журнал учителя" },
+      { route: "schedule", label: "Мое расписание" }
+    ],
+    "Ученик": [
+      { route: "student", label: "Мой дневник" }
+    ],
+    "Родитель": [
+      { route: "parent", label: "Дневник ребенка" }
+    ],
+    "Менеджер расписания": [
+      { route: "schedule", label: "Редактор расписания" }
+    ]
+  };
+
+  return [...common, ...(byRole[role] ?? [])];
 }
 
 function NavLink({ route, current, children }) {
@@ -343,6 +372,9 @@ function RouteContent({ route, role, user }) {
     case "parent":
       return <ParentPage role={role} />;
     case "schedule":
+      if (role === "Учитель") {
+        return <TeacherPersonalSchedule user={user} />;
+      }
       return <SchedulePage role={role} />;
     default:
       return <DashboardPage user={user} />;
@@ -728,6 +760,15 @@ function TeacherPage({ role, user }) {
     }
   }
 
+  async function deleteGrade(gradeId) {
+    try {
+      await apiRequest(`/teacher/grades/${gradeId}`, { method: "DELETE" });
+      await loadLessonMarks(selectedLessonId);
+    } catch (error) {
+      setMessage(error.message || "Не удалось удалить оценку");
+    }
+  }
+
   async function saveAttendance(studentId, status) {
     if (!selectedLessonId) {
       return;
@@ -763,6 +804,8 @@ function TeacherPage({ role, user }) {
   });
   const lessonGrades = gradesByLesson[selectedLessonId] ?? [];
   const lessonAttendance = attendanceByLesson[selectedLessonId] ?? [];
+  const classAverage = calculateAverage(lessonGrades.map((item) => item.value));
+  const presentCount = lessonAttendance.filter((item) => Number(item.status) === 1).length;
 
   return (
     <section className="page-stack">
@@ -772,6 +815,12 @@ function TeacherPage({ role, user }) {
         text="Страница работает как самостоятельный React-интерфейс: загружает классы и предметы учителя, создает уроки и позволяет заполнять журнал выбранного урока."
       />
       <StatusLine loading={loading} message={message} />
+      <div className="metric-grid">
+        <MetricCard label="Уроков" value={lessons.length} />
+        <MetricCard label="Учеников в классе" value={students.length} />
+        <MetricCard label="Средняя оценка" value={formatNumber(classAverage)} />
+        <MetricCard label="Присутствуют" value={presentCount} />
+      </div>
       <form className="inline-form lesson-form" onSubmit={createLesson}>
         <label className="field">
           <span>Предмет</span>
@@ -843,13 +892,32 @@ function TeacherPage({ role, user }) {
           {students.length === 0 ? (
             <p className="empty-text">Выберите класс, чтобы увидеть учеников.</p>
           ) : students.map((student) => {
-            const grade = lessonGrades.find((item) => item.studentId === student.studentId);
+            const grades = lessonGrades.filter((item) => item.studentId === student.studentId);
             const attendance = lessonAttendance.find((item) => item.studentId === student.studentId);
+            const studentAverage = calculateAverage(grades.map((item) => item.value));
             return (
               <div className="journal-row" key={student.studentId}>
-                <strong>{student.lastName} {student.firstName}</strong>
+                <div>
+                  <strong>{student.lastName} {student.firstName}</strong>
+                  <span className="row-note">Средняя: {grades.length ? formatNumber(studentAverage) : "—"}</span>
+                </div>
+                <div className="grade-stack">
+                  {grades.length === 0 ? (
+                    <span className="empty-text">Оценок нет</span>
+                  ) : grades.map((grade) => (
+                    <button
+                      className={`grade-pill grade-${grade.value}`}
+                      key={grade.gradeId}
+                      title="Удалить оценку"
+                      type="button"
+                      onClick={() => deleteGrade(grade.gradeId)}
+                    >
+                      {grade.value}
+                    </button>
+                  ))}
+                </div>
                 <select defaultValue="" onChange={(event) => saveGrade(student.studentId, event.target.value)}>
-                  <option value="">{grade ? `Оценка: ${grade.value}` : "Поставить оценку"}</option>
+                  <option value="">Добавить оценку</option>
                   {[2, 3, 4, 5].map((value) => (
                     <option key={value} value={value}>{value}</option>
                   ))}
@@ -857,8 +925,10 @@ function TeacherPage({ role, user }) {
                 <select value={attendance?.status ?? ""} onChange={(event) => saveAttendance(student.studentId, event.target.value)}>
                   <option value="">Не отмечено</option>
                   <option value="1">Присутствовал</option>
-                  <option value="0">Отсутствовал</option>
-                  <option value="2">Опоздал</option>
+                  <option value="0">Н - пропуск</option>
+                  <option value="2">Б - болезнь</option>
+                  <option value="3">Ув - уважительная</option>
+                  <option value="4">Неуд - неуважительная</option>
                 </select>
               </div>
             );
@@ -1071,77 +1141,293 @@ function LearningSections({ schedule, grades, homework, attendance }) {
 }
 
 function SchedulePage({ role }) {
-  const allowed = role === "Менеджер расписания" || role === "Администратор" || role === "Директор";
-  const [week, setWeek] = useState([]);
+  const allowed = role === "Менеджер расписания" || role === "Администратор";
+  const editable = role === "Менеджер расписания" || role === "Администратор";
+  const [weekStart, setWeekStart] = useState(() => toIsoDate(getMonday(new Date())));
+  const [week, setWeek] = useState({ lessons: [] });
   const [metadata, setMetadata] = useState(null);
+  const [selectedCell, setSelectedCell] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [className, setClassName] = useState("");
+  const [lessonForm, setLessonForm] = useState({
+    subjectId: "",
+    teacherId: "",
+    homework: ""
+  });
+
+  async function loadScheduleEditor() {
+    setLoading(true);
+    setMessage("");
+    try {
+      const [weekData, metadataData] = await Promise.all([
+        apiRequest(`/schedule/editor/week?weekStart=${weekStart}`),
+        apiRequest("/schedule/editor/metadata")
+      ]);
+      setWeek(weekData ?? { lessons: [] });
+      setMetadata(metadataData);
+    } catch (error) {
+      setMessage(error.message || "Не удалось загрузить редактор расписания");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!allowed) {
       return;
     }
 
-    setLoading(true);
-    Promise.allSettled([
-      apiRequest("/schedule/week"),
-      apiRequest("/schedule/editor/metadata")
-    ])
-      .then(([weekResult, metadataResult]) => {
-        if (weekResult.status === "fulfilled") {
-          const value = weekResult.value;
-          setWeek(Array.isArray(value) ? value : Object.values(value ?? {}).flat());
-        }
+    loadScheduleEditor();
+  }, [allowed, weekStart]);
 
-        if (metadataResult.status === "fulfilled") {
-          setMetadata(metadataResult.value);
-        }
+  function selectCell(classItem, slot, lesson) {
+    setSelectedCell({ classItem, slot, lesson });
+    const subjectId = lesson?.subjectId ?? "";
+    const teacherId = lesson?.teacherId
+      ?? metadata?.subjects?.find((item) => Number(item.subjectId) === Number(subjectId))?.teacherId
+      ?? "";
+    setLessonForm({
+      subjectId,
+      teacherId,
+      homework: lesson?.homework ?? ""
+    });
+  }
 
-        const rejected = [weekResult, metadataResult].find((item) => item.status === "rejected");
-        if (rejected) {
-          setMessage(rejected.reason?.message || "Часть данных расписания не загрузилась");
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [allowed]);
+  async function saveLesson(event) {
+    event.preventDefault();
+    if (!selectedCell || !lessonForm.subjectId || !lessonForm.teacherId) {
+      setMessage("Выберите ячейку, предмет и преподавателя");
+      return;
+    }
+
+    const payload = {
+      classId: selectedCell.classItem.classId,
+      subjectId: Number(lessonForm.subjectId),
+      teacherId: Number(lessonForm.teacherId),
+      scheduleId: selectedCell.slot.scheduleId,
+      date: getLessonDateForSlot(weekStart, selectedCell.slot),
+      homework: lessonForm.homework.trim()
+    };
+
+    try {
+      if (selectedCell.lesson) {
+        await apiRequest(`/schedule/editor/lesson/${selectedCell.lesson.lessonId}`, {
+          method: "PUT",
+          body: JSON.stringify(payload)
+        });
+        setMessage("Урок обновлен");
+      } else {
+        await apiRequest("/schedule/editor/lesson", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        setMessage("Урок добавлен в сетку");
+      }
+      setSelectedCell(null);
+      await loadScheduleEditor();
+    } catch (error) {
+      setMessage(error.message || "Не удалось сохранить урок");
+    }
+  }
+
+  async function deleteScheduleLesson() {
+    if (!selectedCell?.lesson) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/schedule/editor/lesson/${selectedCell.lesson.lessonId}`, { method: "DELETE" });
+      setMessage("Урок удален из сетки");
+      setSelectedCell(null);
+      await loadScheduleEditor();
+    } catch (error) {
+      setMessage(error.message || "Не удалось удалить урок");
+    }
+  }
+
+  async function createClass(event) {
+    event.preventDefault();
+    if (!className.trim()) {
+      return;
+    }
+
+    try {
+      await apiRequest("/schedule/editor/class", {
+        method: "POST",
+        body: JSON.stringify({ name: className.trim() })
+      });
+      setClassName("");
+      setMessage("Класс добавлен");
+      await loadScheduleEditor();
+    } catch (error) {
+      setMessage(error.message || "Не удалось создать класс");
+    }
+  }
 
   if (!allowed) {
     return <AccessWarning title="Расписание доступно менеджеру расписания, директору и администратору" />;
   }
 
+  const classes = metadata?.classes ?? [];
+  const subjects = metadata?.subjects ?? [];
+  const teachers = metadata?.teachers ?? [];
+  const slots = metadata?.slots ?? [];
+  const lessonMap = buildScheduleLessonMap(week.lessons ?? []);
+  const weekCaption = getWeekCaption(weekStart);
+  const selectedSubject = subjects.find((item) => Number(item.subjectId) === Number(lessonForm.subjectId));
+
   return (
     <section className="page-stack">
       <PageHeader
-        title="Расписание"
-        subtitle="Неделя и справочники"
-        text="React-страница показывает недельную сетку и справочную информацию для дальнейшего полноценного редактора расписания."
+        title="Редактор расписания"
+        subtitle={weekCaption}
+        text="Недельная сетка перенесена в React: можно выбирать ячейку, назначать предмет и преподавателя, задавать домашнее задание, обновлять и удалять уроки."
       />
       <StatusLine loading={loading} message={message} />
       <div className="metric-grid">
-        <MetricCard label="Записей недели" value={week.length} />
-        <MetricCard label="Классов" value={metadata?.classes?.length ?? 0} />
-        <MetricCard label="Предметов" value={metadata?.subjects?.length ?? 0} />
-        <MetricCard label="Учителей" value={metadata?.teachers?.length ?? 0} />
+        <MetricCard label="Уроков недели" value={(week.lessons ?? []).length} />
+        <MetricCard label="Классов" value={classes.length} />
+        <MetricCard label="Предметов" value={subjects.length} />
+        <MetricCard label="Слотов звонков" value={slots.length} />
+      </div>
+      <div className="schedule-toolbar">
+        <button className="ghost-button compact" onClick={() => setWeekStart(shiftWeek(weekStart, -7))}>Предыдущая</button>
+        <Field label="Неделя" type="date" value={weekStart} onChange={(value) => setWeekStart(toIsoDate(getMonday(new Date(value))))} />
+        <button className="ghost-button compact" onClick={() => setWeekStart(shiftWeek(weekStart, 7))}>Следующая</button>
+        {editable && (
+          <form className="class-create-form" onSubmit={createClass}>
+            <input value={className} placeholder="Новый класс" onChange={(event) => setClassName(event.target.value)} />
+            <button className="primary-button compact">Добавить класс</button>
+          </form>
+        )}
+      </div>
+      <div className="schedule-editor">
+        <div className="schedule-grid-wrap">
+          <table className="schedule-grid-table">
+            <thead>
+              <tr>
+                <th>День</th>
+                <th>Время</th>
+                <th>№</th>
+                {classes.map((classItem) => (
+                  <th key={classItem.classId}>{classItem.name}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {groupSlotsByDay(slots).map(({ day, daySlots }) => daySlots.map((slot, slotIndex) => (
+                <tr key={`${day}-${slot.scheduleId}`}>
+                  {slotIndex === 0 && <td rowSpan={daySlots.length} className="day-cell">{dayName(day)}</td>}
+                  <td>{slot.startTime} - {slot.endTime}</td>
+                  <td>{slot.lessonNumber}</td>
+                  {classes.map((classItem) => {
+                    const lesson = lessonMap.get(`${classItem.classId}_${slot.scheduleId}`) ?? null;
+                    const selected = selectedCell?.classItem.classId === classItem.classId
+                      && selectedCell?.slot.scheduleId === slot.scheduleId;
+                    return (
+                      <td
+                        className={`schedule-cell ${lesson ? "has-lesson" : "empty"} ${selected ? "selected" : ""}`}
+                        key={`${classItem.classId}-${slot.scheduleId}`}
+                        onClick={() => editable && selectCell(classItem, slot, lesson)}
+                      >
+                        {lesson ? (
+                          <>
+                            <strong>{lesson.subjectName}</strong>
+                            <span>{lesson.teacherName}</span>
+                            {lesson.homework && <small>ДЗ: {lesson.homework}</small>}
+                          </>
+                        ) : "Свободно"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )))}
+            </tbody>
+          </table>
+        </div>
+        {editable && (
+          <form className="schedule-side-editor" onSubmit={saveLesson}>
+            <h3>{selectedCell?.lesson ? "Редактирование урока" : "Новый урок"}</h3>
+            <p>{selectedCell ? `${selectedCell.classItem.name}, ${dayName(selectedCell.slot.dayOfWeek)}, ${selectedCell.slot.lessonNumber} урок` : "Выберите ячейку в сетке"}</p>
+            <label className="field">
+              <span>Предмет</span>
+              <select value={lessonForm.subjectId} onChange={(event) => {
+                const subject = subjects.find((item) => Number(item.subjectId) === Number(event.target.value));
+                setLessonForm({
+                  ...lessonForm,
+                  subjectId: event.target.value,
+                  teacherId: lessonForm.teacherId || subject?.teacherId || ""
+                });
+              }}>
+                <option value="">Выберите предмет</option>
+                {subjects.map((subject) => (
+                  <option key={subject.subjectId} value={subject.subjectId}>{subject.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Преподаватель</span>
+              <select value={lessonForm.teacherId || selectedSubject?.teacherId || ""} onChange={(event) => setLessonForm({ ...lessonForm, teacherId: event.target.value })}>
+                <option value="">Выберите преподавателя</option>
+                {teachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
+                ))}
+              </select>
+            </label>
+            <Field label="Домашнее задание / примечание" value={lessonForm.homework} onChange={(value) => setLessonForm({ ...lessonForm, homework: value })} />
+            <button className="primary-button" disabled={!selectedCell}>Сохранить урок</button>
+            {selectedCell?.lesson && (
+              <button className="danger-button" type="button" onClick={deleteScheduleLesson}>Удалить урок</button>
+            )}
+          </form>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TeacherPersonalSchedule({ user }) {
+  const [lessons, setLessons] = useState([]);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    apiRequest(`/teacher/lessons?teacherId=${user.id}`)
+      .then((data) => setLessons(data ?? []))
+      .catch((error) => setMessage(error.message || "Не удалось загрузить личное расписание"))
+      .finally(() => setLoading(false));
+  }, [user.id]);
+
+  const upcomingLessons = lessons
+    .filter((lesson) => new Date(lesson.date) >= getTodayStart())
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  return (
+    <section className="page-stack">
+      <PageHeader
+        title="Мое расписание"
+        subtitle={user.fullName || user.login}
+        text="Личная сетка уроков учителя: классы, темы, домашние задания и ближайшие занятия без доступа к общему редактору расписания."
+      />
+      <StatusLine loading={loading} message={message} />
+      <div className="metric-grid">
+        <MetricCard label="Всего уроков" value={lessons.length} />
+        <MetricCard label="Ближайших" value={upcomingLessons.length} />
+        <MetricCard label="Классов" value={new Set(lessons.map((item) => item.className)).size} />
+        <MetricCard label="Предметов" value={new Set(lessons.map((item) => item.subjectName)).size} />
       </div>
       <DataTable
-        title="Недельное расписание"
-        columns={["День", "Время", "Класс", "Предмет", "Учитель", "Кабинет"]}
-        rows={week.slice(0, 30).map((item) => [
-          item.dayOfWeekName || item.dayOfWeek || formatDate(item.date),
-          formatTimeRange(item),
-          item.className || item.class || "—",
-          item.subjectName || item.subject || "—",
-          item.teacherName || item.teacher || "—",
-          item.room || item.classroom || "—"
+        title="Ближайшие уроки"
+        columns={["Дата", "Класс", "Предмет", "Тема", "Домашнее задание"]}
+        rows={upcomingLessons.slice(0, 20).map((lesson) => [
+          formatDate(lesson.date),
+          lesson.className,
+          lesson.subjectName,
+          lesson.topic || "—",
+          lesson.homework || "—"
         ])}
-      />
-      <CardGrid
-        title="Справочники"
-        items={[
-          { title: "Классы", text: (metadata?.classes ?? []).map((item) => item.name).join(", ") || "Нет данных", meta: "Для выбора класса" },
-          { title: "Предметы", text: (metadata?.subjects ?? []).map((item) => item.name).join(", ") || "Нет данных", meta: "Для сетки уроков" },
-          { title: "Учителя", text: (metadata?.teachers ?? []).map((item) => item.fullName || item.name).join(", ") || "Нет данных", meta: "Для назначения преподавателя" }
-        ]}
       />
     </section>
   );
@@ -1150,17 +1436,18 @@ function SchedulePage({ role }) {
 function BrandPanel() {
   return (
     <section className="brand-card">
-      <div className="eyebrow">ClassBook · React shell</div>
-      <h2 className="brand-title">Один вход. Одна оболочка. Без HTML-переездов.</h2>
+      <div className="eyebrow">ClassBook · электронный журнал</div>
+      <h2 className="brand-title">Учебный день под контролем.</h2>
       <p className="brand-copy">
-        Админка, директорская аналитика и рабочие разделы постепенно живут в
-        React, а backend остается единым источником данных и прав доступа.
+        Единое пространство для расписания, оценок, посещаемости и связи школы
+        с семьей. Данные доступны по ролям, обновляются в реальном времени и
+        остаются защищенными внутри школьной системы.
       </p>
       <div className="role-grid">
-        <RoleTile title="Администратор" text="Пользователи, доступы, классы и структура школы." />
-        <RoleTile title="Учитель" text="Журнал, оценки, посещаемость и уроки." />
-        <RoleTile title="Родитель и ученик" text="Безопасный доступ только к своим учебным данным." />
-        <RoleTile title="Директор" text="Отчеты, аналитика и аудит действий." />
+        <RoleTile title="Оценки и дневник" text="Цветные отметки, средний балл, домашние задания и история уроков." />
+        <RoleTile title="Посещаемость" text="Отметки Н, Б, Ув, Неуд и сводка по ученикам и классам." />
+        <RoleTile title="Расписание" text="Актуальная недельная сетка, кабинеты, замены и примечания к урокам." />
+        <RoleTile title="Отчетность" text="Контроль заполнения журнала, аналитика и прозрачность действий." />
       </div>
     </section>
   );
@@ -1297,6 +1584,13 @@ function formatNumber(value) {
   return Number.isFinite(numeric) ? numeric.toFixed(1) : "0.0";
 }
 
+function calculateAverage(values) {
+  const numericValues = values.map(Number).filter(Number.isFinite);
+  return numericValues.length
+    ? numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length
+    : 0;
+}
+
 function formatDate(value) {
   if (!value) {
     return "—";
@@ -1325,14 +1619,97 @@ function attendanceLabel(status) {
   }
 
   if (numeric === 0) {
-    return "Отсутствовал";
+    return "Н - пропуск";
   }
 
   if (numeric === 2) {
-    return "Опоздал";
+    return "Б - болезнь";
+  }
+
+  if (numeric === 3) {
+    return "Ув - уважительная причина";
+  }
+
+  if (numeric === 4) {
+    return "Неуд - неуважительная причина";
   }
 
   return "Не отмечено";
+}
+
+function toIsoDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getMonday(date) {
+  const result = new Date(date);
+  const day = result.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  result.setDate(result.getDate() + diff);
+  return result;
+}
+
+function getTodayStart() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function shiftWeek(weekStart, days) {
+  const date = new Date(weekStart);
+  date.setDate(date.getDate() + days);
+  return toIsoDate(getMonday(date));
+}
+
+function getWeekCaption(weekStart) {
+  const start = new Date(weekStart);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 4);
+  return `${formatDate(start)} - ${formatDate(end)}`;
+}
+
+function getLessonDateForSlot(weekStart, slot) {
+  const date = new Date(weekStart);
+  date.setDate(date.getDate() + Number(slot.dayOfWeek ?? 0));
+  return toIsoDate(date);
+}
+
+function buildScheduleLessonMap(lessons) {
+  const map = new Map();
+  lessons.forEach((lesson) => {
+    if (lesson.classId && lesson.scheduleId) {
+      map.set(`${lesson.classId}_${lesson.scheduleId}`, lesson);
+    }
+  });
+  return map;
+}
+
+function groupSlotsByDay(slots) {
+  const groups = new Map();
+  slots.forEach((slot) => {
+    if (!groups.has(slot.dayOfWeek)) {
+      groups.set(slot.dayOfWeek, []);
+    }
+    groups.get(slot.dayOfWeek).push(slot);
+  });
+
+  return [...groups.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([day, daySlots]) => ({
+      day,
+      daySlots: daySlots.sort((a, b) => a.lessonNumber - b.lessonNumber)
+    }));
+}
+
+function dayName(day) {
+  return ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"][Number(day)] ?? String(day);
 }
 
 createRoot(document.getElementById("root")).render(<App />);

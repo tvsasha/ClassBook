@@ -587,7 +587,7 @@ td {
 
 .journal-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 180px 190px;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, 1fr) 170px 210px;
   gap: 12px;
   align-items: center;
   padding: 12px;
@@ -602,6 +602,152 @@ td {
   border-radius: 14px;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.88);
+}
+
+.row-note {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.grade-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.grade-pill {
+  width: 36px;
+  height: 34px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(24, 32, 38, 0.12);
+}
+
+.grade-5 {
+  background: #138a63;
+}
+
+.grade-4 {
+  background: #2477c3;
+}
+
+.grade-3 {
+  background: #c47a13;
+}
+
+.grade-2 {
+  background: #b42318;
+}
+
+.danger-button {
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  padding: 14px 16px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #c2410c, #991b1b);
+}
+
+.schedule-toolbar,
+.class-create-form {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.class-create-form input {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px 15px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.schedule-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.schedule-grid-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.schedule-grid-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(249, 251, 248, 0.96);
+}
+
+.day-cell {
+  color: var(--accent-strong);
+  font-weight: 700;
+  background: rgba(15, 124, 102, 0.08);
+}
+
+.schedule-cell {
+  min-width: 170px;
+  height: 92px;
+  cursor: pointer;
+  vertical-align: top;
+  white-space: normal;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.schedule-cell.empty {
+  color: #9aa4ac;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.schedule-cell.has-lesson {
+  background: rgba(15, 124, 102, 0.09);
+}
+
+.schedule-cell.selected {
+  box-shadow: inset 0 0 0 3px rgba(15, 124, 102, 0.46);
+}
+
+.schedule-cell strong,
+.schedule-cell span,
+.schedule-cell small {
+  display: block;
+}
+
+.schedule-cell span,
+.schedule-cell small {
+  margin-top: 5px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.schedule-side-editor {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.schedule-side-editor h3,
+.schedule-side-editor p {
+  margin: 0;
+}
+
+.schedule-side-editor p {
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .card-grid {
@@ -660,6 +806,7 @@ td {
   .inline-form,
   .lesson-form,
   .split-grid,
+  .schedule-editor,
   .card-grid,
   .journal-row {
     grid-template-columns: 1fr;
