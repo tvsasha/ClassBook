@@ -186,6 +186,7 @@ namespace ClassBook
 
             app.UseAuthorization();
             app.MapControllers();
+            app.MapFallbackToFile("/app/{*path:nonfile}", "app/index.html");
 
             app.Run();
         }
