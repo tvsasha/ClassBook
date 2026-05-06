@@ -101,6 +101,44 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
+        /// Привязывает существующую учетную запись ученика к карточке ученика.
+        /// </summary>
+        /// <param name="studentId">Идентификатор карточки ученика.</param>
+        /// <param name="dto">Идентификатор существующего пользователя с ролью ученика.</param>
+        /// <returns>Данные привязанной учетной записи.</returns>
+        [HttpPost("{studentId}/attach-account")]
+        public async Task<IActionResult> AttachStudentAccount(int studentId, [FromBody] AttachStudentAccountDto dto)
+        {
+            try
+            {
+                if (dto.UserId <= 0)
+                    return BadRequestError("UserId обязателен и должен быть больше 0");
+
+                var user = await _facade.AttachStudentAccountAsync(studentId, dto.UserId);
+                var currentUserId = GetCurrentUserId();
+                if (currentUserId > 0)
+                {
+                    await _auditFacade.LogActionAsync<StudentAccessAuditDto>(currentUserId, "User", user.Id, "AttachStudentAccess", null, new StudentAccessAuditDto
+                    {
+                        StudentId = studentId,
+                        Login = user.Login,
+                        FullName = user.FullName,
+                        MustChangePassword = user.MustChangePassword
+                    });
+                }
+                return Ok(user);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Создаёт родительскую учетную запись сразу в контексте выбранного ученика.
         /// </summary>
         /// <param name="studentId">Идентификатор ученика.</param>

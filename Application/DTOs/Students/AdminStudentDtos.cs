@@ -14,6 +14,11 @@ namespace ClassBook.Application.DTOs
         public string Password { get; set; } = string.Empty;
     }
 
+    public class AttachStudentAccountDto
+    {
+        public int UserId { get; set; }
+    }
+
     public class CreateParentAccountDto
     {
         public string FullName { get; set; } = string.Empty;

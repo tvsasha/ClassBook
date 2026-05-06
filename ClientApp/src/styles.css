@@ -604,6 +604,83 @@ td {
   background: rgba(255, 255, 255, 0.88);
 }
 
+.padded {
+  padding: 18px;
+}
+
+.gradebook-wrap {
+  overflow: auto;
+  max-height: 68vh;
+  border-top: 1px solid rgba(24, 32, 38, 0.08);
+}
+
+.gradebook-table {
+  min-width: 960px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.gradebook-table th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  min-width: 150px;
+  vertical-align: top;
+  background: rgba(249, 251, 248, 0.98);
+  box-shadow: 0 1px 0 rgba(24, 32, 38, 0.08);
+}
+
+.gradebook-table th span,
+.gradebook-table th small {
+  display: block;
+}
+
+.gradebook-table th small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-weight: 500;
+  white-space: normal;
+}
+
+.gradebook-table td {
+  vertical-align: top;
+}
+
+.student-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 230px;
+  max-width: 270px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 1px 0 0 rgba(24, 32, 38, 0.08);
+  white-space: normal;
+  font-weight: 700;
+}
+
+.gradebook-table th.student-sticky {
+  z-index: 4;
+  background: rgba(249, 251, 248, 1);
+}
+
+.gradebook-cell {
+  min-width: 160px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.gradebook-cell .grade-stack {
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.gradebook-cell select,
+.attendance-select {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
 .row-note {
   display: block;
   margin-top: 5px;
@@ -652,6 +729,36 @@ td {
   color: #fff;
   cursor: pointer;
   background: linear-gradient(135deg, #c2410c, #991b1b);
+}
+
+.admin-edit-form,
+.attach-form {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.toggle-field {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.toggle-field input {
+  width: 18px;
+  height: 18px;
+}
+
+.table-action {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 13px;
+  color: var(--accent-strong);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.82);
+  font-weight: 700;
 }
 
 .schedule-toolbar,
@@ -808,7 +915,9 @@ td {
   .split-grid,
   .schedule-editor,
   .card-grid,
-  .journal-row {
+  .journal-row,
+  .admin-edit-form,
+  .attach-form {
     grid-template-columns: 1fr;
   }
 

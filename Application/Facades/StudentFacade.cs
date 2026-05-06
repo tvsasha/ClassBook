@@ -131,6 +131,45 @@ namespace ClassBook.Application.Facades
             };
         }
 
+        public async Task<IssuedStudentAccountDto> AttachStudentAccountAsync(int studentId, int userId)
+        {
+            var student = await _db.Students
+                .Include(s => s.User)
+                .FirstOrDefaultAsync(s => s.StudentId == studentId);
+
+            if (student == null)
+                throw new KeyNotFoundException("Ученик не найден");
+
+            if (student.UserId.HasValue)
+                throw new ArgumentException("К этому ученику уже привязана учетная запись");
+
+            var user = await _db.Users
+                .Include(u => u.Role)
+                .Include(u => u.Student)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                throw new KeyNotFoundException("Пользователь не найден");
+
+            if (user.Role?.Name != "Ученик")
+                throw new ArgumentException("К карточке ученика можно привязать только пользователя с ролью 'Ученик'");
+
+            if (user.Student != null)
+                throw new ArgumentException("Эта учетная запись уже привязана к другому ученику");
+
+            student.UserId = user.Id;
+            await _db.SaveChangesAsync();
+
+            return new IssuedStudentAccountDto
+            {
+                Id = user.Id,
+                Login = user.Login,
+                FullName = user.FullName,
+                MustChangePassword = user.MustChangePassword,
+                Message = "Учетная запись ученика привязана"
+            };
+        }
+
         /// <summary>
         /// Получает список учеников по классу.
         /// </summary>

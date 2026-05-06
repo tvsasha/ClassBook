@@ -162,8 +162,8 @@ function LoginPage({ onLogin }) {
           <div className="auth-header">
             <h1>Вход в ClassBook</h1>
             <p>
-              React-приложение теперь управляет входом, ролями и основными
-              страницами без переходов на отдельные HTML-файлы.
+              Войдите в электронный журнал, чтобы открыть расписание, дневник,
+              отчеты или рабочий журнал в соответствии с вашей ролью.
             </p>
           </div>
           <form onSubmit={handleSubmit}>
@@ -254,8 +254,8 @@ function ChangePasswordPage({ user, onChanged }) {
             </p>
           </div>
           <p className="hint">
-            После смены пароля система откроет React-раздел, соответствующий
-            вашей роли.
+            После смены временного пароля система откроет рабочий раздел,
+            соответствующий вашей роли.
           </p>
           <form onSubmit={handleSubmit}>
             <Field
@@ -298,7 +298,7 @@ function AuthenticatedShell({ route, user, onLogout }) {
     <main className="app-shell app-layout">
       <aside className="side-panel">
         <div>
-          <div className="eyebrow">ClassBook React</div>
+          <div className="eyebrow">ClassBook</div>
           <h1>Электронный журнал</h1>
           <p>{user.fullName || user.login}</p>
           <p className="role-badge">{role}</p>
@@ -390,7 +390,7 @@ function DashboardPage({ user }) {
       <PageHeader
         title="Главная панель"
         subtitle={`${user.fullName || user.login} · ${role}`}
-        text="Это уже React-приложение. Ссылки ниже не ведут на отдельные HTML-файлы, поэтому сервер больше не должен отвечать Cannot GET."
+        text="Быстрый доступ к основным разделам электронного журнала, доступным вашей учетной записи."
       />
       <div className="module-grid">
         <ModuleCard
@@ -418,6 +418,7 @@ function AdminPage({ role }) {
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -426,19 +427,27 @@ function AdminPage({ role }) {
     password: "",
     roleId: ""
   });
+  const [editingUser, setEditingUser] = useState(null);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [studentAccountLink, setStudentAccountLink] = useState({
+    studentId: "",
+    userId: ""
+  });
 
   async function loadAdminData() {
     setLoading(true);
     setMessage("");
     try {
-      const [usersData, rolesData, studentsData] = await Promise.all([
+      const [usersData, rolesData, studentsData, classesData] = await Promise.all([
         apiRequest("/users"),
         apiRequest("/roles"),
-        apiRequest("/admin/students")
+        apiRequest("/admin/students"),
+        apiRequest("/classes")
       ]);
       setUsers(usersData ?? []);
       setRoles(rolesData ?? []);
       setStudents(studentsData ?? []);
+      setClasses(classesData ?? []);
     } catch (error) {
       setMessage(error.message || "Не удалось загрузить данные администрирования");
     } finally {
@@ -479,16 +488,92 @@ function AdminPage({ role }) {
     }
   }
 
+  async function saveUser(event) {
+    event.preventDefault();
+    if (!editingUser) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/users/${editingUser.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          login: editingUser.login.trim(),
+          fullName: editingUser.fullName.trim(),
+          password: editingUser.password?.trim() || null,
+          roleId: Number(editingUser.roleId),
+          isActive: Boolean(editingUser.isActive)
+        })
+      });
+      setEditingUser(null);
+      setMessage("Пользователь обновлен");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось обновить пользователя");
+    }
+  }
+
+  async function saveStudent(event) {
+    event.preventDefault();
+    if (!editingStudent) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/admin/students/${editingStudent.studentId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          firstName: editingStudent.firstName.trim(),
+          lastName: editingStudent.lastName.trim(),
+          birthDate: editingStudent.birthDate,
+          classId: Number(editingStudent.classId)
+        })
+      });
+      setEditingStudent(null);
+      setMessage("Карточка ученика обновлена");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось обновить ученика");
+    }
+  }
+
+  async function attachStudentAccount(event) {
+    event.preventDefault();
+    if (!studentAccountLink.studentId || !studentAccountLink.userId) {
+      setMessage("Выберите ученика и учетную запись");
+      return;
+    }
+
+    try {
+      await apiRequest(`/admin/students/${studentAccountLink.studentId}/attach-account`, {
+        method: "POST",
+        body: JSON.stringify({ userId: Number(studentAccountLink.userId) })
+      });
+      setStudentAccountLink({ studentId: "", userId: "" });
+      setMessage("Учетная запись привязана к ученику");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось привязать учетную запись");
+    }
+  }
+
   if (!allowed) {
     return <AccessWarning title="Администрирование доступно только администратору" />;
   }
+
+  const studentRole = roles.find((item) => item.name === "Ученик");
+  const availableStudentUsers = users.filter((item) => {
+    const isStudentRole = studentRole ? Number(item.roleId) === Number(studentRole.id) : item.roleName === "Ученик";
+    const alreadyLinked = students.some((student) => Number(student.userId) === Number(item.id));
+    return isStudentRole && !alreadyLinked;
+  });
 
   return (
     <section className="page-stack">
       <PageHeader
         title="Администрирование"
         subtitle="Пользователи, роли и ученики"
-        text="Минимальная React-админка уже работает напрямую с backend API. Старый файл «index.html» больше не нужен для перехода из приложения."
+        text="Управление учетными записями, ролями, карточками учеников и выдачей доступа к электронному журналу."
       />
       <form className="inline-form" onSubmit={createUser}>
         <Field label="Логин" value={form.login} onChange={(value) => setForm({ ...form, login: value })} />
@@ -506,6 +591,65 @@ function AdminPage({ role }) {
         <button className="primary-button">Создать пользователя</button>
       </form>
       <StatusLine loading={loading} message={message} />
+      {editingUser && (
+        <form className="inline-form admin-edit-form" onSubmit={saveUser}>
+          <Field label="Логин" value={editingUser.login} onChange={(value) => setEditingUser({ ...editingUser, login: value })} />
+          <Field label="ФИО" value={editingUser.fullName} onChange={(value) => setEditingUser({ ...editingUser, fullName: value })} />
+          <Field label="Новый пароль" value={editingUser.password || ""} onChange={(value) => setEditingUser({ ...editingUser, password: value })} />
+          <label className="field">
+            <span>Роль</span>
+            <select value={editingUser.roleId} onChange={(event) => setEditingUser({ ...editingUser, roleId: event.target.value })}>
+              {roles.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="toggle-field">
+            <input type="checkbox" checked={editingUser.isActive} onChange={(event) => setEditingUser({ ...editingUser, isActive: event.target.checked })} />
+            Активен
+          </label>
+          <button className="primary-button">Сохранить пользователя</button>
+          <button className="ghost-button compact" type="button" onClick={() => setEditingUser(null)}>Отмена</button>
+        </form>
+      )}
+      {editingStudent && (
+        <form className="inline-form admin-edit-form" onSubmit={saveStudent}>
+          <Field label="Фамилия" value={editingStudent.lastName} onChange={(value) => setEditingStudent({ ...editingStudent, lastName: value })} />
+          <Field label="Имя" value={editingStudent.firstName} onChange={(value) => setEditingStudent({ ...editingStudent, firstName: value })} />
+          <Field label="Дата рождения" type="date" value={editingStudent.birthDate?.slice(0, 10)} onChange={(value) => setEditingStudent({ ...editingStudent, birthDate: value })} />
+          <label className="field">
+            <span>Класс</span>
+            <select value={editingStudent.classId} onChange={(event) => setEditingStudent({ ...editingStudent, classId: event.target.value })}>
+              {classes.map((item) => (
+                <option key={item.classId} value={item.classId}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <button className="primary-button">Сохранить ученика</button>
+          <button className="ghost-button compact" type="button" onClick={() => setEditingStudent(null)}>Отмена</button>
+        </form>
+      )}
+      <form className="inline-form attach-form" onSubmit={attachStudentAccount}>
+        <label className="field">
+          <span>Карточка ученика без аккаунта</span>
+          <select value={studentAccountLink.studentId} onChange={(event) => setStudentAccountLink({ ...studentAccountLink, studentId: event.target.value })}>
+            <option value="">Выберите ученика</option>
+            {students.filter((item) => !item.hasAccount).map((item) => (
+              <option key={item.studentId} value={item.studentId}>{item.lastName} {item.firstName} · {item.className || "без класса"}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Свободная учетная запись ученика</span>
+          <select value={studentAccountLink.userId} onChange={(event) => setStudentAccountLink({ ...studentAccountLink, userId: event.target.value })}>
+            <option value="">Выберите пользователя</option>
+            {availableStudentUsers.map((item) => (
+              <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
+            ))}
+          </select>
+        </label>
+        <button className="primary-button">Привязать профиль</button>
+      </form>
       <div className="metric-grid">
         <MetricCard label="Пользователей" value={users.length} />
         <MetricCard label="Активных" value={users.filter((item) => item.isActive).length} />
@@ -514,22 +658,24 @@ function AdminPage({ role }) {
       </div>
       <DataTable
         title="Пользователи"
-        columns={["ФИО", "Логин", "Роль", "Статус", "Пароль"]}
+        columns={["ФИО", "Логин", "Роль", "Статус", "Пароль", "Действие"]}
         rows={users.slice(0, 12).map((item) => [
           item.fullName,
           item.login,
           item.roleName,
           item.isActive ? "Активен" : "Отключен",
-          item.mustChangePassword ? "Нужно сменить" : "Постоянный"
+          item.mustChangePassword ? "Нужно сменить" : "Постоянный",
+          <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
         ])}
       />
       <DataTable
         title="Ученики"
-        columns={["ФИО", "Класс", "Аккаунт"]}
+        columns={["ФИО", "Класс", "Аккаунт", "Действие"]}
         rows={students.slice(0, 12).map((item) => [
           `${item.lastName} ${item.firstName}`,
           item.className || "Без класса",
-          item.hasAccount ? "Есть" : "Не выдан"
+          item.hasAccount ? "Есть" : "Не выдан",
+          <button className="table-action" type="button" onClick={() => setEditingStudent({ ...item, birthDate: item.birthDate?.slice(0, 10) })}>Редактировать</button>
         ])}
       />
     </section>
@@ -582,7 +728,7 @@ function DirectorPage({ role }) {
       <PageHeader
         title="Отчеты директора"
         subtitle="Аналитика учебного процесса"
-        text="Эта панель уже открывается внутри React и получает данные из директорских API без перехода на «director-dashboard.html»."
+        text="Сводная аналитика по классам, посещаемости, заполнению журнала и действиям пользователей."
       />
       <StatusLine loading={loading} message={message} />
       <div className="metric-grid">
@@ -683,6 +829,40 @@ function TeacherPage({ role, user }) {
       .catch((error) => setMessage(error.message || "Не удалось загрузить учеников класса"));
   }, [selectedClassId]);
 
+  useEffect(() => {
+    if (!selectedClassId || lessons.length === 0) {
+      return;
+    }
+
+    const selectedClassForLoad = classes.find((item) => String(item.classId ?? item.id) === String(selectedClassId));
+    const lessonsToLoad = lessons
+      .filter((lesson) => String(lesson.classId ?? "") === String(selectedClassId) || lesson.className === selectedClassForLoad?.name)
+      .slice(0, 10);
+
+    if (lessonsToLoad.length === 0) {
+      return;
+    }
+
+    Promise.all(lessonsToLoad.map(async (lesson) => {
+      const [gradeData, attendanceData] = await Promise.all([
+        apiRequest(`/teacher/grades/${lesson.lessonId}`),
+        apiRequest(`/teacher/attendance/${lesson.lessonId}`)
+      ]);
+      return { lessonId: lesson.lessonId, grades: gradeData ?? [], attendance: attendanceData ?? [] };
+    }))
+      .then((items) => {
+        setGradesByLesson((current) => ({
+          ...current,
+          ...Object.fromEntries(items.map((item) => [item.lessonId, item.grades]))
+        }));
+        setAttendanceByLesson((current) => ({
+          ...current,
+          ...Object.fromEntries(items.map((item) => [item.lessonId, item.attendance]))
+        }));
+      })
+      .catch((error) => setMessage(error.message || "Не удалось загрузить журнал класса"));
+  }, [selectedClassId, lessons, classes]);
+
   async function loadLessonMarks(lessonId) {
     if (!lessonId) {
       setSelectedLessonId("");
@@ -745,25 +925,35 @@ function TeacherPage({ role, user }) {
       return;
     }
 
+    await saveGradeForLesson(selectedLessonId, studentId, value);
+  }
+
+  async function saveGradeForLesson(lessonId, studentId, value) {
+    if (!lessonId || !value) {
+      return;
+    }
+
     try {
       await apiRequest("/teacher/grades", {
         method: "POST",
         body: JSON.stringify({
-          lessonId: Number(selectedLessonId),
+          lessonId: Number(lessonId),
           studentId,
           value: Number(value)
         })
       });
-      await loadLessonMarks(selectedLessonId);
+      await loadLessonMarks(lessonId);
     } catch (error) {
       setMessage(error.message || "Не удалось сохранить оценку");
     }
   }
 
-  async function deleteGrade(gradeId) {
+  async function deleteGrade(gradeId, lessonId = selectedLessonId) {
     try {
       await apiRequest(`/teacher/grades/${gradeId}`, { method: "DELETE" });
-      await loadLessonMarks(selectedLessonId);
+      if (lessonId) {
+        await loadLessonMarks(lessonId);
+      }
     } catch (error) {
       setMessage(error.message || "Не удалось удалить оценку");
     }
@@ -774,16 +964,24 @@ function TeacherPage({ role, user }) {
       return;
     }
 
+    await saveAttendanceForLesson(selectedLessonId, studentId, status);
+  }
+
+  async function saveAttendanceForLesson(lessonId, studentId, status) {
+    if (!lessonId || status === "") {
+      return;
+    }
+
     try {
       await apiRequest("/teacher/attendance", {
         method: "POST",
         body: JSON.stringify({
-          lessonId: Number(selectedLessonId),
+          lessonId: Number(lessonId),
           studentId,
           status: Number(status)
         })
       });
-      await loadLessonMarks(selectedLessonId);
+      await loadLessonMarks(lessonId);
     } catch (error) {
       setMessage(error.message || "Не удалось сохранить посещаемость");
     }
@@ -802,17 +1000,18 @@ function TeacherPage({ role, user }) {
     return String(lesson.classId ?? "") === String(selectedClassId)
       || lesson.className === selectedClass?.name;
   });
-  const lessonGrades = gradesByLesson[selectedLessonId] ?? [];
-  const lessonAttendance = attendanceByLesson[selectedLessonId] ?? [];
-  const classAverage = calculateAverage(lessonGrades.map((item) => item.value));
-  const presentCount = lessonAttendance.filter((item) => Number(item.status) === 1).length;
+  const journalLessons = selectedClassId ? classLessons.slice(0, 10) : [];
+  const allVisibleGrades = journalLessons.flatMap((lesson) => gradesByLesson[lesson.lessonId] ?? []);
+  const allVisibleAttendance = journalLessons.flatMap((lesson) => attendanceByLesson[lesson.lessonId] ?? []);
+  const classAverage = calculateAverage(allVisibleGrades.map((item) => item.value));
+  const presentCount = allVisibleAttendance.filter((item) => Number(item.status) === 1).length;
 
   return (
     <section className="page-stack">
       <PageHeader
         title="Кабинет учителя"
         subtitle="Уроки, журнал, оценки и посещаемость"
-        text="Страница работает как самостоятельный React-интерфейс: загружает классы и предметы учителя, создает уроки и позволяет заполнять журнал выбранного урока."
+        text="Рабочее место преподавателя для планирования уроков, заполнения оценок и отметок посещаемости."
       />
       <StatusLine loading={loading} message={message} />
       <div className="metric-grid">
@@ -887,53 +1086,75 @@ function TeacherPage({ role, user }) {
         />
       </div>
       <section className="table-card">
-        <div className="table-title">Журнал выбранного урока</div>
-        <div className="journal-list">
-          {students.length === 0 ? (
-            <p className="empty-text">Выберите класс, чтобы увидеть учеников.</p>
-          ) : students.map((student) => {
-            const grades = lessonGrades.filter((item) => item.studentId === student.studentId);
-            const attendance = lessonAttendance.find((item) => item.studentId === student.studentId);
-            const studentAverage = calculateAverage(grades.map((item) => item.value));
-            return (
-              <div className="journal-row" key={student.studentId}>
-                <div>
-                  <strong>{student.lastName} {student.firstName}</strong>
-                  <span className="row-note">Средняя: {grades.length ? formatNumber(studentAverage) : "—"}</span>
-                </div>
-                <div className="grade-stack">
-                  {grades.length === 0 ? (
-                    <span className="empty-text">Оценок нет</span>
-                  ) : grades.map((grade) => (
-                    <button
-                      className={`grade-pill grade-${grade.value}`}
-                      key={grade.gradeId}
-                      title="Удалить оценку"
-                      type="button"
-                      onClick={() => deleteGrade(grade.gradeId)}
-                    >
-                      {grade.value}
-                    </button>
+        <div className="table-title">Журнал класса</div>
+        {students.length === 0 || journalLessons.length === 0 ? (
+          <p className="empty-text padded">Выберите класс, чтобы увидеть сетку журнала.</p>
+        ) : (
+          <div className="gradebook-wrap">
+            <table className="gradebook-table">
+              <thead>
+                <tr>
+                  <th className="student-sticky">ФИО ученика</th>
+                  {journalLessons.map((lesson, index) => (
+                    <th key={lesson.lessonId}>
+                      <span>{index + 1} урок</span>
+                      <small>{lesson.subjectName}</small>
+                    </th>
                   ))}
-                </div>
-                <select defaultValue="" onChange={(event) => saveGrade(student.studentId, event.target.value)}>
-                  <option value="">Добавить оценку</option>
-                  {[2, 3, 4, 5].map((value) => (
-                    <option key={value} value={value}>{value}</option>
-                  ))}
-                </select>
-                <select value={attendance?.status ?? ""} onChange={(event) => saveAttendance(student.studentId, event.target.value)}>
-                  <option value="">Не отмечено</option>
-                  <option value="1">Присутствовал</option>
-                  <option value="0">Н - пропуск</option>
-                  <option value="2">Б - болезнь</option>
-                  <option value="3">Ув - уважительная</option>
-                  <option value="4">Неуд - неуважительная</option>
-                </select>
-              </div>
-            );
-          })}
-        </div>
+                  <th>Средняя</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((student) => {
+                  const studentGrades = journalLessons.flatMap((lesson) =>
+                    (gradesByLesson[lesson.lessonId] ?? []).filter((grade) => grade.studentId === student.studentId)
+                  );
+                  return (
+                    <tr key={student.studentId}>
+                      <td className="student-sticky">{student.lastName} {student.firstName}</td>
+                      {journalLessons.map((lesson) => {
+                        const grades = (gradesByLesson[lesson.lessonId] ?? []).filter((grade) => grade.studentId === student.studentId);
+                        const attendance = (attendanceByLesson[lesson.lessonId] ?? []).find((item) => item.studentId === student.studentId);
+                        return (
+                          <td key={`${student.studentId}-${lesson.lessonId}`} className="gradebook-cell">
+                            <div className="grade-stack">
+                              {grades.map((grade) => (
+                                <button
+                                  className={`grade-pill grade-${grade.value}`}
+                                  key={grade.gradeId}
+                                  title="Удалить оценку"
+                                  type="button"
+                                  onClick={() => deleteGrade(grade.gradeId, lesson.lessonId)}
+                                >
+                                  {grade.value}
+                                </button>
+                              ))}
+                              <select defaultValue="" onChange={(event) => saveGradeForLesson(lesson.lessonId, student.studentId, event.target.value)}>
+                                <option value="">+</option>
+                                {[2, 3, 4, 5].map((value) => (
+                                  <option key={value} value={value}>{value}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <select className="attendance-select" value={attendance?.status ?? ""} onChange={(event) => saveAttendanceForLesson(lesson.lessonId, student.studentId, event.target.value)}>
+                              <option value="">—</option>
+                              <option value="1">П</option>
+                              <option value="0">Н</option>
+                              <option value="2">Б</option>
+                              <option value="3">Ув</option>
+                              <option value="4">Неуд</option>
+                            </select>
+                          </td>
+                        );
+                      })}
+                      <td>{studentGrades.length ? formatNumber(calculateAverage(studentGrades.map((grade) => grade.value))) : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </section>
   );
@@ -1054,7 +1275,7 @@ function ParentPage({ role }) {
       <PageHeader
         title="Кабинет родителя"
         subtitle={selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : "Выберите ученика"}
-        text="Родитель видит только привязанных учеников. Данные подгружаются из отдельных родительских API без старой страницы."
+        text="Доступ к успеваемости, посещаемости, расписанию и домашним заданиям привязанных учеников."
       />
       <StatusLine loading={loading} message={message} />
       <label className="field wide-field">
@@ -1282,7 +1503,7 @@ function SchedulePage({ role }) {
       <PageHeader
         title="Редактор расписания"
         subtitle={weekCaption}
-        text="Недельная сетка перенесена в React: можно выбирать ячейку, назначать предмет и преподавателя, задавать домашнее задание, обновлять и удалять уроки."
+        text="Недельная сетка занятий с назначением предметов, преподавателей, домашних заданий и примечаний."
       />
       <StatusLine loading={loading} message={message} />
       <div className="metric-grid">
@@ -1538,7 +1759,7 @@ function AccessWarning({ title }) {
       <PageHeader
         title={title}
         subtitle="Доступ ограничен"
-        text="Backend не отдаст данные без нужной роли. React дополнительно скрывает страницу, чтобы пользователь сразу понимал причину."
+        text="У вашей учетной записи нет прав на просмотр этого раздела. Обратитесь к администратору, если доступ нужен для работы."
       />
     </section>
   );
