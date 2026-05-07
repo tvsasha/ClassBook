@@ -13,14 +13,20 @@ export function resolveApiBase() {
 const apiBase = resolveApiBase();
 
 export async function apiRequest(path, options = {}) {
-  const response = await fetch(`${apiBase}${path}`, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    },
-    ...options
-  });
+  let response;
+
+  try {
+    response = await fetch(`${apiBase}${path}`, {
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      },
+      ...options
+    });
+  } catch (error) {
+    throw new Error(toRussianNetworkError(error));
+  }
 
   if (!response.ok) {
     const message = await readErrorMessage(response);
@@ -33,6 +39,16 @@ export async function apiRequest(path, options = {}) {
 
   const text = await response.text();
   return text ? JSON.parse(text) : null;
+}
+
+function toRussianNetworkError(error) {
+  const message = String(error?.message || "").toLowerCase();
+
+  if (message.includes("failed to fetch") || error instanceof TypeError) {
+    return "Не удалось связаться с сервером. Проверьте, что backend запущен, адрес указан верно и браузер не заблокировал запрос.";
+  }
+
+  return "Произошла сетевая ошибка при обращении к серверу.";
 }
 
 async function readErrorMessage(response) {

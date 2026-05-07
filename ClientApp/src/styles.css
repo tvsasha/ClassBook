@@ -926,3 +926,210 @@ td {
     height: auto;
   }
 }
+
+@media (max-width: 640px) {
+  body {
+    background:
+      radial-gradient(circle at 20% 8%, rgba(15, 124, 102, 0.2), transparent 18rem),
+      linear-gradient(160deg, #f2f6ef 0%, #faf2e6 100%);
+  }
+
+  .app-shell {
+    padding: 10px;
+  }
+
+  .hero {
+    gap: 12px;
+  }
+
+  .brand-card,
+  .auth-card,
+  .dashboard-card,
+  .side-panel,
+  .content-panel {
+    border-radius: 20px;
+    box-shadow: 0 14px 38px rgba(24, 32, 38, 0.13);
+  }
+
+  .brand-card {
+    padding: 22px;
+  }
+
+  .brand-card::after {
+    width: 220px;
+    height: 220px;
+    right: -80px;
+    bottom: -90px;
+  }
+
+  .brand-title {
+    margin: 22px 0 14px;
+    font-size: clamp(2.55rem, 18vw, 4.2rem);
+  }
+
+  .brand-copy,
+  .auth-header p,
+  .page-header p {
+    font-size: 0.96rem;
+    line-height: 1.5;
+  }
+
+  .auth-card,
+  .content-panel,
+  .side-panel {
+    padding: 16px;
+  }
+
+  .app-layout {
+    gap: 10px;
+  }
+
+  .side-panel {
+    gap: 14px;
+  }
+
+  .side-panel h1 {
+    margin: 12px 0 8px;
+    font-size: 1.55rem;
+  }
+
+  .app-nav {
+    display: flex;
+    gap: 8px;
+    margin: 0 -4px;
+    padding: 2px 4px 8px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  .app-nav a {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
+
+  .page-stack {
+    gap: 14px;
+  }
+
+  .page-header {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .page-header h2 {
+    font-size: clamp(2rem, 13vw, 3.1rem);
+  }
+
+  .metric-card,
+  .module-card,
+  .table-card,
+  .inline-form {
+    border-radius: 18px;
+  }
+
+  .metric-card,
+  .module-card {
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .metric-card strong {
+    font-size: 1.85rem;
+  }
+
+  .table-title {
+    padding: 14px 16px;
+  }
+
+  th,
+  td {
+    padding: 11px 12px;
+    font-size: 0.92rem;
+  }
+
+  .field input,
+  .field select,
+  .journal-row select,
+  .class-create-form input,
+  .gradebook-cell select,
+  .attendance-select {
+    min-height: 44px;
+    border-radius: 13px;
+  }
+
+  .primary-button,
+  .ghost-button,
+  .danger-button {
+    min-height: 44px;
+    border-radius: 14px;
+  }
+
+  .gradebook-wrap,
+  .schedule-grid-wrap,
+  .table-wrap {
+    margin: 0 -1px;
+    border-radius: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .gradebook-table {
+    min-width: 760px;
+  }
+
+  .student-sticky {
+    min-width: 170px;
+    max-width: 190px;
+  }
+
+  .gradebook-cell {
+    min-width: 132px;
+  }
+
+  .grade-pill {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .schedule-toolbar,
+  .class-create-form {
+    align-items: stretch;
+  }
+
+  .schedule-toolbar .compact,
+  .class-create-form .compact,
+  .compact {
+    width: 100%;
+  }
+
+  .schedule-side-editor {
+    padding: 16px;
+    border-radius: 18px;
+  }
+}
+
+@media (max-width: 420px) {
+  .brand-card {
+    display: none;
+  }
+
+  .auth-header h1 {
+    font-size: 1.85rem;
+  }
+
+  .eyebrow {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .role-badge {
+    max-width: 100%;
+  }
+
+  .student-sticky {
+    min-width: 150px;
+    max-width: 160px;
+  }
+}
