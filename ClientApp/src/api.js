@@ -10,7 +10,7 @@ export function resolveApiBase() {
   return `${origin}/api`;
 }
 
-const apiBase = resolveApiBase();
+export const apiBase = resolveApiBase();
 
 export async function apiRequest(path, options = {}) {
   let response;

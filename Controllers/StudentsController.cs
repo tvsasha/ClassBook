@@ -3,6 +3,7 @@ using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using System.Text;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -200,6 +201,45 @@ namespace ClassBook.Controllers
             {
                 _logger.LogError(ex, "Ошибка при загрузке списка учеников");
                 return InternalServerError("Не удалось загрузить список учеников");
+            }
+        }
+
+        /// <summary>
+        /// Импортирует учеников из CSV-текста с колонками Фамилия;Имя;Дата рождения;Класс.
+        /// </summary>
+        /// <param name="dto">CSV-текст и флаг автоматического создания недостающих классов.</param>
+        /// <returns>Количество добавленных и пропущенных строк.</returns>
+        [HttpPost("import")]
+        public async Task<IActionResult> ImportStudents([FromBody] ImportStudentsDto dto)
+        {
+            try
+            {
+                var result = await _facade.ImportStudentsAsync(dto.CsvText, dto.CreateMissingClasses);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Экспортирует список учеников в CSV-файл для Excel или повторного импорта.
+        /// </summary>
+        /// <returns>CSV-файл со списком учеников.</returns>
+        [HttpGet("export")]
+        public async Task<IActionResult> ExportStudents()
+        {
+            try
+            {
+                var csv = await _facade.ExportStudentsCsvAsync();
+                var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv)).ToArray();
+                return File(bytes, "text/csv; charset=utf-8", "students.csv");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при экспорте списка учеников");
+                return InternalServerError("Не удалось выгрузить список учеников");
             }
         }
 

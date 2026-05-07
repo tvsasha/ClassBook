@@ -19,6 +19,19 @@ namespace ClassBook.Application.DTOs
         public int UserId { get; set; }
     }
 
+    public class ImportStudentsDto
+    {
+        public string CsvText { get; set; } = string.Empty;
+        public bool CreateMissingClasses { get; set; } = true;
+    }
+
+    public class ImportStudentsResultDto
+    {
+        public int Imported { get; set; }
+        public int Skipped { get; set; }
+        public List<string> Errors { get; set; } = [];
+    }
+
     public class CreateParentAccountDto
     {
         public string FullName { get; set; } = string.Empty;

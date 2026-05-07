@@ -85,10 +85,11 @@ select {
 
 .brand-title {
   max-width: 720px;
+  padding-right: 0.18em;
   margin: 34px 0 18px;
   font-size: clamp(3rem, 7vw, 6.6rem);
   line-height: 0.9;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.06em;
 }
 
 .brand-copy {
@@ -156,7 +157,9 @@ select {
   font-size: 0.92rem;
 }
 
-.field input {
+.field input,
+.field select,
+.field textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -166,7 +169,15 @@ select {
   outline: none;
 }
 
-.field input:focus {
+.field textarea {
+  min-height: 130px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
   border-color: rgba(15, 124, 102, 0.55);
   box-shadow: 0 0 0 4px rgba(15, 124, 102, 0.12);
 }
@@ -738,6 +749,44 @@ td {
   padding: 18px;
 }
 
+.import-panel,
+.filter-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.filter-panel {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+}
+
+.file-drop {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px dashed rgba(15, 124, 102, 0.34);
+  border-radius: 18px;
+  color: var(--muted);
+  background: rgba(15, 124, 102, 0.06);
+  cursor: pointer;
+}
+
+.file-drop input {
+  width: 100%;
+}
+
+.file-drop strong {
+  color: var(--accent-strong);
+}
+
+.button-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .toggle-field {
   display: flex;
   gap: 10px;
@@ -939,7 +988,7 @@ td {
   }
 
   .hero {
-    gap: 12px;
+    gap: 0;
   }
 
   .brand-card,
@@ -953,6 +1002,14 @@ td {
 
   .brand-card {
     padding: 22px;
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .auth-card {
+    border-top: 0;
+    border-top-right-radius: 0;
+    border-top-left-radius: 0;
   }
 
   .brand-card::after {
@@ -964,7 +1021,9 @@ td {
 
   .brand-title {
     margin: 22px 0 14px;
+    padding-right: 0.24em;
     font-size: clamp(2.55rem, 18vw, 4.2rem);
+    letter-spacing: -0.045em;
   }
 
   .brand-copy,
@@ -1100,8 +1159,18 @@ td {
 
   .schedule-toolbar .compact,
   .class-create-form .compact,
+  .button-row .compact,
   .compact {
     width: 100%;
+  }
+
+  .filter-panel {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .import-panel {
+    padding: 14px;
   }
 
   .schedule-side-editor {
@@ -1113,6 +1182,11 @@ td {
 @media (max-width: 420px) {
   .brand-card {
     display: none;
+  }
+
+  .auth-card {
+    border-top: 1px solid var(--line);
+    border-radius: 20px;
   }
 
   .auth-header h1 {

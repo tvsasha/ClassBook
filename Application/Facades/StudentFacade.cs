@@ -5,6 +5,8 @@ using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace ClassBook.Application.Facades
@@ -218,6 +220,128 @@ namespace ClassBook.Application.Facades
                 .ToListAsync();
         }
 
+        public async Task<ImportStudentsResultDto> ImportStudentsAsync(string csvText, bool createMissingClasses)
+        {
+            if (string.IsNullOrWhiteSpace(csvText))
+                throw new ArgumentException("Файл импорта пустой");
+
+            var result = new ImportStudentsResultDto();
+            var lines = csvText
+                .Replace("\r\n", "\n")
+                .Replace('\r', '\n')
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (lines.Length == 0)
+                throw new ArgumentException("Файл импорта не содержит строк");
+
+            var startIndex = IsStudentImportHeader(lines[0]) ? 1 : 0;
+            var classes = await _db.Classes.ToDictionaryAsync(c => c.Name.ToLower(), c => c);
+            var seenRows = new HashSet<string>();
+
+            for (var index = startIndex; index < lines.Length; index++)
+            {
+                var rowNumber = index + 1;
+                var values = SplitStudentImportLine(lines[index]);
+                if (values.Count < 4)
+                {
+                    result.Skipped++;
+                    result.Errors.Add($"Строка {rowNumber}: нужно указать фамилию, имя, дату рождения и класс");
+                    continue;
+                }
+
+                var lastName = values[0].Trim();
+                var firstName = values[1].Trim();
+                var birthDateText = values[2].Trim();
+                var className = values[3].Trim();
+
+                if (string.IsNullOrWhiteSpace(lastName) || string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(className))
+                {
+                    result.Skipped++;
+                    result.Errors.Add($"Строка {rowNumber}: фамилия, имя и класс обязательны");
+                    continue;
+                }
+
+                if (!TryParseStudentBirthDate(birthDateText, out var birthDate))
+                {
+                    result.Skipped++;
+                    result.Errors.Add($"Строка {rowNumber}: дата рождения должна быть в формате дд.мм.гггг или гггг-мм-дд");
+                    continue;
+                }
+
+                if (!classes.TryGetValue(className.ToLower(), out var classEntity))
+                {
+                    if (!createMissingClasses)
+                    {
+                        result.Skipped++;
+                        result.Errors.Add($"Строка {rowNumber}: класс '{className}' не найден");
+                        continue;
+                    }
+
+                    classEntity = new Class { Name = className };
+                    _db.Classes.Add(classEntity);
+                    classes[className.ToLower()] = classEntity;
+                }
+
+                var importKey = $"{lastName}|{firstName}|{birthDate:yyyy-MM-dd}|{className}".ToLowerInvariant();
+                if (!seenRows.Add(importKey))
+                {
+                    result.Skipped++;
+                    result.Errors.Add($"Строка {rowNumber}: такая строка уже встречалась в файле");
+                    continue;
+                }
+
+                var exists = await _db.Students.AnyAsync(s =>
+                    s.LastName == lastName &&
+                    s.FirstName == firstName &&
+                    s.BirthDate.Date == birthDate.Date &&
+                    s.ClassId == classEntity.ClassId);
+
+                if (exists)
+                {
+                    result.Skipped++;
+                    result.Errors.Add($"Строка {rowNumber}: такой ученик уже есть в выбранном классе");
+                    continue;
+                }
+
+                _db.Students.Add(new Student
+                {
+                    LastName = lastName,
+                    FirstName = firstName,
+                    BirthDate = birthDate,
+                    Class = classEntity
+                });
+                result.Imported++;
+            }
+
+            await _db.SaveChangesAsync();
+            return result;
+        }
+
+        public async Task<string> ExportStudentsCsvAsync()
+        {
+            var students = await _db.Students
+                .Include(s => s.Class)
+                .OrderBy(s => s.Class.Name)
+                .ThenBy(s => s.LastName)
+                .ThenBy(s => s.FirstName)
+                .ToListAsync();
+
+            var builder = new StringBuilder();
+            builder.AppendLine("Фамилия;Имя;Дата рождения;Класс;Аккаунт");
+
+            foreach (var student in students)
+            {
+                builder.Append(EscapeCsv(student.LastName)).Append(';')
+                    .Append(EscapeCsv(student.FirstName)).Append(';')
+                    .Append(student.BirthDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)).Append(';')
+                    .Append(EscapeCsv(student.Class?.Name ?? string.Empty)).Append(';')
+                    .Append(student.UserId.HasValue ? "Есть" : "Не выдан")
+                    .AppendLine();
+            }
+
+            return builder.ToString();
+        }
+
         public async Task DeleteStudentAsync(int studentId)
         {
             var student = await _db.Students
@@ -397,6 +521,33 @@ namespace ClassBook.Application.Facades
                 ClassId = student.ClassId,
                 ClassName = className
             };
+        }
+
+        private static bool IsStudentImportHeader(string line)
+        {
+            var normalized = line.ToLowerInvariant();
+            return normalized.Contains("фамилия") && normalized.Contains("имя") && normalized.Contains("класс");
+        }
+
+        private static List<string> SplitStudentImportLine(string line)
+        {
+            var delimiter = line.Contains(';') ? ';' : ',';
+            return line.Split(delimiter).Select(value => value.Trim().Trim('"')).ToList();
+        }
+
+        private static bool TryParseStudentBirthDate(string value, out DateTime birthDate)
+        {
+            var formats = new[] { "dd.MM.yyyy", "d.M.yyyy", "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy" };
+            return DateTime.TryParseExact(value, formats, CultureInfo.GetCultureInfo("ru-RU"), DateTimeStyles.None, out birthDate)
+                || DateTime.TryParse(value, CultureInfo.GetCultureInfo("ru-RU"), DateTimeStyles.None, out birthDate);
+        }
+
+        private static string EscapeCsv(string value)
+        {
+            if (value.Contains(';') || value.Contains('"') || value.Contains('\n'))
+                return $"\"{value.Replace("\"", "\"\"")}\"";
+
+            return value;
         }
 
         private async Task<Student> GetCurrentStudentAsync(int userId, bool includeClass = false)

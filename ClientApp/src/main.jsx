@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { apiRequest } from "./api.js";
+import { apiBase, apiRequest } from "./api.js";
 import {
   changePassword,
   clearUser,
@@ -433,6 +433,20 @@ function AdminPage({ role }) {
     studentId: "",
     userId: ""
   });
+  const [userFilters, setUserFilters] = useState({
+    search: "",
+    roleId: "",
+    status: "all",
+    sort: "fullName"
+  });
+  const [studentFilters, setStudentFilters] = useState({
+    search: "",
+    classId: "",
+    account: "all",
+    sort: "name"
+  });
+  const [studentImportText, setStudentImportText] = useState("");
+  const [studentImportFileName, setStudentImportFileName] = useState("");
 
   async function loadAdminData() {
     setLoading(true);
@@ -557,6 +571,62 @@ function AdminPage({ role }) {
     }
   }
 
+  async function importStudents(event) {
+    event.preventDefault();
+    if (!studentImportText.trim()) {
+      setMessage("Добавьте CSV-файл или вставьте строки для импорта");
+      return;
+    }
+
+    try {
+      const result = await apiRequest("/admin/students/import", {
+        method: "POST",
+        body: JSON.stringify({
+          csvText: studentImportText,
+          createMissingClasses: true
+        })
+      });
+      setStudentImportText("");
+      setStudentImportFileName("");
+      setMessage(`Импорт завершен: добавлено ${result.imported}, пропущено ${result.skipped}${result.errors?.length ? `. Ошибки: ${result.errors.slice(0, 3).join("; ")}` : ""}`);
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось импортировать учеников");
+    }
+  }
+
+  async function readStudentImportFile(file) {
+    if (!file) {
+      return;
+    }
+
+    const text = await file.text();
+    setStudentImportFileName(file.name);
+    setStudentImportText(text);
+  }
+
+  async function exportStudents() {
+    try {
+      const response = await fetch(`${apiBase}/admin/students/export`, {
+        credentials: "include"
+      });
+
+      if (!response.ok) {
+        throw new Error("Не удалось выгрузить учеников");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "students.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage(error.message || "Не удалось выгрузить учеников");
+    }
+  }
+
   if (!allowed) {
     return <AccessWarning title="Администрирование доступно только администратору" />;
   }
@@ -566,6 +636,41 @@ function AdminPage({ role }) {
     const isStudentRole = studentRole ? Number(item.roleId) === Number(studentRole.id) : item.roleName === "Ученик";
     const alreadyLinked = students.some((student) => Number(student.userId) === Number(item.id));
     return isStudentRole && !alreadyLinked;
+  });
+  const filteredUsers = sortItems(users.filter((item) => {
+    const search = userFilters.search.trim().toLowerCase();
+    const matchesSearch = !search
+      || item.fullName?.toLowerCase().includes(search)
+      || item.login?.toLowerCase().includes(search)
+      || item.roleName?.toLowerCase().includes(search);
+    const matchesRole = !userFilters.roleId || Number(item.roleId) === Number(userFilters.roleId);
+    const matchesStatus = userFilters.status === "all"
+      || (userFilters.status === "active" && item.isActive)
+      || (userFilters.status === "blocked" && !item.isActive)
+      || (userFilters.status === "temporary" && item.mustChangePassword);
+
+    return matchesSearch && matchesRole && matchesStatus;
+  }), userFilters.sort, {
+    fullName: (item) => item.fullName || "",
+    login: (item) => item.login || "",
+    role: (item) => item.roleName || ""
+  });
+  const filteredStudents = sortItems(students.filter((item) => {
+    const search = studentFilters.search.trim().toLowerCase();
+    const fullName = `${item.lastName} ${item.firstName}`.toLowerCase();
+    const matchesSearch = !search
+      || fullName.includes(search)
+      || item.className?.toLowerCase().includes(search);
+    const matchesClass = !studentFilters.classId || Number(item.classId) === Number(studentFilters.classId);
+    const matchesAccount = studentFilters.account === "all"
+      || (studentFilters.account === "issued" && item.hasAccount)
+      || (studentFilters.account === "missing" && !item.hasAccount);
+
+    return matchesSearch && matchesClass && matchesAccount;
+  }), studentFilters.sort, {
+    name: (item) => `${item.lastName} ${item.firstName}`,
+    className: (item) => item.className || "",
+    account: (item) => item.hasAccount ? "1" : "0"
   });
 
   return (
@@ -650,16 +755,70 @@ function AdminPage({ role }) {
         </label>
         <button className="primary-button">Привязать профиль</button>
       </form>
+      <section className="table-card import-card">
+        <div className="table-title">Импорт и экспорт учеников</div>
+        <form className="import-panel" onSubmit={importStudents}>
+          <label className="file-drop">
+            <input type="file" accept=".csv,.txt" onChange={(event) => readStudentImportFile(event.target.files?.[0])} />
+            <strong>{studentImportFileName || "Выберите CSV-файл"}</strong>
+            <span>Формат: Фамилия;Имя;Дата рождения;Класс</span>
+          </label>
+          <label className="field">
+            <span>Или вставьте строки вручную</span>
+            <textarea
+              value={studentImportText}
+              onChange={(event) => setStudentImportText(event.target.value)}
+              placeholder={"Фамилия;Имя;Дата рождения;Класс\nИванов;Артем;12.04.2012;7Г"}
+            />
+          </label>
+          <div className="button-row">
+            <button className="primary-button compact">Импортировать</button>
+            <button className="ghost-button compact" type="button" onClick={exportStudents}>Выгрузить CSV</button>
+          </div>
+        </form>
+      </section>
       <div className="metric-grid">
         <MetricCard label="Пользователей" value={users.length} />
         <MetricCard label="Активных" value={users.filter((item) => item.isActive).length} />
         <MetricCard label="Со временным паролем" value={users.filter((item) => item.mustChangePassword).length} />
         <MetricCard label="Учеников" value={students.length} />
       </div>
+      <section className="table-card">
+        <div className="table-title">Фильтр пользователей</div>
+        <div className="filter-panel">
+          <Field label="Поиск" value={userFilters.search} onChange={(value) => setUserFilters({ ...userFilters, search: value })} />
+          <label className="field">
+            <span>Роль</span>
+            <select value={userFilters.roleId} onChange={(event) => setUserFilters({ ...userFilters, roleId: event.target.value })}>
+              <option value="">Все роли</option>
+              {roles.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Статус</span>
+            <select value={userFilters.status} onChange={(event) => setUserFilters({ ...userFilters, status: event.target.value })}>
+              <option value="all">Все</option>
+              <option value="active">Активные</option>
+              <option value="blocked">Отключенные</option>
+              <option value="temporary">С временным паролем</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Сортировка</span>
+            <select value={userFilters.sort} onChange={(event) => setUserFilters({ ...userFilters, sort: event.target.value })}>
+              <option value="fullName">По ФИО</option>
+              <option value="login">По логину</option>
+              <option value="role">По роли</option>
+            </select>
+          </label>
+        </div>
+      </section>
       <DataTable
-        title="Пользователи"
+        title={`Пользователи (${filteredUsers.length})`}
         columns={["ФИО", "Логин", "Роль", "Статус", "Пароль", "Действие"]}
-        rows={users.slice(0, 12).map((item) => [
+        rows={filteredUsers.slice(0, 30).map((item) => [
           item.fullName,
           item.login,
           item.roleName,
@@ -668,10 +827,41 @@ function AdminPage({ role }) {
           <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
         ])}
       />
+      <section className="table-card">
+        <div className="table-title">Фильтр учеников</div>
+        <div className="filter-panel">
+          <Field label="Поиск" value={studentFilters.search} onChange={(value) => setStudentFilters({ ...studentFilters, search: value })} />
+          <label className="field">
+            <span>Класс</span>
+            <select value={studentFilters.classId} onChange={(event) => setStudentFilters({ ...studentFilters, classId: event.target.value })}>
+              <option value="">Все классы</option>
+              {classes.map((item) => (
+                <option key={item.classId} value={item.classId}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Аккаунт</span>
+            <select value={studentFilters.account} onChange={(event) => setStudentFilters({ ...studentFilters, account: event.target.value })}>
+              <option value="all">Все</option>
+              <option value="issued">Выдан</option>
+              <option value="missing">Не выдан</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Сортировка</span>
+            <select value={studentFilters.sort} onChange={(event) => setStudentFilters({ ...studentFilters, sort: event.target.value })}>
+              <option value="name">По ФИО</option>
+              <option value="className">По классу</option>
+              <option value="account">По аккаунту</option>
+            </select>
+          </label>
+        </div>
+      </section>
       <DataTable
-        title="Ученики"
+        title={`Ученики (${filteredStudents.length})`}
         columns={["ФИО", "Класс", "Аккаунт", "Действие"]}
-        rows={students.slice(0, 12).map((item) => [
+        rows={filteredStudents.slice(0, 30).map((item) => [
           `${item.lastName} ${item.firstName}`,
           item.className || "Без класса",
           item.hasAccount ? "Есть" : "Не выдан",
@@ -1810,6 +2000,16 @@ function calculateAverage(values) {
   return numericValues.length
     ? numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length
     : 0;
+}
+
+function sortItems(items, sortKey, selectors) {
+  const selector = selectors[sortKey] || Object.values(selectors)[0];
+  return [...items].sort((left, right) =>
+    String(selector(left)).localeCompare(String(selector(right)), "ru", {
+      numeric: true,
+      sensitivity: "base"
+    })
+  );
 }
 
 function formatDate(value) {
