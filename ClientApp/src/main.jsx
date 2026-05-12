@@ -339,7 +339,8 @@ function getNavItemsForRole(role) {
       { route: "schedule", label: "Мое расписание" }
     ],
     "Ученик": [
-      { route: "student", label: "Мой дневник" }
+      { route: "student", label: "Мой дневник" },
+      { route: "schedule", label: "Мое расписание" }
     ],
     "Родитель": [
       { route: "parent", label: "Дневник ребенка" }
@@ -401,16 +402,27 @@ function DashboardPage({ user }) {
           title="Открыть мой раздел"
           text="Основной рабочий экран для текущей роли."
         />
-        <ModuleCard
-          href="#/admin"
-          title="Администрирование"
-          text="Пользователи, роли, ученики и выдача доступов."
-        />
-        <ModuleCard
-          href="#/director"
-          title="Отчеты директора"
-          text="Сводка по классам, посещаемость, ежедневный контроль и аудит."
-        />
+        {role === "Администратор" && (
+          <>
+            <ModuleCard
+              href="#/admin"
+              title="Администрирование"
+              text="Пользователи, роли, ученики и выдача доступов."
+            />
+            <ModuleCard
+              href="#/director"
+              title="Отчеты директора"
+              text="Сводка по классам, посещаемость, ежедневный контроль и аудит."
+            />
+          </>
+        )}
+        {role === "Директор" && (
+          <ModuleCard
+            href="#/director"
+            title="Отчеты директора"
+            text="Сводка по классам, посещаемость, ежедневный контроль и аудит."
+          />
+        )}
       </div>
     </section>
   );
@@ -463,17 +475,28 @@ function AdminPage({ role }) {
   const [parentRosterFile, setParentRosterFile] = useState(null);
   const [issuedBatch, setIssuedBatch] = useState(null);
   const [adminTab, setAdminTab] = useState("overview");
+  const [subjects, setSubjects] = useState([]);
+  const [subjectForm, setSubjectForm] = useState({
+    name: "",
+    teacherId: ""
+  });
+  const [editingSubject, setEditingSubject] = useState(null);
+  const [subjectClassAssignmentForm, setSubjectClassAssignmentForm] = useState({
+    classId: "",
+    teacherId: ""
+  });
 
   async function loadAdminData() {
     setLoading(true);
     setMessage("");
     try {
-      const [usersData, rolesData, studentsData, classesData, assignmentsData] = await Promise.all([
+      const [usersData, rolesData, studentsData, classesData, assignmentsData, subjectsData] = await Promise.all([
         apiRequest("/users"),
         apiRequest("/roles"),
         apiRequest("/admin/students"),
         apiRequest("/classes"),
-        apiRequest("/class-teacher/assignments")
+        apiRequest("/class-teacher/assignments"),
+        apiRequest("/subjects")
       ]);
       setUsers(usersData ?? []);
       setRoles(rolesData ?? []);
@@ -483,6 +506,7 @@ function AdminPage({ role }) {
         className: (item) => classSortValue(item.className),
         teacherName: (item) => item.teacherName || ""
       }));
+      setSubjects(subjectsData ?? []);
     } catch (error) {
       setMessage(error.message || "Не удалось загрузить данные администрирования");
     } finally {
@@ -767,6 +791,68 @@ function AdminPage({ role }) {
     }
   }
 
+  async function createSubject(event) {
+    event.preventDefault();
+    if (!subjectForm.name.trim() || !subjectForm.teacherId) {
+      setMessage("Укажите название предмета и выберите учителя");
+      return;
+    }
+
+    try {
+      await apiRequest("/subjects", {
+        method: "POST",
+        body: JSON.stringify({
+          name: subjectForm.name.trim(),
+          teacherId: Number(subjectForm.teacherId)
+        })
+      });
+      setSubjectForm({ name: "", teacherId: "" });
+      setMessage("Предмет создан");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось создать предмет");
+    }
+  }
+
+  async function updateSubject(event) {
+    event.preventDefault();
+    if (!editingSubject || !editingSubject.name.trim() || !editingSubject.teacherId) {
+      setMessage("Укажите название предмета и выберите учителя");
+      return;
+    }
+
+    try {
+      await apiRequest(`/subjects/${editingSubject.subjectId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: editingSubject.name.trim(),
+          teacherId: Number(editingSubject.teacherId)
+        })
+      });
+      setEditingSubject(null);
+      setMessage("Предмет обновлен");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось обновить предмет");
+    }
+  }
+
+  async function deleteSubject(subjectId) {
+    if (!window.confirm("Удалить предмет? Это действие удалит все связанные уроки.")) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/subjects/${subjectId}`, {
+        method: "DELETE"
+      });
+      setMessage("Предмет удален");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось удалить предмет");
+    }
+  }
+
   async function exportRosterDocx() {
     try {
       const response = await fetch(`${apiBase}/admin/students/export-docx`, {
@@ -907,6 +993,7 @@ function AdminPage({ role }) {
     { id: "overview", label: "Обзор" },
     { id: "users", label: "Пользователи" },
     { id: "students", label: "Ученики" },
+    { id: "subjects", label: "Предметы" },
     { id: "access", label: "Доступы и классы" },
     { id: "import", label: "Импорт" }
   ];
@@ -1073,6 +1160,55 @@ function AdminPage({ role }) {
         </label>
         <button className="primary-button">Привязать профиль</button>
       </form>
+      <section className={`table-card admin-section ${adminTab === "subjects" ? "active" : ""}`}>
+        <div className="table-title">Предметы и учителя</div>
+        <form className="inline-form attach-form" onSubmit={createSubject}>
+          <label className="field">
+            <span>Название предмета</span>
+            <input type="text" value={subjectForm.name} onChange={(event) => setSubjectForm({ ...subjectForm, name: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Учитель</span>
+            <select value={subjectForm.teacherId} onChange={(event) => setSubjectForm({ ...subjectForm, teacherId: event.target.value })}>
+              <option value="">Выберите учителя</option>
+              {teacherUsers.map((item) => (
+                <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
+              ))}
+            </select>
+          </label>
+          <button className="primary-button">Создать предмет</button>
+        </form>
+        <DataTable
+          title={`Предметы (${subjects.length})`}
+          className="nested-table"
+          columns={["Предмет", "Учитель", "Действие"]}
+          rows={subjects.map((item) => [
+            item.name,
+            item.teacherName,
+            <div key={item.subjectId} style={{ display: "flex", gap: "8px" }}>
+              <button className="table-action" type="button" onClick={() => setEditingSubject(item)}>Изменить</button>
+              <button className="table-action" type="button" onClick={() => deleteSubject(item.subjectId)}>Удалить</button>
+            </div>
+          ])}
+        />
+      </section>
+      {editingSubject && adminTab === "subjects" && (
+        <Modal title="Редактирование предмета" onClose={() => setEditingSubject(null)}>
+          <form className="modal-form" onSubmit={updateSubject}>
+            <Field label="Название предмета" value={editingSubject.name} onChange={(value) => setEditingSubject({ ...editingSubject, name: value })} />
+            <label className="field">
+              <span>Учитель</span>
+              <select value={editingSubject.teacherId} onChange={(event) => setEditingSubject({ ...editingSubject, teacherId: event.target.value })}>
+                {teacherUsers.map((item) => (
+                  <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
+                ))}
+              </select>
+            </label>
+            <button className="primary-button">Сохранить предмет</button>
+            <button className="ghost-button compact" type="button" onClick={() => setEditingSubject(null)}>Отмена</button>
+          </form>
+        </Modal>
+      )}
       <section className={`table-card admin-section ${adminTab === "access" ? "active" : ""}`}>
         <div className="table-title">Классные руководители</div>
         <form className="inline-form attach-form" onSubmit={assignClassTeacher}>
