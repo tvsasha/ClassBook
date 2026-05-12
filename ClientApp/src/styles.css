@@ -526,6 +526,53 @@ select {
   overflow: hidden;
 }
 
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.admin-tabs button {
+  width: auto;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 11px 16px;
+  color: var(--muted);
+  cursor: pointer;
+  background: transparent;
+  font-weight: 700;
+}
+
+.admin-tabs button.active,
+.admin-tabs button:hover {
+  border-color: rgba(15, 124, 102, 0.26);
+  color: var(--accent-strong);
+  background: rgba(15, 124, 102, 0.09);
+}
+
+.admin-section {
+  display: none;
+}
+
+.admin-section.active {
+  display: grid;
+}
+
+.table-card.admin-section.active,
+.table-card.nested-table {
+  display: block;
+}
+
+.nested-table {
+  margin: 0 18px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
 .table-title {
   padding: 18px 20px;
   border-bottom: 1px solid var(--line);
@@ -534,6 +581,8 @@ select {
 
 .table-wrap {
   overflow-x: auto;
+  max-height: 62vh;
+  overflow-y: auto;
 }
 
 table {
@@ -550,9 +599,13 @@ td {
 }
 
 th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   color: var(--muted);
   font-size: 0.88rem;
   font-weight: 600;
+  background: rgba(249, 251, 248, 0.98);
 }
 
 td {

@@ -45,10 +45,10 @@ function toRussianNetworkError(error) {
   const message = String(error?.message || "").toLowerCase();
 
   if (message.includes("failed to fetch") || error instanceof TypeError) {
-    return "Не удалось связаться с сервером. Проверьте, что сервер запущен, адрес указан верно и браузер не заблокировал запрос.";
+    return "Сейчас не получается открыть данные. Попробуйте обновить страницу через пару минут.";
   }
 
-  return "Произошла сетевая ошибка при обращении к серверу.";
+  return "Что-то пошло не так при загрузке данных. Попробуйте повторить действие.";
 }
 
 async function readErrorMessage(response) {

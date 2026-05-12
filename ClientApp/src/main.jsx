@@ -456,6 +456,7 @@ function AdminPage({ role }) {
   const [studentImportText, setStudentImportText] = useState("");
   const [studentImportFileName, setStudentImportFileName] = useState("");
   const [docxRosterFile, setDocxRosterFile] = useState(null);
+  const [adminTab, setAdminTab] = useState("overview");
 
   async function loadAdminData() {
     setLoading(true);
@@ -471,8 +472,11 @@ function AdminPage({ role }) {
       setUsers(usersData ?? []);
       setRoles(rolesData ?? []);
       setStudents(studentsData ?? []);
-      setClasses(classesData ?? []);
-      setClassTeacherAssignments(assignmentsData ?? []);
+      setClasses(sortItems(classesData ?? [], "name", { name: (item) => classSortValue(item.name) }));
+      setClassTeacherAssignments(sortItems(assignmentsData ?? [], "className", {
+        className: (item) => classSortValue(item.className),
+        teacherName: (item) => item.teacherName || ""
+      }));
     } catch (error) {
       setMessage(error.message || "Не удалось загрузить данные администрирования");
     } finally {
@@ -653,7 +657,10 @@ function AdminPage({ role }) {
           teacherId: Number(classTeacherForm.teacherId)
         })
       });
-      setClassTeacherAssignments(assignments ?? []);
+      setClassTeacherAssignments(sortItems(assignments ?? [], "className", {
+        className: (item) => classSortValue(item.className),
+        teacherName: (item) => item.teacherName || ""
+      }));
       setMessage("Классный руководитель назначен");
     } catch (error) {
       setMessage(error.message || "Не удалось назначить классного руководителя");
@@ -665,7 +672,10 @@ function AdminPage({ role }) {
       const assignments = await apiRequest(`/class-teacher/assignments/${classId}/${teacherId}`, {
         method: "DELETE"
       });
-      setClassTeacherAssignments(assignments ?? []);
+      setClassTeacherAssignments(sortItems(assignments ?? [], "className", {
+        className: (item) => classSortValue(item.className),
+        teacherName: (item) => item.teacherName || ""
+      }));
       setMessage("Назначение классного руководителя удалено");
     } catch (error) {
       setMessage(error.message || "Не удалось удалить назначение");
@@ -730,9 +740,10 @@ function AdminPage({ role }) {
 
   const studentRole = roles.find((item) => item.name === "Ученик");
   const teacherRole = roles.find((item) => item.name === "Учитель");
-  const teacherUsers = users.filter((item) => teacherRole
+  const sortedClasses = sortItems(classes, "name", { name: (item) => classSortValue(item.name) });
+  const teacherUsers = sortItems(users.filter((item) => teacherRole
     ? Number(item.roleId) === Number(teacherRole.id)
-    : item.roleName === "Учитель");
+    : item.roleName === "Учитель"), "fullName", { fullName: (item) => item.fullName || "" });
   const availableStudentUsers = users.filter((item) => {
     const isStudentRole = studentRole ? Number(item.roleId) === Number(studentRole.id) : item.roleName === "Ученик";
     const alreadyLinked = students.some((student) => Number(student.userId) === Number(item.id));
@@ -770,9 +781,18 @@ function AdminPage({ role }) {
     return matchesSearch && matchesClass && matchesAccount;
   }), studentFilters.sort, {
     name: (item) => `${item.lastName} ${item.firstName}`,
-    className: (item) => item.className || "",
+    className: (item) => classSortValue(item.className),
     account: (item) => item.hasAccount ? "1" : "0"
   });
+  const usersWithoutActiveAccount = users.filter((item) => !item.isActive).length;
+  const missingStudentAccounts = students.filter((item) => !item.hasAccount).length;
+  const adminTabs = [
+    { id: "overview", label: "Обзор" },
+    { id: "users", label: "Пользователи" },
+    { id: "students", label: "Ученики" },
+    { id: "access", label: "Доступы и классы" },
+    { id: "import", label: "Импорт" }
+  ];
 
   return (
     <section className="page-stack">
@@ -781,7 +801,30 @@ function AdminPage({ role }) {
         subtitle="Пользователи, роли и ученики"
         text="Управление учетными записями, ролями, карточками учеников и выдачей доступа к электронному журналу."
       />
-      <form className="inline-form" onSubmit={createUser}>
+      <StatusLine loading={loading} message={message} />
+      <div className="admin-tabs" role="tablist" aria-label="Разделы администрирования">
+        {adminTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={adminTab === tab.id ? "active" : ""}
+            onClick={() => setAdminTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className={`metric-grid admin-section ${adminTab === "overview" ? "active" : ""}`}>
+        <MetricCard label="Пользователей" value={users.length} />
+        <MetricCard label="Активных" value={users.filter((item) => item.isActive).length} />
+        <MetricCard label="Нужно сменить пароль" value={users.filter((item) => item.mustChangePassword).length} />
+        <MetricCard label="Учеников" value={students.length} />
+        <MetricCard label="Без аккаунта" value={missingStudentAccounts} />
+        <MetricCard label="Отключенных" value={usersWithoutActiveAccount} />
+        <MetricCard label="Классов" value={classes.length} />
+        <MetricCard label="Классных руководителей" value={classTeacherAssignments.length} />
+      </div>
+      <form className={`inline-form admin-section ${adminTab === "users" ? "active" : ""}`} onSubmit={createUser}>
         <Field label="Логин" value={form.login} onChange={(value) => setForm({ ...form, login: value })} />
         <Field label="ФИО" value={form.fullName} onChange={(value) => setForm({ ...form, fullName: value })} />
         <Field label="Временный пароль" value={form.password} onChange={(value) => setForm({ ...form, password: value })} />
@@ -796,8 +839,7 @@ function AdminPage({ role }) {
         </label>
         <button className="primary-button">Создать пользователя</button>
       </form>
-      <StatusLine loading={loading} message={message} />
-      {editingUser && (
+      {editingUser && adminTab === "users" && (
         <form className="inline-form admin-edit-form" onSubmit={saveUser}>
           <Field label="Логин" value={editingUser.login} onChange={(value) => setEditingUser({ ...editingUser, login: value })} />
           <Field label="ФИО" value={editingUser.fullName} onChange={(value) => setEditingUser({ ...editingUser, fullName: value })} />
@@ -818,7 +860,7 @@ function AdminPage({ role }) {
           <button className="ghost-button compact" type="button" onClick={() => setEditingUser(null)}>Отмена</button>
         </form>
       )}
-      {editingStudent && (
+      {editingStudent && adminTab === "students" && (
         <form className="inline-form admin-edit-form" onSubmit={saveStudent}>
           <Field label="Фамилия" value={editingStudent.lastName} onChange={(value) => setEditingStudent({ ...editingStudent, lastName: value })} />
           <Field label="Имя" value={editingStudent.firstName} onChange={(value) => setEditingStudent({ ...editingStudent, firstName: value })} />
@@ -826,7 +868,7 @@ function AdminPage({ role }) {
           <label className="field">
             <span>Класс</span>
             <select value={editingStudent.classId} onChange={(event) => setEditingStudent({ ...editingStudent, classId: event.target.value })}>
-              {classes.map((item) => (
+              {sortedClasses.map((item) => (
                 <option key={item.classId} value={item.classId}>{item.name}</option>
               ))}
             </select>
@@ -835,7 +877,7 @@ function AdminPage({ role }) {
           <button className="ghost-button compact" type="button" onClick={() => setEditingStudent(null)}>Отмена</button>
         </form>
       )}
-      <form className="inline-form attach-form" onSubmit={attachStudentAccount}>
+      <form className={`inline-form attach-form admin-section ${adminTab === "access" ? "active" : ""}`} onSubmit={attachStudentAccount}>
         <label className="field">
           <span>Карточка ученика без аккаунта</span>
           <select value={studentAccountLink.studentId} onChange={(event) => setStudentAccountLink({ ...studentAccountLink, studentId: event.target.value })}>
@@ -856,14 +898,14 @@ function AdminPage({ role }) {
         </label>
         <button className="primary-button">Привязать профиль</button>
       </form>
-      <section className="table-card">
+      <section className={`table-card admin-section ${adminTab === "access" ? "active" : ""}`}>
         <div className="table-title">Классные руководители</div>
         <form className="inline-form attach-form" onSubmit={assignClassTeacher}>
           <label className="field">
             <span>Класс</span>
             <select value={classTeacherForm.classId} onChange={(event) => setClassTeacherForm({ ...classTeacherForm, classId: event.target.value })}>
               <option value="">Выберите класс</option>
-              {classes.map((item) => (
+              {sortedClasses.map((item) => (
                 <option key={item.classId} value={item.classId}>{item.name}</option>
               ))}
             </select>
@@ -881,6 +923,7 @@ function AdminPage({ role }) {
         </form>
         <DataTable
           title={`Назначения (${classTeacherAssignments.length})`}
+          className="nested-table"
           columns={["Класс", "Классный руководитель", "Действие"]}
           rows={classTeacherAssignments.map((item) => [
             item.className,
@@ -889,7 +932,7 @@ function AdminPage({ role }) {
           ])}
         />
       </section>
-      <section className="table-card import-card">
+      <section className={`table-card import-card admin-section ${adminTab === "import" ? "active" : ""}`}>
         <div className="table-title">Импорт и экспорт учеников</div>
         <form className="import-panel" onSubmit={importRosterDocx}>
           <label className="file-drop">
@@ -920,13 +963,7 @@ function AdminPage({ role }) {
           </div>
         </form>
       </section>
-      <div className="metric-grid">
-        <MetricCard label="Пользователей" value={users.length} />
-        <MetricCard label="Активных" value={users.filter((item) => item.isActive).length} />
-        <MetricCard label="Со временным паролем" value={users.filter((item) => item.mustChangePassword).length} />
-        <MetricCard label="Учеников" value={students.length} />
-      </div>
-      <section className="table-card">
+      <section className={`table-card admin-section ${adminTab === "users" ? "active" : ""}`}>
         <div className="table-title">Фильтр пользователей</div>
         <div className="filter-panel">
           <Field label="Поиск" value={userFilters.search} onChange={(value) => setUserFilters({ ...userFilters, search: value })} />
@@ -960,8 +997,9 @@ function AdminPage({ role }) {
       </section>
       <DataTable
         title={`Пользователи (${filteredUsers.length})`}
+        className={`admin-section ${adminTab === "users" ? "active" : ""}`}
         columns={["ФИО", "Логин", "Роль", "Статус", "Пароль", "Действие"]}
-        rows={filteredUsers.slice(0, 30).map((item) => [
+        rows={filteredUsers.map((item) => [
           item.fullName,
           item.login,
           item.roleName,
@@ -970,7 +1008,7 @@ function AdminPage({ role }) {
           <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
         ])}
       />
-      <section className="table-card">
+      <section className={`table-card admin-section ${adminTab === "students" ? "active" : ""}`}>
         <div className="table-title">Фильтр учеников</div>
         <div className="filter-panel">
           <Field label="Поиск" value={studentFilters.search} onChange={(value) => setStudentFilters({ ...studentFilters, search: value })} />
@@ -978,7 +1016,7 @@ function AdminPage({ role }) {
             <span>Класс</span>
             <select value={studentFilters.classId} onChange={(event) => setStudentFilters({ ...studentFilters, classId: event.target.value })}>
               <option value="">Все классы</option>
-              {classes.map((item) => (
+              {sortedClasses.map((item) => (
                 <option key={item.classId} value={item.classId}>{item.name}</option>
               ))}
             </select>
@@ -1003,8 +1041,9 @@ function AdminPage({ role }) {
       </section>
       <DataTable
         title={`Ученики (${filteredStudents.length})`}
+        className={`admin-section ${adminTab === "students" ? "active" : ""}`}
         columns={["ФИО", "Класс", "Аккаунт", "Действие"]}
-        rows={filteredStudents.slice(0, 30).map((item) => [
+        rows={filteredStudents.map((item) => [
           `${item.lastName} ${item.firstName}`,
           item.className || "Без класса",
           item.hasAccount ? "Есть" : "Не выдан",
@@ -1052,8 +1091,8 @@ function DirectorPage({ role }) {
     return <AccessWarning title="Отчеты доступны директору и администратору" />;
   }
 
-  const classRows = summary?.classSummary ?? [];
-  const attendanceRows = attendance?.statistics ?? [];
+  const classRows = sortItems(summary?.classSummary ?? [], "className", { className: (item) => classSortValue(item.className) });
+  const attendanceRows = sortItems(attendance?.statistics ?? [], "className", { className: (item) => classSortValue(item.className) });
   const dailyRows = daily?.report ?? [];
 
   return (
@@ -1135,7 +1174,7 @@ function TeacherPage({ role, user }) {
         apiRequest(`/teacher/subjects?teacherId=${user.id}`),
         apiRequest(`/teacher/lessons?teacherId=${user.id}`)
       ]);
-      setClasses(classData ?? []);
+      setClasses(sortItems(classData ?? [], "name", { name: (item) => classSortValue(item.name) }));
       setSubjects(subjectData ?? []);
       setLessons(lessonData ?? []);
     } catch (error) {
@@ -1823,7 +1862,7 @@ function SchedulePage({ role }) {
     return <AccessWarning title="Расписание доступно менеджеру расписания, директору и администратору" />;
   }
 
-  const classes = metadata?.classes ?? [];
+  const classes = sortItems(metadata?.classes ?? [], "name", { name: (item) => classSortValue(item.name) });
   const subjects = metadata?.subjects ?? [];
   const teachers = metadata?.teachers ?? [];
   const slots = metadata?.slots ?? [];
@@ -2009,7 +2048,7 @@ function ClassTeacherPage({ role }) {
     return <AccessWarning title="Раздел классного руководителя доступен учителю и администратору" />;
   }
 
-  const classes = dashboard?.classes ?? [];
+  const classes = sortItems(dashboard?.classes ?? [], "className", { className: (item) => classSortValue(item.className) });
   const totalStudents = classes.reduce((sum, item) => sum + item.studentsCount, 0);
   const totalAbsences = classes.reduce((sum, item) => sum + item.absencesCount, 0);
   const totalGrades = classes.reduce((sum, item) => sum + item.gradesCount, 0);
@@ -2129,9 +2168,9 @@ function MetricCard({ label, value }) {
   );
 }
 
-function DataTable({ title, columns, rows }) {
+function DataTable({ title, columns, rows, className = "" }) {
   return (
-    <section className="table-card">
+    <section className={`table-card ${className}`}>
       <div className="table-title">{title}</div>
       <div className="table-wrap">
         <table>
@@ -2247,6 +2286,17 @@ function sortItems(items, sortKey, selectors) {
       sensitivity: "base"
     })
   );
+}
+
+function classSortValue(value) {
+  const normalized = String(value || "").trim().toUpperCase().replace(/[«»"]/g, "").replace(/\s+/g, "");
+  const match = normalized.match(/^(\d+)([А-ЯЁA-Z]*)$/);
+
+  if (!match) {
+    return `999|${normalized}`;
+  }
+
+  return `${String(Number(match[1])).padStart(3, "0")}|${match[2] || ""}`;
 }
 
 function formatDate(value) {
