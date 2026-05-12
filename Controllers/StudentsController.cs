@@ -224,6 +224,37 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
+        /// Импортирует школьный список из Word-документа: учеников, учителей и классных руководителей.
+        /// </summary>
+        /// <param name="file">Документ .docx со списком учащихся и руководителей.</param>
+        /// <returns>Итоги импорта и временные доступы созданных учителей.</returns>
+        [HttpPost("import-docx")]
+        [RequestSizeLimit(10_000_000)]
+        public async Task<IActionResult> ImportSchoolRosterDocx(IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                    return BadRequestError("Выберите Word-документ для импорта");
+
+                if (!file.FileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+                    return BadRequestError("Поддерживается только формат .docx");
+
+                await using var stream = file.OpenReadStream();
+                var result = await _facade.ImportSchoolRosterDocxAsync(stream);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Экспортирует список учеников в CSV-файл для Excel или повторного импорта.
         /// </summary>
         /// <returns>CSV-файл со списком учеников.</returns>
@@ -240,6 +271,25 @@ namespace ClassBook.Controllers
             {
                 _logger.LogError(ex, "Ошибка при экспорте списка учеников");
                 return InternalServerError("Не удалось выгрузить список учеников");
+            }
+        }
+
+        /// <summary>
+        /// Экспортирует учеников и классных руководителей в Word-документ.
+        /// </summary>
+        /// <returns>Документ .docx со списками по классам.</returns>
+        [HttpGet("export-docx")]
+        public async Task<IActionResult> ExportSchoolRosterDocx()
+        {
+            try
+            {
+                var bytes = await _facade.ExportSchoolRosterDocxAsync();
+                return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "school-roster.docx");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при экспорте списка учеников в Word");
+                return InternalServerError("Не удалось выгрузить Word-документ");
             }
         }
 

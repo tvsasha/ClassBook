@@ -45,7 +45,7 @@ function toRussianNetworkError(error) {
   const message = String(error?.message || "").toLowerCase();
 
   if (message.includes("failed to fetch") || error instanceof TypeError) {
-    return "Не удалось связаться с сервером. Проверьте, что backend запущен, адрес указан верно и браузер не заблокировал запрос.";
+    return "Не удалось связаться с сервером. Проверьте, что сервер запущен, адрес указан верно и браузер не заблокировал запрос.";
   }
 
   return "Произошла сетевая ошибка при обращении к серверу.";

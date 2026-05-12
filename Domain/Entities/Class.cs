@@ -9,5 +9,6 @@
         public string Name { get; set; } = null!;
         public ICollection<Student>? Students { get; set; }
         public ICollection<Lesson>? Lessons { get; set; }
+        public ICollection<ClassTeacher>? ClassTeachers { get; set; }
     }
 }

@@ -787,6 +787,16 @@ td {
   flex-wrap: wrap;
 }
 
+.class-teacher-card {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 18px;
+}
+
+.compact-metrics {
+  padding: 0 16px;
+}
+
 .toggle-field {
   display: flex;
   gap: 10px;

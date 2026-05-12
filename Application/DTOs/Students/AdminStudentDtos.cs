@@ -32,6 +32,23 @@ namespace ClassBook.Application.DTOs
         public List<string> Errors { get; set; } = [];
     }
 
+    public class ImportedTeacherAccountDto
+    {
+        public int Id { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Login { get; set; } = string.Empty;
+        public string TemporaryPassword { get; set; } = string.Empty;
+        public bool Created { get; set; }
+    }
+
+    public class SchoolRosterImportResultDto : ImportStudentsResultDto
+    {
+        public int TeachersCreated { get; set; }
+        public int TeachersFound { get; set; }
+        public int ClassTeacherLinksCreated { get; set; }
+        public List<ImportedTeacherAccountDto> Teachers { get; set; } = [];
+    }
+
     public class CreateParentAccountDto
     {
         public string FullName { get; set; } = string.Empty;

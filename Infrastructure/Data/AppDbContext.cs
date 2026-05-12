@@ -17,6 +17,7 @@ namespace ClassBook.Infrastructure.Data
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Schedule> Schedules => Set<Schedule>();
         public DbSet<StudentParent> StudentParents => Set<StudentParent>();
+        public DbSet<ClassTeacher> ClassTeachers => Set<ClassTeacher>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -73,6 +74,24 @@ namespace ClassBook.Infrastructure.Data
                 entity.HasMany(c => c.Lessons).WithOne(l => l.Class)
                       .HasForeignKey(l => l.ClassId)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ClassTeacher>(entity =>
+            {
+                entity.HasKey(ct => ct.ClassTeacherId);
+                entity.Property(ct => ct.CreatedAt).IsRequired();
+
+                entity.HasOne(ct => ct.Class)
+                      .WithMany(c => c.ClassTeachers)
+                      .HasForeignKey(ct => ct.ClassId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(ct => ct.Teacher)
+                      .WithMany(u => u.ClassTeacherAssignments)
+                      .HasForeignKey(ct => ct.TeacherId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(ct => new { ct.ClassId, ct.TeacherId }).IsUnique();
             });
 
             // 🔹 Students

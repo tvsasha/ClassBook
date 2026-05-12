@@ -335,6 +335,7 @@ function getNavItemsForRole(role) {
     ],
     "Учитель": [
       { route: "teacher", label: "Журнал учителя" },
+      { route: "class-teacher", label: "Классное руководство" },
       { route: "schedule", label: "Мое расписание" }
     ],
     "Ученик": [
@@ -367,6 +368,8 @@ function RouteContent({ route, role, user }) {
       return <DirectorPage role={role} />;
     case "teacher":
       return <TeacherPage role={role} user={user} />;
+    case "class-teacher":
+      return <ClassTeacherPage role={role} />;
     case "student":
       return <StudentPage role={role} />;
     case "parent":
@@ -419,6 +422,7 @@ function AdminPage({ role }) {
   const [roles, setRoles] = useState([]);
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [classTeacherAssignments, setClassTeacherAssignments] = useState([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -432,6 +436,10 @@ function AdminPage({ role }) {
   const [studentAccountLink, setStudentAccountLink] = useState({
     studentId: "",
     userId: ""
+  });
+  const [classTeacherForm, setClassTeacherForm] = useState({
+    classId: "",
+    teacherId: ""
   });
   const [userFilters, setUserFilters] = useState({
     search: "",
@@ -447,21 +455,24 @@ function AdminPage({ role }) {
   });
   const [studentImportText, setStudentImportText] = useState("");
   const [studentImportFileName, setStudentImportFileName] = useState("");
+  const [docxRosterFile, setDocxRosterFile] = useState(null);
 
   async function loadAdminData() {
     setLoading(true);
     setMessage("");
     try {
-      const [usersData, rolesData, studentsData, classesData] = await Promise.all([
+      const [usersData, rolesData, studentsData, classesData, assignmentsData] = await Promise.all([
         apiRequest("/users"),
         apiRequest("/roles"),
         apiRequest("/admin/students"),
-        apiRequest("/classes")
+        apiRequest("/classes"),
+        apiRequest("/class-teacher/assignments")
       ]);
       setUsers(usersData ?? []);
       setRoles(rolesData ?? []);
       setStudents(studentsData ?? []);
       setClasses(classesData ?? []);
+      setClassTeacherAssignments(assignmentsData ?? []);
     } catch (error) {
       setMessage(error.message || "Не удалось загрузить данные администрирования");
     } finally {
@@ -627,11 +638,101 @@ function AdminPage({ role }) {
     }
   }
 
+  async function assignClassTeacher(event) {
+    event.preventDefault();
+    if (!classTeacherForm.classId || !classTeacherForm.teacherId) {
+      setMessage("Выберите класс и учителя");
+      return;
+    }
+
+    try {
+      const assignments = await apiRequest("/class-teacher/assignments", {
+        method: "POST",
+        body: JSON.stringify({
+          classId: Number(classTeacherForm.classId),
+          teacherId: Number(classTeacherForm.teacherId)
+        })
+      });
+      setClassTeacherAssignments(assignments ?? []);
+      setMessage("Классный руководитель назначен");
+    } catch (error) {
+      setMessage(error.message || "Не удалось назначить классного руководителя");
+    }
+  }
+
+  async function removeClassTeacher(classId, teacherId) {
+    try {
+      const assignments = await apiRequest(`/class-teacher/assignments/${classId}/${teacherId}`, {
+        method: "DELETE"
+      });
+      setClassTeacherAssignments(assignments ?? []);
+      setMessage("Назначение классного руководителя удалено");
+    } catch (error) {
+      setMessage(error.message || "Не удалось удалить назначение");
+    }
+  }
+
+  async function exportRosterDocx() {
+    try {
+      const response = await fetch(`${apiBase}/admin/students/export-docx`, {
+        credentials: "include"
+      });
+
+      if (!response.ok) {
+        throw new Error("Не удалось выгрузить Word-документ");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "school-roster.docx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage(error.message || "Не удалось выгрузить Word-документ");
+    }
+  }
+
+  async function importRosterDocx(event) {
+    event.preventDefault();
+    if (!docxRosterFile) {
+      setMessage("Выберите Word-документ со списком");
+      return;
+    }
+
+    try {
+      const data = new FormData();
+      data.append("file", docxRosterFile);
+      const response = await fetch(`${apiBase}/admin/students/import-docx`, {
+        method: "POST",
+        credentials: "include",
+        body: data
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || "Не удалось импортировать Word-документ");
+      }
+
+      const result = await response.json();
+      setDocxRosterFile(null);
+      setMessage(`Импорт Word завершен: учеников добавлено ${result.imported}, учителей создано ${result.teachersCreated}, связей руководителей ${result.classTeacherLinksCreated}`);
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось импортировать Word-документ");
+    }
+  }
+
   if (!allowed) {
     return <AccessWarning title="Администрирование доступно только администратору" />;
   }
 
   const studentRole = roles.find((item) => item.name === "Ученик");
+  const teacherRole = roles.find((item) => item.name === "Учитель");
+  const teacherUsers = users.filter((item) => teacherRole
+    ? Number(item.roleId) === Number(teacherRole.id)
+    : item.roleName === "Учитель");
   const availableStudentUsers = users.filter((item) => {
     const isStudentRole = studentRole ? Number(item.roleId) === Number(studentRole.id) : item.roleName === "Ученик";
     const alreadyLinked = students.some((student) => Number(student.userId) === Number(item.id));
@@ -755,8 +856,49 @@ function AdminPage({ role }) {
         </label>
         <button className="primary-button">Привязать профиль</button>
       </form>
+      <section className="table-card">
+        <div className="table-title">Классные руководители</div>
+        <form className="inline-form attach-form" onSubmit={assignClassTeacher}>
+          <label className="field">
+            <span>Класс</span>
+            <select value={classTeacherForm.classId} onChange={(event) => setClassTeacherForm({ ...classTeacherForm, classId: event.target.value })}>
+              <option value="">Выберите класс</option>
+              {classes.map((item) => (
+                <option key={item.classId} value={item.classId}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Учитель</span>
+            <select value={classTeacherForm.teacherId} onChange={(event) => setClassTeacherForm({ ...classTeacherForm, teacherId: event.target.value })}>
+              <option value="">Выберите учителя</option>
+              {teacherUsers.map((item) => (
+                <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
+              ))}
+            </select>
+          </label>
+          <button className="primary-button">Назначить</button>
+        </form>
+        <DataTable
+          title={`Назначения (${classTeacherAssignments.length})`}
+          columns={["Класс", "Классный руководитель", "Действие"]}
+          rows={classTeacherAssignments.map((item) => [
+            item.className,
+            item.teacherName,
+            <button className="table-action" type="button" onClick={() => removeClassTeacher(item.classId, item.teacherId)}>Снять</button>
+          ])}
+        />
+      </section>
       <section className="table-card import-card">
         <div className="table-title">Импорт и экспорт учеников</div>
+        <form className="import-panel" onSubmit={importRosterDocx}>
+          <label className="file-drop">
+            <input type="file" accept=".docx" onChange={(event) => setDocxRosterFile(event.target.files?.[0] ?? null)} />
+            <strong>{docxRosterFile?.name || "Выберите Word-документ"}</strong>
+            <span>Система достанет учеников, учителей и классных руководителей из таблиц документа.</span>
+          </label>
+          <button className="primary-button compact">Импортировать Word-документ</button>
+        </form>
         <form className="import-panel" onSubmit={importStudents}>
           <label className="file-drop">
             <input type="file" accept=".csv,.txt" onChange={(event) => readStudentImportFile(event.target.files?.[0])} />
@@ -774,6 +916,7 @@ function AdminPage({ role }) {
           <div className="button-row">
             <button className="primary-button compact">Импортировать</button>
             <button className="ghost-button compact" type="button" onClick={exportStudents}>Выгрузить CSV</button>
+            <button className="ghost-button compact" type="button" onClick={exportRosterDocx}>Выгрузить Word</button>
           </div>
         </form>
       </section>
@@ -1833,6 +1976,100 @@ function TeacherPersonalSchedule({ user }) {
         title="Ближайшие уроки"
         columns={["Дата", "Класс", "Предмет", "Тема", "Домашнее задание"]}
         rows={upcomingLessons.slice(0, 20).map((lesson) => [
+          formatDate(lesson.date),
+          lesson.className,
+          lesson.subjectName,
+          lesson.topic || "—",
+          lesson.homework || "—"
+        ])}
+      />
+    </section>
+  );
+}
+
+function ClassTeacherPage({ role }) {
+  const allowed = role === "Учитель" || role === "Администратор";
+  const [dashboard, setDashboard] = useState(null);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!allowed) {
+      return;
+    }
+
+    setLoading(true);
+    apiRequest("/class-teacher/me/dashboard")
+      .then(setDashboard)
+      .catch((error) => setMessage(error.message || "Не удалось загрузить сводку классного руководителя"))
+      .finally(() => setLoading(false));
+  }, [allowed]);
+
+  if (!allowed) {
+    return <AccessWarning title="Раздел классного руководителя доступен учителю и администратору" />;
+  }
+
+  const classes = dashboard?.classes ?? [];
+  const totalStudents = classes.reduce((sum, item) => sum + item.studentsCount, 0);
+  const totalAbsences = classes.reduce((sum, item) => sum + item.absencesCount, 0);
+  const totalGrades = classes.reduce((sum, item) => sum + item.gradesCount, 0);
+
+  return (
+    <section className="page-stack">
+      <PageHeader
+        title="Классное руководство"
+        subtitle={dashboard?.teacherName || "Сводка по закрепленным классам"}
+        text="Здесь собрана общая картина по классам классного руководителя: предметы, оценки, посещаемость, ученики и собственные уроки учителя."
+      />
+      <StatusLine loading={loading} message={message} />
+      <div className="metric-grid">
+        <MetricCard label="Закрепленных классов" value={classes.length} />
+        <MetricCard label="Учеников" value={totalStudents} />
+        <MetricCard label="Оценок" value={totalGrades} />
+        <MetricCard label="Пропусков" value={totalAbsences} />
+      </div>
+      {classes.length === 0 ? (
+        <section className="table-card">
+          <div className="table-title">Назначения не найдены</div>
+          <p className="empty-text padded">Администратор еще не привязал учителя как классного руководителя.</p>
+        </section>
+      ) : classes.map((classItem) => (
+        <section className="table-card class-teacher-card" key={classItem.classId}>
+          <div className="table-title">{classItem.className}</div>
+          <div className="metric-grid compact-metrics">
+            <MetricCard label="Учеников" value={classItem.studentsCount} />
+            <MetricCard label="Уроков" value={classItem.lessonsCount} />
+            <MetricCard label="Средняя" value={formatNumber(classItem.averageGrade)} />
+            <MetricCard label="Пропусков" value={classItem.absencesCount} />
+          </div>
+          <DataTable
+            title="Сводка по предметам"
+            columns={["Предмет", "Учитель", "Уроков", "Оценок", "Средняя", "Пропуски"]}
+            rows={classItem.subjects.map((item) => [
+              item.subjectName,
+              item.teacherName,
+              item.lessonsCount,
+              item.gradesCount,
+              formatNumber(item.averageGrade),
+              item.absencesCount
+            ])}
+          />
+          <DataTable
+            title="Ученики класса"
+            columns={["ФИО", "Оценок", "Средняя", "Пропуски"]}
+            rows={classItem.students.map((item) => [
+              item.fullName,
+              item.gradesCount,
+              formatNumber(item.averageGrade),
+              item.absencesCount
+            ])}
+          />
+        </section>
+      ))}
+      <DataTable
+        title="Мои уроки"
+        columns={["Дата", "Класс", "Предмет", "Тема", "Домашнее задание"]}
+        rows={(dashboard?.ownLessons ?? []).slice(0, 20).map((lesson) => [
           formatDate(lesson.date),
           lesson.className,
           lesson.subjectName,

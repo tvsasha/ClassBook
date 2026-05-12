@@ -81,6 +81,7 @@ namespace ClassBook
             builder.Services.AddScoped<ParentFacade>();
             builder.Services.AddScoped<AnalyticsFacade>();
             builder.Services.AddScoped<RoleFacade>();
+            builder.Services.AddScoped<ClassTeacherFacade>();
 
             builder.Services.AddCors(options =>
             {
@@ -115,6 +116,22 @@ namespace ClassBook
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 db.Database.Migrate();
+            }
+
+            if (args.Length >= 2 && args[0].Equals("import-roster", StringComparison.OrdinalIgnoreCase))
+            {
+                using var scope = app.Services.CreateScope();
+                var facade = scope.ServiceProvider.GetRequiredService<StudentFacade>();
+                using var stream = File.OpenRead(args[1]);
+                var result = facade.ImportSchoolRosterDocxAsync(stream).GetAwaiter().GetResult();
+
+                Console.WriteLine($"Импорт завершен. Ученики: {result.Imported}, пропущено: {result.Skipped}, учителей создано: {result.TeachersCreated}, связей руководителей: {result.ClassTeacherLinksCreated}");
+                foreach (var teacher in result.Teachers.Where(t => t.Created))
+                {
+                    Console.WriteLine($"Учитель: {teacher.FullName}; логин: {teacher.Login}; временный пароль: {teacher.TemporaryPassword}");
+                }
+
+                return;
             }
 
             if (app.Environment.IsDevelopment())
