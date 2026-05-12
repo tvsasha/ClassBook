@@ -460,6 +460,8 @@ function AdminPage({ role }) {
   const [studentImportText, setStudentImportText] = useState("");
   const [studentImportFileName, setStudentImportFileName] = useState("");
   const [docxRosterFile, setDocxRosterFile] = useState(null);
+  const [parentRosterFile, setParentRosterFile] = useState(null);
+  const [issuedBatch, setIssuedBatch] = useState(null);
   const [adminTab, setAdminTab] = useState("overview");
 
   async function loadAdminData() {
@@ -641,6 +643,14 @@ function AdminPage({ role }) {
     setMessage("Данные доступа скопированы");
   }
 
+  async function copyBatchAccess(items) {
+    const text = items
+      .map((item) => `${item.fullName}\nЛогин: ${item.login}\nВременный пароль: ${item.temporaryPassword}\n`)
+      .join("\n");
+    await navigator.clipboard.writeText(text);
+    setMessage("Список доступов скопирован");
+  }
+
   async function attachStudentAccount(event) {
     event.preventDefault();
     if (!studentAccountLink.studentId || !studentAccountLink.userId) {
@@ -806,6 +816,38 @@ function AdminPage({ role }) {
       await loadAdminData();
     } catch (error) {
       setMessage(error.message || "Не удалось импортировать Word-документ");
+    }
+  }
+
+  async function importParentsDocx(event) {
+    event.preventDefault();
+    if (!parentRosterFile) {
+      setMessage("Выберите Word-документ с родителями");
+      return;
+    }
+
+    try {
+      const data = new FormData();
+      data.append("file", parentRosterFile);
+      const response = await fetch(`${apiBase}/admin/students/import-parents-docx`, {
+        method: "POST",
+        credentials: "include",
+        body: data
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || payload?.error || "Не удалось импортировать родителей");
+      }
+
+      const result = await response.json();
+      const createdAccesses = (result.parents ?? []).filter((item) => item.created && item.temporaryPassword);
+      setParentRosterFile(null);
+      setIssuedBatch(createdAccesses.length > 0 ? createdAccesses : null);
+      setMessage(`Импорт родителей завершен: создано ${result.parentsCreated}, найдено ${result.parentsFound}, привязок ${result.linksCreated}${result.errors?.length ? `. Не найдено: ${result.errors.length}` : ""}`);
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось импортировать родителей");
     }
   }
 
@@ -992,6 +1034,24 @@ function AdminPage({ role }) {
           </div>
         </Modal>
       )}
+      {issuedBatch && (
+        <Modal title="Доступы родителей из документа" onClose={() => setIssuedBatch(null)}>
+          <div className="access-card">
+            <p>Созданные временные пароли показываются только сейчас. Скопируйте список и передайте родителям безопасным способом.</p>
+            <button className="primary-button" type="button" onClick={() => copyBatchAccess(issuedBatch)}>Скопировать весь список</button>
+            <div className="access-list">
+              {issuedBatch.map((item) => (
+                <article key={item.id}>
+                  <strong>{item.fullName}</strong>
+                  <span>Логин: {item.login}</span>
+                  <span>Пароль: {item.temporaryPassword}</span>
+                  <small>{item.linkedStudents?.join(", ") || "ученик привязан"}</small>
+                </article>
+              ))}
+            </div>
+          </div>
+        </Modal>
+      )}
       <form className={`inline-form attach-form admin-section ${adminTab === "access" ? "active" : ""}`} onSubmit={attachStudentAccount}>
         <label className="field">
           <span>Карточка ученика без аккаунта</span>
@@ -1056,6 +1116,14 @@ function AdminPage({ role }) {
             <span>Система достанет учеников, учителей и классных руководителей из таблиц документа.</span>
           </label>
           <button className="primary-button compact">Импортировать Word-документ</button>
+        </form>
+        <form className="import-panel" onSubmit={importParentsDocx}>
+          <label className="file-drop">
+            <input type="file" accept=".docx" onChange={(event) => setParentRosterFile(event.target.files?.[0] ?? null)} />
+            <strong>{parentRosterFile?.name || "Выберите Word-документ с родителями"}</strong>
+            <span>Система найдет учеников по классу и дате рождения, создаст родительские доступы и привяжет их к детям.</span>
+          </label>
+          <button className="primary-button compact">Импортировать родителей</button>
         </form>
         <form className="import-panel" onSubmit={importStudents}>
           <label className="file-drop">
@@ -2373,7 +2441,8 @@ function StatusLine({ loading, message }) {
   }
 
   if (message) {
-    return <p className="status-line">{message}</p>;
+    const isError = /не удалось|недоступно|ошиб|не хватает прав/i.test(message);
+    return <p className={`status-line ${isError ? "status-error" : "status-success"}`} role={isError ? "alert" : "status"}>{message}</p>;
   }
 
   return null;

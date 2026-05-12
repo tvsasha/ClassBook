@@ -6,8 +6,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace ClassBook.Application.Facades
 {
@@ -98,6 +101,110 @@ namespace ClassBook.Application.Facades
             };
         }
 
+        public async Task<ParentRosterImportResultDto> ImportParentRosterDocxAsync(Stream docxStream)
+        {
+            var result = new ParentRosterImportResultDto();
+            var rows = ExtractDocxRows(docxStream);
+            var parentRole = await _db.Roles.FirstOrDefaultAsync(r => r.Name == "Родитель");
+            if (parentRole == null)
+                throw new KeyNotFoundException("Роль 'Родитель' не найдена");
+
+            var parentsByName = await _db.Users
+                .Where(u => u.RoleId == parentRole.Id)
+                .ToDictionaryAsync(u => u.FullName.ToLower(), u => u);
+
+            foreach (var row in rows.Skip(1))
+            {
+                if (row.Count < 6)
+                    continue;
+
+                var parentName = NormalizeName(row[1]);
+                var childItems = ExtractChildren(row[4], row[5]);
+                if (string.IsNullOrWhiteSpace(parentName) || childItems.Count == 0)
+                {
+                    result.Skipped++;
+                    continue;
+                }
+
+                var matchedStudents = new List<Student>();
+                foreach (var child in childItems)
+                {
+                    var student = await FindStudentForParentImportAsync(child.Name, child.ClassName, child.BirthDate);
+                    if (student == null)
+                    {
+                        result.Errors.Add($"Не найден ученик: {child.Name}, {child.ClassName}, {child.BirthDate:dd.MM.yyyy}");
+                        continue;
+                    }
+
+                    matchedStudents.Add(student);
+                }
+
+                if (matchedStudents.Count == 0)
+                {
+                    result.Skipped++;
+                    continue;
+                }
+
+                User parent;
+                var created = false;
+                var temporaryPassword = string.Empty;
+                if (!parentsByName.TryGetValue(parentName.ToLower(), out parent!))
+                {
+                    temporaryPassword = UserFacade.GenerateTemporaryPassword();
+                    parent = new User
+                    {
+                        Login = await GenerateUniqueLoginAsync(parentName),
+                        FullName = parentName,
+                        PasswordHash = _hasher.Hash(temporaryPassword),
+                        RoleId = parentRole.Id,
+                        IsActive = true,
+                        MustChangePassword = true,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _db.Users.Add(parent);
+                    await _db.SaveChangesAsync();
+                    parentsByName[parentName.ToLower()] = parent;
+                    created = true;
+                    result.ParentsCreated++;
+                }
+                else
+                {
+                    result.ParentsFound++;
+                }
+
+                var importedParent = new ImportedParentAccountDto
+                {
+                    Id = parent.Id,
+                    FullName = parent.FullName,
+                    Login = parent.Login,
+                    TemporaryPassword = temporaryPassword,
+                    Created = created
+                };
+
+                foreach (var student in matchedStudents)
+                {
+                    var exists = await _db.StudentParents.AnyAsync(sp => sp.StudentId == student.StudentId && sp.ParentId == parent.Id);
+                    if (!exists)
+                    {
+                        _db.StudentParents.Add(new StudentParent
+                        {
+                            StudentId = student.StudentId,
+                            ParentId = parent.Id,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                        result.LinksCreated++;
+                    }
+
+                    importedParent.LinkedStudents.Add($"{student.LastName} {student.FirstName}".Trim());
+                }
+
+                result.Parents.Add(importedParent);
+            }
+
+            await _db.SaveChangesAsync();
+            return result;
+        }
+
         /// <summary>
         /// Привязывает родителя к ученику
         /// </summary>
@@ -155,6 +262,115 @@ namespace ClassBook.Application.Facades
             }
 
             return login;
+        }
+
+        private async Task<Student?> FindStudentForParentImportAsync(string childName, string className, DateTime birthDate)
+        {
+            var normalizedChildName = NormalizeForCompare(childName);
+            var classKey = NormalizeClassName(className);
+            var candidates = await _db.Students
+                .Include(s => s.Class)
+                .Where(s => s.BirthDate.Date == birthDate.Date && s.Class != null && s.Class.Name == classKey)
+                .ToListAsync();
+
+            if (candidates.Count == 1)
+                return candidates[0];
+
+            return candidates.FirstOrDefault(student =>
+            {
+                var studentName = NormalizeForCompare($"{student.LastName} {student.FirstName}");
+                return normalizedChildName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .All(part => studentName.Contains(part, StringComparison.OrdinalIgnoreCase));
+            });
+        }
+
+        private static List<List<string>> ExtractDocxRows(Stream docxStream)
+        {
+            using var archive = new ZipArchive(docxStream, ZipArchiveMode.Read, leaveOpen: true);
+            var entry = archive.GetEntry("word/document.xml");
+            if (entry == null)
+                throw new ArgumentException("В документе не найдено содержимое");
+
+            using var reader = new StreamReader(entry.Open());
+            var xml = XDocument.Parse(reader.ReadToEnd());
+            var w = XNamespace.Get("http://schemas.openxmlformats.org/wordprocessingml/2006/main");
+
+            return xml.Descendants(w + "tr")
+                .Select(row => row.Elements(w + "tc")
+                    .Select(cell => string.Join(" / ", cell.Descendants(w + "p")
+                        .Select(paragraph => NormalizeName(string.Concat(paragraph.Descendants(w + "t").Select(t => t.Value))))
+                        .Where(text => !string.IsNullOrWhiteSpace(text))))
+                    .ToList())
+                .Where(row => row.Any(cell => !string.IsNullOrWhiteSpace(cell)))
+                .ToList();
+        }
+
+        private static List<(string Name, string ClassName, DateTime BirthDate)> ExtractChildren(string rawChildren, string rawDates)
+        {
+            var dates = rawDates
+                .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(value => DateTime.TryParseExact(value, ["dd.MM.yyyy", "d.M.yyyy"], CultureInfo.GetCultureInfo("ru-RU"), DateTimeStyles.None, out var date) ? date : (DateTime?)null)
+                .Where(date => date.HasValue)
+                .Select(date => date!.Value)
+                .ToList();
+
+            var parts = rawChildren
+                .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(NormalizeName)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToList();
+
+            var children = new List<(string Name, string ClassName, DateTime BirthDate)>();
+            var nameParts = new List<string>();
+            foreach (var part in parts)
+            {
+                if (TryReadClassName(part, out var className))
+                {
+                    var childIndex = children.Count;
+                    if (childIndex < dates.Count && nameParts.Count > 0)
+                    {
+                        children.Add((NormalizeName(string.Join(" ", nameParts)), className, dates[childIndex]));
+                    }
+
+                    nameParts.Clear();
+                    continue;
+                }
+
+                nameParts.Add(part);
+            }
+
+            return children;
+        }
+
+        private static bool TryReadClassName(string value, out string className)
+        {
+            className = string.Empty;
+            var match = System.Text.RegularExpressions.Regex.Match(value, @"(\d+\s*[А-ЯЁA-Z]?)\s*класс", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!match.Success)
+                return false;
+
+            className = NormalizeClassName(match.Groups[1].Value);
+            return true;
+        }
+
+        private static string NormalizeClassName(string value)
+        {
+            return NormalizeName(value)
+                .Replace("«", string.Empty)
+                .Replace("»", string.Empty)
+                .Replace("\"", string.Empty)
+                .Replace(" ", string.Empty)
+                .ToUpperInvariant();
+        }
+
+        private static string NormalizeName(string value)
+        {
+            return System.Text.RegularExpressions.Regex.Replace(value.Replace("/", " ").Trim(), @"\s+", " ");
+        }
+
+        private static string NormalizeForCompare(string value)
+        {
+            return NormalizeName(value).ToLowerInvariant().Replace("ё", "е");
         }
 
         private static string Transliterate(string value)

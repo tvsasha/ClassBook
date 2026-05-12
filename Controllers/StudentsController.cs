@@ -370,6 +370,37 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
+        /// Импортирует родителей из Word-документа и привязывает их к найденным ученикам.
+        /// </summary>
+        /// <param name="file">Документ .docx со списком родителей, детей, классов и дат рождения.</param>
+        /// <returns>Итоги импорта и временные доступы созданных родителей.</returns>
+        [HttpPost("import-parents-docx")]
+        [RequestSizeLimit(10_000_000)]
+        public async Task<IActionResult> ImportParentsDocx(IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                    return BadRequestError("Выберите Word-документ с родителями");
+
+                if (!file.FileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+                    return BadRequestError("Поддерживается только формат .docx");
+
+                await using var stream = file.OpenReadStream();
+                var result = await _parentFacade.ImportParentRosterDocxAsync(stream);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Привязывает существующего ученика к родительской учетной записи.
         /// </summary>
         /// <param name="dto">Идентификаторы ученика и родителя.</param>

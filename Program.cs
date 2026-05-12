@@ -10,6 +10,7 @@ using Microsoft.OpenApi.Models;
 using System.IO;
 using System.Security.Claims;
 using System.Reflection;
+using System.Text;
 
 namespace ClassBook
 {
@@ -131,6 +132,63 @@ namespace ClassBook
                     Console.WriteLine($"Учитель: {teacher.FullName}; логин: {teacher.Login}; временный пароль: {teacher.TemporaryPassword}");
                 }
 
+                return;
+            }
+
+            if (args.Length >= 2 && args[0].Equals("import-parents", StringComparison.OrdinalIgnoreCase))
+            {
+                using var scope = app.Services.CreateScope();
+                var facade = scope.ServiceProvider.GetRequiredService<ParentFacade>();
+                using var stream = File.OpenRead(args[1]);
+                var result = facade.ImportParentRosterDocxAsync(stream).GetAwaiter().GetResult();
+
+                Console.WriteLine($"Импорт родителей завершен. Создано: {result.ParentsCreated}, найдено: {result.ParentsFound}, привязок: {result.LinksCreated}, пропущено: {result.Skipped}, ошибок: {result.Errors.Count}");
+                foreach (var parent in result.Parents.Where(parent => parent.Created))
+                {
+                    Console.WriteLine($"Родитель: {parent.FullName}; логин: {parent.Login}; временный пароль: {parent.TemporaryPassword}; дети: {string.Join(", ", parent.LinkedStudents)}");
+                }
+
+                return;
+            }
+
+            if (args.Length >= 2 && args[0].Equals("reset-parent-accesses", StringComparison.OrdinalIgnoreCase))
+            {
+                using var scope = app.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+                var parentRole = db.Roles.FirstOrDefault(role => role.Name == "Родитель");
+                if (parentRole == null)
+                {
+                    Console.WriteLine("Роль 'Родитель' не найдена");
+                    return;
+                }
+
+                var since = DateTime.Today;
+                var parents = db.Users
+                    .Include(user => user.StudentParents!)
+                    .ThenInclude(link => link.Student)
+                    .Where(user => user.RoleId == parentRole.Id && user.CreatedAt >= since)
+                    .OrderBy(user => user.FullName)
+                    .ToList();
+
+                var csv = new StringBuilder();
+                csv.AppendLine("ФИО;Логин;Временный пароль;Дети");
+                foreach (var parent in parents)
+                {
+                    var temporaryPassword = UserFacade.GenerateTemporaryPassword();
+                    parent.PasswordHash = hasher.Hash(temporaryPassword);
+                    parent.MustChangePassword = true;
+                    parent.IsActive = true;
+                    var children = string.Join(", ", parent.StudentParents?.Select(link => $"{link.Student.LastName} {link.Student.FirstName}".Trim()) ?? []);
+                    csv.Append('"').Append(parent.FullName.Replace("\"", "\"\"")).Append("\";")
+                        .Append('"').Append(parent.Login.Replace("\"", "\"\"")).Append("\";")
+                        .Append('"').Append(temporaryPassword.Replace("\"", "\"\"")).Append("\";")
+                        .Append('"').Append(children.Replace("\"", "\"\"")).AppendLine("\"");
+                }
+
+                db.SaveChanges();
+                File.WriteAllText(args[1], csv.ToString(), new UTF8Encoding(true));
+                Console.WriteLine($"Сброшено доступов родителей: {parents.Count}. Файл: {args[1]}");
                 return;
             }
 

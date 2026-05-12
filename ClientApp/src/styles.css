@@ -522,6 +522,17 @@ select {
   line-height: 1.45;
 }
 
+.status-error {
+  border-color: rgba(180, 35, 24, 0.34);
+  color: var(--danger);
+  background: rgba(180, 35, 24, 0.09);
+  box-shadow: 0 14px 36px rgba(180, 35, 24, 0.12);
+}
+
+.status-success {
+  border-color: rgba(15, 124, 102, 0.22);
+}
+
 .table-card {
   overflow: hidden;
 }
@@ -957,6 +968,27 @@ td {
 .access-card strong {
   font-size: 1.08rem;
   word-break: break-all;
+}
+
+.access-list {
+  display: grid;
+  gap: 10px;
+  max-height: 48vh;
+  overflow: auto;
+}
+
+.access-list article {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid rgba(24, 32, 38, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.access-list small {
+  color: var(--muted);
+  line-height: 1.35;
 }
 
 .schedule-toolbar,
