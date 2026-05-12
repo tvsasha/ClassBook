@@ -4,6 +4,8 @@ using ClassBook.Domain.Interfaces;
 using ClassBook.Domain.Constants;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 
 namespace ClassBook.Application.Facades
 {
@@ -196,6 +198,58 @@ namespace ClassBook.Application.Facades
             };
         }
 
+        public async Task<IssuedAccessDto> ResetTemporaryPasswordAsync(int id)
+        {
+            var user = await _db.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null)
+                throw new KeyNotFoundException("Пользователь не найден");
+
+            var temporaryPassword = GenerateTemporaryPassword();
+            user.PasswordHash = _hasher.Hash(temporaryPassword);
+            user.MustChangePassword = true;
+            user.IsActive = true;
+            await _db.SaveChangesAsync();
+
+            return new IssuedAccessDto
+            {
+                Id = user.Id,
+                Login = user.Login,
+                FullName = user.FullName,
+                TemporaryPassword = temporaryPassword,
+                MustChangePassword = user.MustChangePassword,
+                Message = "Временный пароль создан. Он показывается только сейчас."
+            };
+        }
+
+        public async Task<string> GenerateUniqueLoginAsync(string fullName)
+        {
+            var baseLogin = Transliterate(fullName)
+                .ToLowerInvariant()
+                .Replace(" ", ".");
+            baseLogin = Regex.Replace(baseLogin, @"[^a-z0-9\.]", string.Empty).Trim('.');
+            if (string.IsNullOrWhiteSpace(baseLogin))
+                baseLogin = "user";
+
+            var login = baseLogin;
+            var index = 1;
+            while (await _db.Users.AnyAsync(u => u.Login == login))
+            {
+                index++;
+                login = $"{baseLogin}{index}";
+            }
+
+            return login;
+        }
+
+        public static string GenerateTemporaryPassword()
+        {
+            Span<byte> bytes = stackalloc byte[6];
+            RandomNumberGenerator.Fill(bytes);
+            return $"Cb-{Convert.ToHexString(bytes)}!";
+        }
+
         /// <summary>
         /// Возвращает учеников выбранного родителя.
         /// </summary>
@@ -274,6 +328,25 @@ namespace ClassBook.Application.Facades
                 MustChangePassword = user.MustChangePassword,
                 PasswordReset = passwordReset
             };
+        }
+
+        private static string Transliterate(string value)
+        {
+            var map = new Dictionary<char, string>
+            {
+                ['а'] = "a", ['б'] = "b", ['в'] = "v", ['г'] = "g", ['д'] = "d", ['е'] = "e", ['ё'] = "e",
+                ['ж'] = "zh", ['з'] = "z", ['и'] = "i", ['й'] = "y", ['к'] = "k", ['л'] = "l", ['м'] = "m",
+                ['н'] = "n", ['о'] = "o", ['п'] = "p", ['р'] = "r", ['с'] = "s", ['т'] = "t", ['у'] = "u",
+                ['ф'] = "f", ['х'] = "h", ['ц'] = "c", ['ч'] = "ch", ['ш'] = "sh", ['щ'] = "sch", ['ъ'] = "",
+                ['ы'] = "y", ['ь'] = "", ['э'] = "e", ['ю'] = "yu", ['я'] = "ya"
+            };
+            var builder = new System.Text.StringBuilder();
+            foreach (var symbol in value.ToLowerInvariant())
+            {
+                builder.Append(map.TryGetValue(symbol, out var replacement) ? replacement : symbol);
+            }
+
+            return builder.ToString();
         }
     }
 }

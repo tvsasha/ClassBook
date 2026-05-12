@@ -433,6 +433,10 @@ function AdminPage({ role }) {
   });
   const [editingUser, setEditingUser] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [studentAccessTarget, setStudentAccessTarget] = useState(null);
+  const [parentAccessTarget, setParentAccessTarget] = useState(null);
+  const [parentAccessForm, setParentAccessForm] = useState({ fullName: "", login: "" });
+  const [issuedAccess, setIssuedAccess] = useState(null);
   const [studentAccountLink, setStudentAccountLink] = useState({
     studentId: "",
     userId: ""
@@ -494,23 +498,32 @@ function AdminPage({ role }) {
     event.preventDefault();
     setMessage("");
 
-    if (!form.login || !form.fullName || !form.password || !form.roleId) {
-      setMessage("Заполните логин, ФИО, пароль и роль");
+    if (!form.login || !form.fullName || !form.roleId) {
+      setMessage("Заполните логин, ФИО и роль");
       return;
     }
 
     try {
-      await apiRequest("/users", {
+      const temporaryPassword = form.password || generateTemporaryPassword();
+      const created = await apiRequest("/users", {
         method: "POST",
         body: JSON.stringify({
           login: form.login.trim(),
           fullName: form.fullName.trim(),
-          password: form.password,
+          password: temporaryPassword,
           roleId: Number(form.roleId)
         })
       });
       setForm({ login: "", fullName: "", password: "", roleId: "" });
-      setMessage("Пользователь создан. Не забудьте передать временный пароль лично адресату.");
+      setIssuedAccess({
+        id: created.id,
+        login: created.login,
+        fullName: created.fullName,
+        temporaryPassword,
+        mustChangePassword: created.mustChangePassword,
+        message: "Пользователь создан"
+      });
+      setMessage("Пользователь создан, временный пароль готов к передаче");
       await loadAdminData();
     } catch (error) {
       setMessage(error.message || "Не удалось создать пользователя");
@@ -564,6 +577,68 @@ function AdminPage({ role }) {
     } catch (error) {
       setMessage(error.message || "Не удалось обновить ученика");
     }
+  }
+
+  async function resetUserPassword(user) {
+    try {
+      const access = await apiRequest(`/users/${user.id}/reset-password`, { method: "POST" });
+      setIssuedAccess(access);
+      setMessage("Временный пароль создан");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось создать временный пароль");
+    }
+  }
+
+  async function issueStudentAccess(event) {
+    event.preventDefault();
+    if (!studentAccessTarget) {
+      return;
+    }
+
+    try {
+      const access = await apiRequest(`/admin/students/${studentAccessTarget.studentId}/issue-account`, {
+        method: "POST",
+        body: JSON.stringify({ login: "" })
+      });
+      setStudentAccessTarget(null);
+      setIssuedAccess(access);
+      setMessage("Доступ ученика подготовлен");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось подготовить доступ ученика");
+    }
+  }
+
+  async function issueParentAccess(event) {
+    event.preventDefault();
+    if (!parentAccessTarget || !parentAccessForm.fullName.trim()) {
+      setMessage("Укажите ФИО родителя");
+      return;
+    }
+
+    try {
+      const access = await apiRequest(`/admin/students/${parentAccessTarget.studentId}/issue-parent-account`, {
+        method: "POST",
+        body: JSON.stringify({
+          fullName: parentAccessForm.fullName.trim(),
+          login: parentAccessForm.login.trim() || null
+        })
+      });
+      setParentAccessTarget(null);
+      setParentAccessForm({ fullName: "", login: "" });
+      setIssuedAccess(access);
+      setMessage("Доступ родителя подготовлен");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось подготовить доступ родителя");
+    }
+  }
+
+  async function copyAccessText(access) {
+    const text = `Логин: ${access.login}\nВременный пароль: ${access.temporaryPassword}\nПри первом входе система попросит задать постоянный пароль.`;
+    await navigator.clipboard.writeText(text);
+    setMessage("Данные доступа скопированы");
   }
 
   async function attachStudentAccount(event) {
@@ -827,7 +902,7 @@ function AdminPage({ role }) {
       <form className={`inline-form admin-section ${adminTab === "users" ? "active" : ""}`} onSubmit={createUser}>
         <Field label="Логин" value={form.login} onChange={(value) => setForm({ ...form, login: value })} />
         <Field label="ФИО" value={form.fullName} onChange={(value) => setForm({ ...form, fullName: value })} />
-        <Field label="Временный пароль" value={form.password} onChange={(value) => setForm({ ...form, password: value })} />
+        <Field label="Временный пароль, можно оставить пустым" value={form.password} onChange={(value) => setForm({ ...form, password: value })} />
         <label className="field">
           <span>Роль</span>
           <select value={form.roleId} onChange={(event) => setForm({ ...form, roleId: event.target.value })}>
@@ -840,7 +915,8 @@ function AdminPage({ role }) {
         <button className="primary-button">Создать пользователя</button>
       </form>
       {editingUser && adminTab === "users" && (
-        <form className="inline-form admin-edit-form" onSubmit={saveUser}>
+        <Modal title="Редактирование пользователя" onClose={() => setEditingUser(null)}>
+        <form className="modal-form" onSubmit={saveUser}>
           <Field label="Логин" value={editingUser.login} onChange={(value) => setEditingUser({ ...editingUser, login: value })} />
           <Field label="ФИО" value={editingUser.fullName} onChange={(value) => setEditingUser({ ...editingUser, fullName: value })} />
           <Field label="Новый пароль" value={editingUser.password || ""} onChange={(value) => setEditingUser({ ...editingUser, password: value })} />
@@ -859,9 +935,11 @@ function AdminPage({ role }) {
           <button className="primary-button">Сохранить пользователя</button>
           <button className="ghost-button compact" type="button" onClick={() => setEditingUser(null)}>Отмена</button>
         </form>
+        </Modal>
       )}
       {editingStudent && adminTab === "students" && (
-        <form className="inline-form admin-edit-form" onSubmit={saveStudent}>
+        <Modal title="Редактирование ученика" onClose={() => setEditingStudent(null)}>
+        <form className="modal-form" onSubmit={saveStudent}>
           <Field label="Фамилия" value={editingStudent.lastName} onChange={(value) => setEditingStudent({ ...editingStudent, lastName: value })} />
           <Field label="Имя" value={editingStudent.firstName} onChange={(value) => setEditingStudent({ ...editingStudent, firstName: value })} />
           <Field label="Дата рождения" type="date" value={editingStudent.birthDate?.slice(0, 10)} onChange={(value) => setEditingStudent({ ...editingStudent, birthDate: value })} />
@@ -876,6 +954,43 @@ function AdminPage({ role }) {
           <button className="primary-button">Сохранить ученика</button>
           <button className="ghost-button compact" type="button" onClick={() => setEditingStudent(null)}>Отмена</button>
         </form>
+        </Modal>
+      )}
+      {studentAccessTarget && (
+        <Modal title="Выдача доступа ученику" onClose={() => setStudentAccessTarget(null)}>
+          <form className="modal-form" onSubmit={issueStudentAccess}>
+            <p className="modal-hint">
+              Система сама создаст логин, временный пароль и привяжет учетную запись к ученику:
+              {" "}<strong>{studentAccessTarget.lastName} {studentAccessTarget.firstName}</strong>.
+            </p>
+            <button className="primary-button">Подготовить доступ</button>
+            <button className="ghost-button compact" type="button" onClick={() => setStudentAccessTarget(null)}>Отмена</button>
+          </form>
+        </Modal>
+      )}
+      {parentAccessTarget && (
+        <Modal title="Выдача доступа родителю" onClose={() => setParentAccessTarget(null)}>
+          <form className="modal-form" onSubmit={issueParentAccess}>
+            <p className="modal-hint">
+              Родитель будет привязан только к ученику: <strong>{parentAccessTarget.lastName} {parentAccessTarget.firstName}</strong>.
+            </p>
+            <Field label="ФИО родителя" value={parentAccessForm.fullName} onChange={(value) => setParentAccessForm({ ...parentAccessForm, fullName: value })} />
+            <Field label="Логин, если нужен свой" value={parentAccessForm.login} onChange={(value) => setParentAccessForm({ ...parentAccessForm, login: value })} />
+            <button className="primary-button">Подготовить доступ родителю</button>
+            <button className="ghost-button compact" type="button" onClick={() => setParentAccessTarget(null)}>Отмена</button>
+          </form>
+        </Modal>
+      )}
+      {issuedAccess && (
+        <Modal title="Данные для входа" onClose={() => setIssuedAccess(null)}>
+          <div className="access-card">
+            <p>Передайте эти данные адресату. Пароль показывается только после выдачи или сброса.</p>
+            <div><span>ФИО</span><strong>{issuedAccess.fullName}</strong></div>
+            <div><span>Логин</span><strong>{issuedAccess.login}</strong></div>
+            <div><span>Временный пароль</span><strong>{issuedAccess.temporaryPassword}</strong></div>
+            <button className="primary-button" type="button" onClick={() => copyAccessText(issuedAccess)}>Скопировать для отправки</button>
+          </div>
+        </Modal>
       )}
       <form className={`inline-form attach-form admin-section ${adminTab === "access" ? "active" : ""}`} onSubmit={attachStudentAccount}>
         <label className="field">
@@ -1005,7 +1120,10 @@ function AdminPage({ role }) {
           item.roleName,
           item.isActive ? "Активен" : "Отключен",
           item.mustChangePassword ? "Нужно сменить" : "Постоянный",
-          <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
+          <div className="row-actions">
+            <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
+            <button className="table-action" type="button" onClick={() => resetUserPassword(item)}>Временный пароль</button>
+          </div>
         ])}
       />
       <section className={`table-card admin-section ${adminTab === "students" ? "active" : ""}`}>
@@ -1047,7 +1165,11 @@ function AdminPage({ role }) {
           `${item.lastName} ${item.firstName}`,
           item.className || "Без класса",
           item.hasAccount ? "Есть" : "Не выдан",
-          <button className="table-action" type="button" onClick={() => setEditingStudent({ ...item, birthDate: item.birthDate?.slice(0, 10) })}>Редактировать</button>
+          <div className="row-actions">
+            <button className="table-action" type="button" onClick={() => setEditingStudent({ ...item, birthDate: item.birthDate?.slice(0, 10) })}>Редактировать</button>
+            <button className="table-action" type="button" onClick={() => setStudentAccessTarget(item)}>{item.hasAccount ? "Сбросить доступ" : "Выдать доступ"}</button>
+            <button className="table-action" type="button" onClick={() => setParentAccessTarget(item)}>Доступ родителю</button>
+          </div>
         ])}
       />
     </section>
@@ -2200,6 +2322,20 @@ function DataTable({ title, columns, rows, className = "" }) {
   );
 }
 
+function Modal({ title, children, onClose }) {
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={title}>
+      <section className="modal-card">
+        <div className="modal-header">
+          <h3>{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Закрыть">×</button>
+        </div>
+        {children}
+      </section>
+    </div>
+  );
+}
+
 function CardGrid({ title, items }) {
   return (
     <section className="table-card">
@@ -2297,6 +2433,12 @@ function classSortValue(value) {
   }
 
   return `${String(Number(match[1])).padStart(3, "0")}|${match[2] || ""}`;
+}
+
+function generateTemporaryPassword() {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return `Cb-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase()}!`;
 }
 
 function formatDate(value) {

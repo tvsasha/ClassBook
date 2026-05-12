@@ -67,4 +67,14 @@ namespace ClassBook.Application.DTOs
         public int UserId { get; set; }
         public UserMutationAuditDto OldValues { get; set; } = new();
     }
+
+    public class IssuedAccessDto
+    {
+        public int Id { get; set; }
+        public string Login { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string TemporaryPassword { get; set; } = string.Empty;
+        public bool MustChangePassword { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
 }

@@ -75,6 +75,29 @@ namespace ClassBook.Application.Facades
             return parent;
         }
 
+        public async Task<IssuedAccessDto> IssueParentAccountForStudentAsync(int studentId, string fullName, string? login)
+        {
+            if (string.IsNullOrWhiteSpace(fullName))
+                throw new ArgumentException("Укажите ФИО родителя");
+
+            var normalizedFullName = fullName.Trim();
+            var normalizedLogin = string.IsNullOrWhiteSpace(login)
+                ? await GenerateUniqueLoginAsync(normalizedFullName)
+                : login.Trim();
+            var temporaryPassword = UserFacade.GenerateTemporaryPassword();
+            var parent = await CreateParentAccountForStudentAsync(studentId, normalizedFullName, normalizedLogin, temporaryPassword);
+
+            return new IssuedAccessDto
+            {
+                Id = parent.Id,
+                Login = parent.Login,
+                FullName = parent.FullName,
+                TemporaryPassword = temporaryPassword,
+                MustChangePassword = parent.MustChangePassword,
+                Message = "Учетная запись родителя создана и привязана к ученику"
+            };
+        }
+
         /// <summary>
         /// Привязывает родителя к ученику
         /// </summary>
@@ -112,6 +135,45 @@ namespace ClassBook.Application.Facades
             await _db.SaveChangesAsync();
 
             return studentParent;
+        }
+
+        private async Task<string> GenerateUniqueLoginAsync(string fullName)
+        {
+            var baseLogin = Transliterate(fullName)
+                .ToLowerInvariant()
+                .Replace(" ", ".");
+            baseLogin = System.Text.RegularExpressions.Regex.Replace(baseLogin, @"[^a-z0-9\.]", string.Empty).Trim('.');
+            if (string.IsNullOrWhiteSpace(baseLogin))
+                baseLogin = "parent";
+
+            var login = baseLogin;
+            var index = 1;
+            while (await _db.Users.AnyAsync(u => u.Login == login))
+            {
+                index++;
+                login = $"{baseLogin}{index}";
+            }
+
+            return login;
+        }
+
+        private static string Transliterate(string value)
+        {
+            var map = new Dictionary<char, string>
+            {
+                ['а'] = "a", ['б'] = "b", ['в'] = "v", ['г'] = "g", ['д'] = "d", ['е'] = "e", ['ё'] = "e",
+                ['ж'] = "zh", ['з'] = "z", ['и'] = "i", ['й'] = "y", ['к'] = "k", ['л'] = "l", ['м'] = "m",
+                ['н'] = "n", ['о'] = "o", ['п'] = "p", ['р'] = "r", ['с'] = "s", ['т'] = "t", ['у'] = "u",
+                ['ф'] = "f", ['х'] = "h", ['ц'] = "c", ['ч'] = "ch", ['ш'] = "sh", ['щ'] = "sch", ['ъ'] = "",
+                ['ы'] = "y", ['ь'] = "", ['э'] = "e", ['ю'] = "yu", ['я'] = "ya"
+            };
+            var builder = new System.Text.StringBuilder();
+            foreach (var symbol in value.ToLowerInvariant())
+            {
+                builder.Append(map.TryGetValue(symbol, out var replacement) ? replacement : symbol);
+            }
+
+            return builder.ToString();
         }
 
         /// <summary>

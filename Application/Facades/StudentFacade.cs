@@ -138,6 +138,51 @@ namespace ClassBook.Application.Facades
             };
         }
 
+        public async Task<IssuedAccessDto> IssueStudentAccountAsync(int studentId, string? login)
+        {
+            var student = await _db.Students
+                .Include(s => s.User)
+                .FirstOrDefaultAsync(s => s.StudentId == studentId);
+
+            if (student == null)
+                throw new KeyNotFoundException("Ученик не найден");
+
+            if (student.User != null)
+            {
+                var password = UserFacade.GenerateTemporaryPassword();
+                student.User.PasswordHash = _hasher.Hash(password);
+                student.User.MustChangePassword = true;
+                student.User.IsActive = true;
+                await _db.SaveChangesAsync();
+
+                return new IssuedAccessDto
+                {
+                    Id = student.User.Id,
+                    Login = student.User.Login,
+                    FullName = student.User.FullName,
+                    TemporaryPassword = password,
+                    MustChangePassword = true,
+                    Message = "Временный пароль ученика обновлен"
+                };
+            }
+
+            var generatedLogin = string.IsNullOrWhiteSpace(login)
+                ? await GenerateUniqueLoginAsync($"{student.LastName} {student.FirstName}")
+                : login.Trim();
+            var temporaryPassword = UserFacade.GenerateTemporaryPassword();
+            var created = await CreateStudentAccountAsync(studentId, generatedLogin, temporaryPassword);
+
+            return new IssuedAccessDto
+            {
+                Id = created.Id,
+                Login = created.Login,
+                FullName = created.FullName,
+                TemporaryPassword = temporaryPassword,
+                MustChangePassword = created.MustChangePassword,
+                Message = "Учетная запись ученика создана"
+            };
+        }
+
         public async Task<IssuedStudentAccountDto> AttachStudentAccountAsync(int studentId, int userId)
         {
             var student = await _db.Students

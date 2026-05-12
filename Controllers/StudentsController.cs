@@ -102,6 +102,42 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
+        /// Создает или обновляет временный доступ ученика без ручного ввода пароля.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <param name="dto">Необязательный логин. Если пусто, система сформирует логин автоматически.</param>
+        /// <returns>Логин и временный пароль для передачи ученику.</returns>
+        [HttpPost("{studentId}/issue-account")]
+        public async Task<IActionResult> IssueStudentAccount(int studentId, [FromBody] IssueStudentAccountDto dto)
+        {
+            try
+            {
+                var access = await _facade.IssueStudentAccountAsync(studentId, dto.Login);
+                var currentUserId = GetCurrentUserId();
+                if (currentUserId > 0)
+                {
+                    await _auditFacade.LogActionAsync<StudentAccessAuditDto>(currentUserId, "User", access.Id, "IssueStudentAccess", null, new StudentAccessAuditDto
+                    {
+                        StudentId = studentId,
+                        Login = access.Login,
+                        FullName = access.FullName,
+                        MustChangePassword = access.MustChangePassword
+                    });
+                }
+
+                return Ok(access);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Привязывает существующую учетную запись ученика к карточке ученика.
         /// </summary>
         /// <param name="studentId">Идентификатор карточки ученика.</param>
@@ -170,6 +206,46 @@ namespace ClassBook.Controllers
                     MustChangePassword = parent.MustChangePassword,
                     Message = "Учетная запись родителя создана и привязана к ученику"
                 });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Создает родительский доступ с автоматическим временным паролем.
+        /// </summary>
+        /// <param name="studentId">Идентификатор ученика.</param>
+        /// <param name="dto">ФИО родителя и необязательный логин.</param>
+        /// <returns>Логин и временный пароль для передачи родителю.</returns>
+        [HttpPost("{studentId}/issue-parent-account")]
+        public async Task<IActionResult> IssueParentAccountForStudent(int studentId, [FromBody] IssueParentAccountDto dto)
+        {
+            try
+            {
+                var access = await _parentFacade.IssueParentAccountForStudentAsync(studentId, dto.FullName, dto.Login);
+                var currentUserId = GetCurrentUserId();
+                if (currentUserId > 0)
+                {
+                    await _auditFacade.LogActionAsync<StudentAccessAuditDto>(currentUserId, "User", access.Id, "IssueParentAccess", null, new StudentAccessAuditDto
+                    {
+                        StudentId = studentId,
+                        Login = access.Login,
+                        FullName = access.FullName,
+                        MustChangePassword = access.MustChangePassword
+                    });
+                }
+
+                return Ok(access);
             }
             catch (ArgumentException ex)
             {

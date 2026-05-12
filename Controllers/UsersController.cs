@@ -134,6 +134,40 @@ namespace ClassBook.Controllers
         }
 
         /// <summary>
+        /// Создает новый временный пароль для существующего пользователя.
+        /// </summary>
+        /// <param name="id">Идентификатор пользователя.</param>
+        /// <returns>Логин и временный пароль, который нужно передать пользователю.</returns>
+        [HttpPost("{id}/reset-password")]
+        public async Task<IActionResult> ResetPassword(int id)
+        {
+            try
+            {
+                var access = await _userFacade.ResetTemporaryPasswordAsync(id);
+
+                var currentUserId = GetCurrentUserId();
+                if (currentUserId > 0)
+                {
+                    await _auditFacade.LogActionAsync<UserMutationAuditDto>(currentUserId, "User", id, "ResetPassword", null, new UserMutationAuditDto
+                    {
+                        Login = access.Login,
+                        FullName = access.FullName,
+                        IsActive = true,
+                        MustChangePassword = access.MustChangePassword,
+                        PasswordReset = true
+                    });
+                }
+
+                return Ok(access);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+        }
+
+
+        /// <summary>
         /// Получает список учеников, привязанных к выбранному родителю.
         /// </summary>
         /// <param name="parentId">Идентификатор родительской учетной записи.</param>

@@ -873,6 +873,92 @@ td {
   font-weight: 700;
 }
 
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(24, 32, 38, 0.32);
+  backdrop-filter: blur(10px);
+}
+
+.modal-card {
+  width: min(620px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.modal-header button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--accent-strong);
+  cursor: pointer;
+  background: rgba(15, 124, 102, 0.09);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.modal-form,
+.access-card {
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px 22px;
+}
+
+.modal-hint,
+.access-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.access-card div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid rgba(24, 32, 38, 0.1);
+  border-radius: 16px;
+  background: rgba(15, 124, 102, 0.05);
+}
+
+.access-card span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.access-card strong {
+  font-size: 1.08rem;
+  word-break: break-all;
+}
+
 .schedule-toolbar,
 .class-create-form {
   display: flex;
