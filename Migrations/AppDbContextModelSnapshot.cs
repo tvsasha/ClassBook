@@ -341,6 +341,38 @@ namespace ClassBook.Migrations
                     b.ToTable("Subjects");
                 });
 
+            modelBuilder.Entity("ClassBook.Domain.Entities.SubjectClassAssignment", b =>
+                {
+                    b.Property<int>("SubjectClassAssignmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SubjectClassAssignmentId"));
+
+                    b.Property<int>("ClassId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TeacherId")
+                        .HasColumnType("int");
+
+                    b.HasKey("SubjectClassAssignmentId");
+
+                    b.HasIndex("ClassId");
+
+                    b.HasIndex("SubjectId", "ClassId", "TeacherId")
+                        .IsUnique();
+
+                    b.HasIndex("TeacherId", "ClassId");
+
+                    b.ToTable("SubjectClassAssignments");
+                });
+
             modelBuilder.Entity("ClassBook.Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -555,6 +587,33 @@ namespace ClassBook.Migrations
                     b.Navigation("Teacher");
                 });
 
+            modelBuilder.Entity("ClassBook.Domain.Entities.SubjectClassAssignment", b =>
+                {
+                    b.HasOne("ClassBook.Domain.Entities.Class", "Class")
+                        .WithMany("SubjectAssignments")
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClassBook.Domain.Entities.Subject", "Subject")
+                        .WithMany("ClassAssignments")
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClassBook.Domain.Entities.User", "Teacher")
+                        .WithMany("SubjectClassAssignments")
+                        .HasForeignKey("TeacherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Class");
+
+                    b.Navigation("Subject");
+
+                    b.Navigation("Teacher");
+                });
+
             modelBuilder.Entity("ClassBook.Domain.Entities.User", b =>
                 {
                     b.HasOne("ClassBook.Domain.Entities.Role", "Role")
@@ -591,6 +650,8 @@ namespace ClassBook.Migrations
                     b.Navigation("Lessons");
 
                     b.Navigation("Students");
+
+                    b.Navigation("SubjectAssignments");
                 });
 
             modelBuilder.Entity("ClassBook.Domain.Entities.Lesson", b =>
@@ -612,6 +673,8 @@ namespace ClassBook.Migrations
 
             modelBuilder.Entity("ClassBook.Domain.Entities.Subject", b =>
                 {
+                    b.Navigation("ClassAssignments");
+
                     b.Navigation("Lessons");
                 });
 
@@ -626,6 +689,8 @@ namespace ClassBook.Migrations
                     b.Navigation("Student");
 
                     b.Navigation("StudentParents");
+
+                    b.Navigation("SubjectClassAssignments");
 
                     b.Navigation("Subjects");
                 });

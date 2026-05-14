@@ -55,7 +55,7 @@ namespace ClassBook.Controllers
         {
             try
             {
-                return Ok(await _subjectFacade.CreateSubjectAsync(dto.Name, dto.TeacherId));
+                return Ok(await _subjectFacade.CreateSubjectAsync(dto.Name, dto.TeacherId, dto.ClassId));
             }
             catch (ArgumentException ex)
             {
@@ -106,6 +106,41 @@ namespace ClassBook.Controllers
             try
             {
                 return Ok(await _subjectFacade.AttachTeacherToSubjectAsync(subjectId, dto.TeacherId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+        }
+
+        [HttpPost("{subjectId}/classes")]
+        public async Task<IActionResult> AssignSubjectToClass(int subjectId, [FromBody] SubjectClassAssignmentRequestDto dto)
+        {
+            try
+            {
+                return Ok(await _subjectFacade.AssignSubjectToClassAsync(subjectId, dto.ClassId, dto.TeacherId));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+        }
+
+        [HttpDelete("{subjectId}/classes/{classId}/teachers/{teacherId}")]
+        public async Task<IActionResult> RemoveSubjectClassAssignment(int subjectId, int classId, int teacherId)
+        {
+            try
+            {
+                await _subjectFacade.RemoveSubjectClassAssignmentAsync(subjectId, classId, teacherId);
+                return NoContent();
             }
             catch (KeyNotFoundException ex)
             {

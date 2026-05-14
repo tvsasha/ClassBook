@@ -122,7 +122,9 @@ namespace ClassBook.Application.Facades
                 .Select(l => new TeacherLessonListItemDto
                 {
                     LessonId = l.LessonId,
+                    SubjectId = l.SubjectId,
                     SubjectName = l.Subject.Name,
+                    ClassId = l.ClassId,
                     ClassName = l.Class.Name,
                     Topic = l.Topic,
                     Date = l.Date,
@@ -146,6 +148,13 @@ namespace ClassBook.Application.Facades
             var teacherExists = await _db.Users.AnyAsync(u => u.Id == teacherId && u.RoleId == SystemRoleIds.Teacher);
             if (!teacherExists)
                 throw new InvalidOperationException("Учитель не найден или это не учитель");
+
+            var assignmentExists = await _db.SubjectClassAssignments.AnyAsync(a =>
+                a.SubjectId == subjectId &&
+                a.ClassId == classId &&
+                a.TeacherId == teacherId);
+            if (!assignmentExists)
+                throw new InvalidOperationException("Учитель не назначен на этот предмет в выбранном классе");
         }
 
         private async Task<LessonResponse> GetRequiredLessonResponseAsync(int lessonId)

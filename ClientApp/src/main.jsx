@@ -478,12 +478,20 @@ function AdminPage({ role }) {
   const [subjects, setSubjects] = useState([]);
   const [subjectForm, setSubjectForm] = useState({
     name: "",
-    teacherId: ""
+    teacherId: "",
+    classId: ""
   });
   const [editingSubject, setEditingSubject] = useState(null);
   const [subjectClassAssignmentForm, setSubjectClassAssignmentForm] = useState({
+    subjectId: "",
     classId: "",
     teacherId: ""
+  });
+  const [subjectFilters, setSubjectFilters] = useState({
+    search: "",
+    teacherId: "",
+    classId: "",
+    sort: "name"
   });
 
   async function loadAdminData() {
@@ -506,7 +514,7 @@ function AdminPage({ role }) {
         className: (item) => classSortValue(item.className),
         teacherName: (item) => item.teacherName || ""
       }));
-      setSubjects(subjectsData ?? []);
+      setSubjects(sortItems(subjectsData ?? [], "name", { name: (item) => item.name || "" }));
     } catch (error) {
       setMessage(error.message || "Не удалось загрузить данные администрирования");
     } finally {
@@ -793,7 +801,7 @@ function AdminPage({ role }) {
 
   async function createSubject(event) {
     event.preventDefault();
-    if (!subjectForm.name.trim() || !subjectForm.teacherId) {
+    if (!subjectForm.name.trim() || !subjectForm.teacherId || !subjectForm.classId) {
       setMessage("Укажите название предмета и выберите учителя");
       return;
     }
@@ -803,10 +811,11 @@ function AdminPage({ role }) {
         method: "POST",
         body: JSON.stringify({
           name: subjectForm.name.trim(),
-          teacherId: Number(subjectForm.teacherId)
+          teacherId: Number(subjectForm.teacherId),
+          classId: Number(subjectForm.classId)
         })
       });
-      setSubjectForm({ name: "", teacherId: "" });
+      setSubjectForm({ name: "", teacherId: "", classId: "" });
       setMessage("Предмет создан");
       await loadAdminData();
     } catch (error) {
@@ -850,6 +859,41 @@ function AdminPage({ role }) {
       await loadAdminData();
     } catch (error) {
       setMessage(error.message || "Не удалось удалить предмет");
+    }
+  }
+
+  async function assignSubjectToClass(event) {
+    event.preventDefault();
+    if (!subjectClassAssignmentForm.subjectId || !subjectClassAssignmentForm.classId || !subjectClassAssignmentForm.teacherId) {
+      setMessage("Выберите предмет, класс и учителя");
+      return;
+    }
+
+    try {
+      await apiRequest(`/subjects/${subjectClassAssignmentForm.subjectId}/classes`, {
+        method: "POST",
+        body: JSON.stringify({
+          classId: Number(subjectClassAssignmentForm.classId),
+          teacherId: Number(subjectClassAssignmentForm.teacherId)
+        })
+      });
+      setSubjectClassAssignmentForm({ subjectId: "", classId: "", teacherId: "" });
+      setMessage("Назначение предмета добавлено");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось назначить предмет классу");
+    }
+  }
+
+  async function removeSubjectAssignment(subjectId, classId, teacherId) {
+    try {
+      await apiRequest(`/subjects/${subjectId}/classes/${classId}/teachers/${teacherId}`, {
+        method: "DELETE"
+      });
+      setMessage("Назначение предмета снято");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось снять назначение предмета");
     }
   }
 
@@ -986,6 +1030,27 @@ function AdminPage({ role }) {
     name: (item) => `${item.lastName} ${item.firstName}`,
     className: (item) => classSortValue(item.className),
     account: (item) => item.hasAccount ? "1" : "0"
+  });
+  const filteredSubjects = sortItems(subjects.filter((item) => {
+    const search = subjectFilters.search.trim().toLowerCase();
+    const assignments = item.classAssignments ?? [];
+    const classNames = assignments.map((assignment) => assignment.className).join(" ").toLowerCase();
+    const teacherNames = [item.teacherName, ...assignments.map((assignment) => assignment.teacherName)].join(" ").toLowerCase();
+    const matchesSearch = !search
+      || item.name?.toLowerCase().includes(search)
+      || classNames.includes(search)
+      || teacherNames.includes(search);
+    const matchesTeacher = !subjectFilters.teacherId
+      || Number(item.teacherId) === Number(subjectFilters.teacherId)
+      || assignments.some((assignment) => Number(assignment.teacherId) === Number(subjectFilters.teacherId));
+    const matchesClass = !subjectFilters.classId
+      || assignments.some((assignment) => Number(assignment.classId) === Number(subjectFilters.classId));
+
+    return matchesSearch && matchesTeacher && matchesClass;
+  }), subjectFilters.sort, {
+    name: (item) => item.name || "",
+    teacher: (item) => item.teacherName || "",
+    classes: (item) => (item.classAssignments ?? []).map((assignment) => classSortValue(assignment.className)).join("|")
   });
   const usersWithoutActiveAccount = users.filter((item) => !item.isActive).length;
   const missingStudentAccounts = students.filter((item) => !item.hasAccount).length;

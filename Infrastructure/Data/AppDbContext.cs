@@ -18,6 +18,7 @@ namespace ClassBook.Infrastructure.Data
         public DbSet<Schedule> Schedules => Set<Schedule>();
         public DbSet<StudentParent> StudentParents => Set<StudentParent>();
         public DbSet<ClassTeacher> ClassTeachers => Set<ClassTeacher>();
+        public DbSet<SubjectClassAssignment> SubjectClassAssignments => Set<SubjectClassAssignment>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -92,6 +93,30 @@ namespace ClassBook.Infrastructure.Data
                       .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(ct => new { ct.ClassId, ct.TeacherId }).IsUnique();
+            });
+
+            modelBuilder.Entity<SubjectClassAssignment>(entity =>
+            {
+                entity.HasKey(sca => sca.SubjectClassAssignmentId);
+                entity.Property(sca => sca.CreatedAt).IsRequired();
+
+                entity.HasOne(sca => sca.Subject)
+                      .WithMany(subject => subject.ClassAssignments)
+                      .HasForeignKey(sca => sca.SubjectId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(sca => sca.Class)
+                      .WithMany(classEntity => classEntity.SubjectAssignments)
+                      .HasForeignKey(sca => sca.ClassId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(sca => sca.Teacher)
+                      .WithMany(user => user.SubjectClassAssignments)
+                      .HasForeignKey(sca => sca.TeacherId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(sca => new { sca.SubjectId, sca.ClassId, sca.TeacherId }).IsUnique();
+                entity.HasIndex(sca => new { sca.TeacherId, sca.ClassId });
             });
 
             // 🔹 Students

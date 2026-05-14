@@ -14,5 +14,6 @@ namespace ClassBook.Domain.Entities
         public int TeacherId { get; set; }
         public User Teacher { get; set; } = null!;
         public ICollection<Lesson>? Lessons { get; set; }
+        public ICollection<SubjectClassAssignment>? ClassAssignments { get; set; }
     }
 }

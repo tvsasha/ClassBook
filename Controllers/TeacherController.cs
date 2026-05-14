@@ -99,10 +99,11 @@ namespace ClassBook.Controllers
             try
             {
                 var currentUserId = GetCurrentUserId();
-                if (dto.TeacherId != currentUserId && !User.IsInRole("Администратор"))
+                var requestedTeacherId = dto.TeacherId == 0 ? currentUserId : dto.TeacherId;
+                if (requestedTeacherId != currentUserId && !User.IsInRole("Администратор"))
                     return ForbiddenError("Вы можете создавать только свои уроки");
 
-                var lesson = await _lessonFacade.CreateLessonAsync(dto.SubjectId, dto.ClassId, dto.TeacherId, dto.Topic, dto.Date, dto.Homework);
+                var lesson = await _lessonFacade.CreateLessonAsync(dto.SubjectId, dto.ClassId, requestedTeacherId, dto.Topic, dto.Date, dto.Homework);
                 return CreatedAtAction(nameof(GetLessons), new { id = lesson.LessonId }, lesson);
             }
             catch (InvalidOperationException ex)

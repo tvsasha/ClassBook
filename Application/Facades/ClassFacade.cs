@@ -68,15 +68,22 @@ namespace ClassBook.Application.Facades
 
         public async Task<IEnumerable<ClassListItemDto>> GetClassesForTeacherAsync(int teacherId)
         {
-            return await _db.Lessons
+            var lessonClasses = _db.Lessons
                 .Where(l => l.TeacherId == teacherId)
-                .Select(l => l.Class)
+                .Select(l => l.Class);
+            var assignedClasses = _db.SubjectClassAssignments
+                .Where(a => a.TeacherId == teacherId)
+                .Select(a => a.Class);
+
+            return await lessonClasses
+                .Union(assignedClasses)
                 .Distinct()
                 .Select(c => new ClassListItemDto
                 {
                     ClassId = c.ClassId,
                     Name = c.Name
                 })
+                .OrderBy(c => c.Name)
                 .ToListAsync();
         }
 

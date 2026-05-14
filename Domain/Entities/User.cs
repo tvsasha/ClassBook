@@ -15,6 +15,7 @@
         public ICollection<Lesson>? Lessons { get; set; }
         public Student? Student { get; set; }
         public ICollection<ClassTeacher>? ClassTeacherAssignments { get; set; }
+        public ICollection<SubjectClassAssignment>? SubjectClassAssignments { get; set; }
         /// <summary>
         /// Навигация: для родителей - их дети
         /// </summary>
