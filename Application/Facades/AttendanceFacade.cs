@@ -26,6 +26,9 @@ namespace ClassBook.Application.Facades
         /// </summary>
         public async Task MarkAttendanceAsync(int lessonId, int studentId, byte status)
         {
+            if (status != 0 && status != 1 && status != 2)
+                throw new ArgumentException("Можно отметить только присутствие, опоздание или неявку");
+
             var lesson = await _db.Lessons.FindAsync(lessonId);
             if (lesson == null)
                 throw new KeyNotFoundException("Урок не найден");
@@ -39,6 +42,17 @@ namespace ClassBook.Application.Facades
 
             var existing = await _db.Attendances
                 .FirstOrDefaultAsync(a => a.LessonId == lessonId && a.StudentId == studentId);
+
+            if (status == 1)
+            {
+                if (existing != null)
+                {
+                    _db.Attendances.Remove(existing);
+                    await _db.SaveChangesAsync();
+                }
+
+                return;
+            }
 
             if (existing != null)
             {

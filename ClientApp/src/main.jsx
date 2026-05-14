@@ -1628,7 +1628,10 @@ function TeacherPage({ role, user }) {
   const [gradesByLesson, setGradesByLesson] = useState({});
   const [attendanceByLesson, setAttendanceByLesson] = useState({});
   const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedLessonId, setSelectedLessonId] = useState("");
+  const [journalDateFrom, setJournalDateFrom] = useState("");
+  const [journalDateTo, setJournalDateTo] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [lessonForm, setLessonForm] = useState({
@@ -1682,8 +1685,7 @@ function TeacherPage({ role, user }) {
 
     const selectedClassForLoad = classes.find((item) => String(item.classId ?? item.id) === String(selectedClassId));
     const lessonsToLoad = lessons
-      .filter((lesson) => String(lesson.classId ?? "") === String(selectedClassId) || lesson.className === selectedClassForLoad?.name)
-      .slice(0, 10);
+      .filter((lesson) => String(lesson.classId ?? "") === String(selectedClassId) || lesson.className === selectedClassForLoad?.name);
 
     if (lessonsToLoad.length === 0) {
       return;
@@ -1818,13 +1820,15 @@ function TeacherPage({ role, user }) {
       return;
     }
 
+    const normalizedStatus = status === "present" ? 1 : Number(status);
+
     try {
       await apiRequest("/teacher/attendance", {
         method: "POST",
         body: JSON.stringify({
           lessonId: Number(lessonId),
           studentId,
-          status: Number(status)
+          status: normalizedStatus
         })
       });
       await loadLessonMarks(lessonId);
@@ -1846,11 +1850,28 @@ function TeacherPage({ role, user }) {
     return String(lesson.classId ?? "") === String(selectedClassId)
       || lesson.className === selectedClass?.name;
   });
-  const journalLessons = selectedClassId ? classLessons.slice(0, 10) : [];
+  const classSubjectIds = new Set(classLessons.map((lesson) => String(lesson.subjectId ?? "")));
+  const availableJournalSubjects = subjects.filter((subject) => {
+    const subjectId = String(subject.subjectId ?? subject.id ?? "");
+    const assignedClassIds = subject.classIds ?? [];
+    return !selectedClassId
+      || assignedClassIds.some((classId) => String(classId) === String(selectedClassId))
+      || classSubjectIds.has(subjectId);
+  });
+  const journalLessons = selectedClassId ? classLessons
+    .filter((lesson) => !selectedSubjectId || String(lesson.subjectId ?? "") === String(selectedSubjectId))
+    .filter((lesson) => !selectedLessonId || String(lesson.lessonId) === String(selectedLessonId))
+    .filter((lesson) => !journalDateFrom || new Date(lesson.date) >= new Date(journalDateFrom))
+    .filter((lesson) => !journalDateTo || new Date(lesson.date) <= new Date(journalDateTo))
+    .sort((a, b) => new Date(a.date) - new Date(b.date)) : [];
   const allVisibleGrades = journalLessons.flatMap((lesson) => gradesByLesson[lesson.lessonId] ?? []);
   const allVisibleAttendance = journalLessons.flatMap((lesson) => attendanceByLesson[lesson.lessonId] ?? []);
   const classAverage = calculateAverage(allVisibleGrades.map((item) => item.value));
-  const presentCount = allVisibleAttendance.filter((item) => Number(item.status) === 1).length;
+  const absentCount = allVisibleAttendance.filter((item) => Number(item.status) === 0).length;
+  const lateCount = allVisibleAttendance.filter((item) => Number(item.status) === 2).length;
+  const presentCount = students.length && journalLessons.length
+    ? (students.length * journalLessons.length) - absentCount
+    : 0;
 
   return (
     <section className="page-stack">
@@ -1865,6 +1886,8 @@ function TeacherPage({ role, user }) {
         <MetricCard label="Учеников в классе" value={students.length} />
         <MetricCard label="Средняя оценка" value={formatNumber(classAverage)} />
         <MetricCard label="Присутствуют" value={presentCount} />
+        <MetricCard label="Не явились" value={absentCount} />
+        <MetricCard label="Опоздали" value={lateCount} />
       </div>
       <form className="inline-form lesson-form" onSubmit={createLesson}>
         <label className="field">
@@ -1898,6 +1921,7 @@ function TeacherPage({ role, user }) {
               <span>Класс</span>
               <select value={selectedClassId} onChange={(event) => {
                 setSelectedClassId(event.target.value);
+                setSelectedSubjectId("");
                 setSelectedLessonId("");
               }}>
                 <option value="">Все классы</option>
@@ -1907,16 +1931,37 @@ function TeacherPage({ role, user }) {
               </select>
             </label>
             <label className="field">
+              <span>Предмет</span>
+              <select value={selectedSubjectId} onChange={(event) => {
+                setSelectedSubjectId(event.target.value);
+                setSelectedLessonId("");
+              }} disabled={!selectedClassId}>
+                <option value="">Выберите предмет</option>
+                {availableJournalSubjects.map((subject) => (
+                  <option key={subject.subjectId ?? subject.id} value={subject.subjectId ?? subject.id}>{subject.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
               <span>Урок</span>
               <select value={selectedLessonId} onChange={(event) => loadLessonMarks(event.target.value)}>
-                <option value="">Выберите урок</option>
-                {classLessons.map((lesson) => (
+                <option value="">Все уроки предмета</option>
+                {classLessons
+                  .filter((lesson) => !selectedSubjectId || String(lesson.subjectId ?? "") === String(selectedSubjectId))
+                  .map((lesson) => (
                   <option key={lesson.lessonId} value={lesson.lessonId}>
                     {lesson.subjectName} · {lesson.topic} · {formatDate(lesson.date)}
                   </option>
                 ))}
               </select>
             </label>
+            <Field label="От" type="date" value={journalDateFrom} onChange={setJournalDateFrom} />
+            <Field label="До" type="date" value={journalDateTo} onChange={setJournalDateTo} />
+            <button className="ghost-button compact" type="button" onClick={() => {
+              setJournalDateFrom("");
+              setJournalDateTo("");
+              setSelectedLessonId("");
+            }}>Сбросить фильтр</button>
           </div>
         </section>
         <DataTable
@@ -1933,8 +1978,12 @@ function TeacherPage({ role, user }) {
       </div>
       <section className="table-card">
         <div className="table-title">Журнал класса</div>
-        {students.length === 0 || journalLessons.length === 0 ? (
+        {!selectedClassId ? (
           <p className="empty-text padded">Выберите класс, чтобы увидеть сетку журнала.</p>
+        ) : !selectedSubjectId ? (
+          <p className="empty-text padded">Выберите предмет, чтобы открыть журнал класса.</p>
+        ) : students.length === 0 || journalLessons.length === 0 ? (
+          <p className="empty-text padded">Нет уроков или учеников по выбранным фильтрам.</p>
         ) : (
           <div className="gradebook-wrap">
             <table className="gradebook-table">
@@ -1943,11 +1992,12 @@ function TeacherPage({ role, user }) {
                   <th className="student-sticky">ФИО ученика</th>
                   {journalLessons.map((lesson, index) => (
                     <th key={lesson.lessonId}>
-                      <span>{index + 1} урок</span>
-                      <small>{lesson.subjectName}</small>
+                      <span>{formatDate(lesson.date)}</span>
+                      <small>{lesson.topic}</small>
                     </th>
                   ))}
                   <th>Средняя</th>
+                  <th>Медиана</th>
                 </tr>
               </thead>
               <tbody>
@@ -1961,8 +2011,9 @@ function TeacherPage({ role, user }) {
                       {journalLessons.map((lesson) => {
                         const grades = (gradesByLesson[lesson.lessonId] ?? []).filter((grade) => grade.studentId === student.studentId);
                         const attendance = (attendanceByLesson[lesson.lessonId] ?? []).find((item) => item.studentId === student.studentId);
+                        const attendanceStatus = attendance?.status ?? 1;
                         return (
-                          <td key={`${student.studentId}-${lesson.lessonId}`} className="gradebook-cell">
+                          <td key={`${student.studentId}-${lesson.lessonId}`} className={`gradebook-cell ${attendanceClassName(attendanceStatus)}`}>
                             <div className="grade-stack">
                               {grades.map((grade) => (
                                 <button
@@ -1982,18 +2033,16 @@ function TeacherPage({ role, user }) {
                                 ))}
                               </select>
                             </div>
-                            <select className="attendance-select" value={attendance?.status ?? ""} onChange={(event) => saveAttendanceForLesson(lesson.lessonId, student.studentId, event.target.value)}>
-                              <option value="">—</option>
-                              <option value="1">П</option>
-                              <option value="0">Н</option>
-                              <option value="2">Б</option>
-                              <option value="3">Ув</option>
-                              <option value="4">Неуд</option>
+                            <select className="attendance-select" value={String(attendanceStatus)} onChange={(event) => saveAttendanceForLesson(lesson.lessonId, student.studentId, event.target.value)}>
+                              <option value="1">Присутствует</option>
+                              <option value="2">Опоздал</option>
+                              <option value="0">Не явился</option>
                             </select>
                           </td>
                         );
                       })}
                       <td>{studentGrades.length ? formatNumber(calculateAverage(studentGrades.map((grade) => grade.value))) : "—"}</td>
+                      <td>{studentGrades.length ? formatNumber(calculateMedian(studentGrades.map((grade) => grade.value))) : "—"}</td>
                     </tr>
                   );
                 })}
@@ -2767,6 +2816,18 @@ function calculateAverage(values) {
     : 0;
 }
 
+function calculateMedian(values) {
+  const numericValues = values.map(Number).filter(Number.isFinite).sort((left, right) => left - right);
+  if (numericValues.length === 0) {
+    return 0;
+  }
+
+  const middle = Math.floor(numericValues.length / 2);
+  return numericValues.length % 2
+    ? numericValues[middle]
+    : (numericValues[middle - 1] + numericValues[middle]) / 2;
+}
+
 function sortItems(items, sortKey, selectors) {
   const selector = selectors[sortKey] || Object.values(selectors)[0];
   return [...items].sort((left, right) =>
@@ -2822,22 +2883,27 @@ function attendanceLabel(status) {
   }
 
   if (numeric === 0) {
-    return "Н - пропуск";
+    return "Не явился";
   }
 
   if (numeric === 2) {
-    return "Б - болезнь";
+    return "Опоздал";
   }
 
-  if (numeric === 3) {
-    return "Ув - уважительная причина";
+  return "Присутствовал";
+}
+
+function attendanceClassName(status) {
+  const numeric = Number(status);
+  if (numeric === 0) {
+    return "attendance-absent";
   }
 
-  if (numeric === 4) {
-    return "Неуд - неуважительная причина";
+  if (numeric === 2) {
+    return "attendance-late";
   }
 
-  return "Не отмечено";
+  return "attendance-present";
 }
 
 function toIsoDate(date) {

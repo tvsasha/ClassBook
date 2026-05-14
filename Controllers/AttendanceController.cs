@@ -9,7 +9,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/teacher/attendance")]
-    [Authorize(Roles = "Учитель")]
+    [Authorize(Roles = "Учитель,Администратор")]
     public class AttendanceController : ApiControllerBase
     {
         private readonly AttendanceFacade _facade;
@@ -35,6 +35,10 @@ namespace ClassBook.Controllers
                 return NotFoundError(ex.Message);
             }
             catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (ArgumentException ex)
             {
                 return BadRequestError(ex.Message);
             }

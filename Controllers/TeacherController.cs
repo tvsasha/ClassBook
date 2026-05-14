@@ -231,6 +231,10 @@ namespace ClassBook.Controllers
             {
                 return BadRequestError(ex.Message);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
         }
 
         private int GetCurrentUserId()

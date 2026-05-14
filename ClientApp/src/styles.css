@@ -743,6 +743,18 @@ td {
   background: rgba(255, 255, 255, 0.58);
 }
 
+.gradebook-cell.attendance-present {
+  background: rgba(220, 252, 231, 0.7);
+}
+
+.gradebook-cell.attendance-absent {
+  background: rgba(254, 226, 226, 0.78);
+}
+
+.gradebook-cell.attendance-late {
+  background: rgba(254, 249, 195, 0.78);
+}
+
 .gradebook-cell .grade-stack {
   align-items: center;
   margin-bottom: 10px;
