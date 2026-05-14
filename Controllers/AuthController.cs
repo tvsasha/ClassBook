@@ -34,7 +34,7 @@ namespace ClassBook.Controllers
         {
             var user = await _authFacade.LoginAsync(dto.Login, dto.Password);
             if (user == null)
-                return UnauthorizedError("Неверный логин или пароль");
+                return UnauthorizedError("Не получилось войти. Проверьте логин и пароль.");
 
             var claims = new List<Claim>
             {

@@ -802,7 +802,7 @@ function AdminPage({ role }) {
   async function createSubject(event) {
     event.preventDefault();
     if (!subjectForm.name.trim() || !subjectForm.teacherId || !subjectForm.classId) {
-      setMessage("Укажите название предмета и выберите учителя");
+      setMessage("Укажите название предмета, учителя и класс");
       return;
     }
 
@@ -1241,15 +1241,98 @@ function AdminPage({ role }) {
               ))}
             </select>
           </label>
-          <button className="primary-button">Создать предмет</button>
+          <label className="field">
+            <span>Класс</span>
+            <select value={subjectForm.classId} onChange={(event) => setSubjectForm({ ...subjectForm, classId: event.target.value })}>
+              <option value="">Выберите класс</option>
+              {sortedClasses.map((item) => (
+                <option key={item.classId} value={item.classId}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <button className="primary-button">Создать и назначить</button>
         </form>
+        <form className="inline-form attach-form" onSubmit={assignSubjectToClass}>
+          <label className="field">
+            <span>Предмет</span>
+            <select value={subjectClassAssignmentForm.subjectId} onChange={(event) => setSubjectClassAssignmentForm({ ...subjectClassAssignmentForm, subjectId: event.target.value })}>
+              <option value="">Выберите предмет</option>
+              {subjects.map((item) => (
+                <option key={item.subjectId} value={item.subjectId}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Учитель</span>
+            <select value={subjectClassAssignmentForm.teacherId} onChange={(event) => setSubjectClassAssignmentForm({ ...subjectClassAssignmentForm, teacherId: event.target.value })}>
+              <option value="">Выберите учителя</option>
+              {teacherUsers.map((item) => (
+                <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Класс</span>
+            <select value={subjectClassAssignmentForm.classId} onChange={(event) => setSubjectClassAssignmentForm({ ...subjectClassAssignmentForm, classId: event.target.value })}>
+              <option value="">Выберите класс</option>
+              {sortedClasses.map((item) => (
+                <option key={item.classId} value={item.classId}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <button className="ghost-button">Добавить класс</button>
+        </form>
+        <div className="filter-panel">
+          <Field label="Поиск" value={subjectFilters.search} onChange={(value) => setSubjectFilters({ ...subjectFilters, search: value })} />
+          <label className="field">
+            <span>Учитель</span>
+            <select value={subjectFilters.teacherId} onChange={(event) => setSubjectFilters({ ...subjectFilters, teacherId: event.target.value })}>
+              <option value="">Все учителя</option>
+              {teacherUsers.map((item) => (
+                <option key={item.id} value={item.id}>{item.fullName}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Класс</span>
+            <select value={subjectFilters.classId} onChange={(event) => setSubjectFilters({ ...subjectFilters, classId: event.target.value })}>
+              <option value="">Все классы</option>
+              {sortedClasses.map((item) => (
+                <option key={item.classId} value={item.classId}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Сортировка</span>
+            <select value={subjectFilters.sort} onChange={(event) => setSubjectFilters({ ...subjectFilters, sort: event.target.value })}>
+              <option value="name">По предмету</option>
+              <option value="teacher">По учителю</option>
+              <option value="classes">По классу</option>
+            </select>
+          </label>
+        </div>
         <DataTable
-          title={`Предметы (${subjects.length})`}
+          title={`Предметы (${filteredSubjects.length})`}
           className="nested-table"
-          columns={["Предмет", "Учитель", "Действие"]}
-          rows={subjects.map((item) => [
+          columns={["Предмет", "Основной учитель", "Классы", "Действие"]}
+          rows={filteredSubjects.map((item) => [
             item.name,
             item.teacherName,
+            (item.classAssignments?.length ? (
+              <div className="row-actions" key={`assignments-${item.subjectId}`}>
+                {item.classAssignments.map((assignment) => (
+                  <button
+                    className="table-action"
+                    key={`${assignment.classId}-${assignment.teacherId}`}
+                    type="button"
+                    onClick={() => removeSubjectAssignment(item.subjectId, assignment.classId, assignment.teacherId)}
+                    title="Снять назначение"
+                  >
+                    {assignment.className} · {assignment.teacherName}
+                  </button>
+                ))}
+              </div>
+            ) : "Нет назначенных классов"),
             <div key={item.subjectId} style={{ display: "flex", gap: "8px" }}>
               <button className="table-action" type="button" onClick={() => setEditingSubject(item)}>Изменить</button>
               <button className="table-action" type="button" onClick={() => deleteSubject(item.subjectId)}>Удалить</button>

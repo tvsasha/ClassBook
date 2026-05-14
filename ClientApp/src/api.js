@@ -71,7 +71,7 @@ async function readErrorMessage(response) {
 
   try {
     const parsed = JSON.parse(text);
-    return parsed.message || parsed.title || text;
+    return parsed.message || parsed.error || parsed.title || text;
   } catch {
     return text;
   }
