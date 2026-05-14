@@ -1,10 +1,13 @@
 using System;
+using ClassBook.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace ClassBook.Migrations
 {
+    [DbContext(typeof(AppDbContext))]
     [Migration("20260514095000_AddSubjectClassAssignments")]
     public partial class AddSubjectClassAssignments : Migration
     {
