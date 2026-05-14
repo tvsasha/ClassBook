@@ -270,8 +270,11 @@ namespace ClassBook.Application.Facades
             var classKey = NormalizeClassName(className);
             var candidates = await _db.Students
                 .Include(s => s.Class)
-                .Where(s => s.BirthDate.Date == birthDate.Date && s.Class != null && s.Class.Name == classKey)
+                .Where(s => s.BirthDate.Date == birthDate.Date && s.Class != null)
                 .ToListAsync();
+            candidates = candidates
+                .Where(s => s.Class.Name == classKey || IsGenericClassMatch(s.Class.Name, classKey))
+                .ToList();
 
             if (candidates.Count == 1)
                 return candidates[0];
@@ -282,6 +285,16 @@ namespace ClassBook.Application.Facades
                 return normalizedChildName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .All(part => studentName.Contains(part, StringComparison.OrdinalIgnoreCase));
             });
+        }
+
+        private static bool IsGenericClassMatch(string actualClassName, string importedClassName)
+        {
+            var importedMatch = System.Text.RegularExpressions.Regex.Match(importedClassName, @"^\d+$");
+            if (!importedMatch.Success)
+                return false;
+
+            var actualMatch = System.Text.RegularExpressions.Regex.Match(NormalizeClassName(actualClassName), @"^(\d+)[А-ЯЁA-Z]?$");
+            return actualMatch.Success && actualMatch.Groups[1].Value == importedClassName;
         }
 
         private static List<List<string>> ExtractDocxRows(Stream docxStream)

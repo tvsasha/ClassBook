@@ -3,6 +3,7 @@ using ClassBook.Domain.Interfaces;
 using ClassBook.Infrastructure.Data;
 using ClassBook.Application.Facades;
 using ClassBook.Infrastructure.Security;
+using ClassBook.Domain.Entities;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
@@ -117,6 +118,8 @@ namespace ClassBook
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 db.Database.Migrate();
+                var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+                EnsureBootstrapAdmin(db, hasher);
             }
 
             if (args.Length >= 2 && args[0].Equals("import-roster", StringComparison.OrdinalIgnoreCase))
@@ -127,6 +130,11 @@ namespace ClassBook
                 var result = facade.ImportSchoolRosterDocxAsync(stream).GetAwaiter().GetResult();
 
                 Console.WriteLine($"Импорт завершен. Ученики: {result.Imported}, пропущено: {result.Skipped}, учителей создано: {result.TeachersCreated}, связей руководителей: {result.ClassTeacherLinksCreated}");
+                foreach (var error in result.Errors)
+                {
+                    Console.WriteLine($"Ошибка: {error}");
+                }
+
                 foreach (var teacher in result.Teachers.Where(t => t.Created))
                 {
                     Console.WriteLine($"Учитель: {teacher.FullName}; логин: {teacher.Login}; временный пароль: {teacher.TemporaryPassword}");
@@ -143,6 +151,11 @@ namespace ClassBook
                 var result = facade.ImportParentRosterDocxAsync(stream).GetAwaiter().GetResult();
 
                 Console.WriteLine($"Импорт родителей завершен. Создано: {result.ParentsCreated}, найдено: {result.ParentsFound}, привязок: {result.LinksCreated}, пропущено: {result.Skipped}, ошибок: {result.Errors.Count}");
+                foreach (var error in result.Errors)
+                {
+                    Console.WriteLine($"Ошибка: {error}");
+                }
+
                 foreach (var parent in result.Parents.Where(parent => parent.Created))
                 {
                     Console.WriteLine($"Родитель: {parent.FullName}; логин: {parent.Login}; временный пароль: {parent.TemporaryPassword}; дети: {string.Join(", ", parent.LinkedStudents)}");
@@ -189,6 +202,42 @@ namespace ClassBook
                 db.SaveChanges();
                 File.WriteAllText(args[1], csv.ToString(), new UTF8Encoding(true));
                 Console.WriteLine($"Сброшено доступов родителей: {parents.Count}. Файл: {args[1]}");
+                return;
+            }
+
+            if (args.Length >= 2 && args[0].Equals("reset-teacher-accesses", StringComparison.OrdinalIgnoreCase))
+            {
+                using var scope = app.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+                var teacherRole = db.Roles.FirstOrDefault(role => role.Name == "Учитель");
+                if (teacherRole == null)
+                {
+                    Console.WriteLine("Роль 'Учитель' не найдена");
+                    return;
+                }
+
+                var teachers = db.Users
+                    .Where(user => user.RoleId == teacherRole.Id)
+                    .OrderBy(user => user.FullName)
+                    .ToList();
+
+                var csv = new StringBuilder();
+                csv.AppendLine("ФИО;Логин;Временный пароль");
+                foreach (var teacher in teachers)
+                {
+                    var temporaryPassword = UserFacade.GenerateTemporaryPassword();
+                    teacher.PasswordHash = hasher.Hash(temporaryPassword);
+                    teacher.MustChangePassword = true;
+                    teacher.IsActive = true;
+                    csv.Append('"').Append(teacher.FullName.Replace("\"", "\"\"")).Append("\";")
+                        .Append('"').Append(teacher.Login.Replace("\"", "\"\"")).Append("\";")
+                        .Append('"').Append(temporaryPassword.Replace("\"", "\"\"")).AppendLine("\"");
+                }
+
+                db.SaveChanges();
+                File.WriteAllText(args[1], csv.ToString(), new UTF8Encoding(true));
+                Console.WriteLine($"Сброшено доступов учителей: {teachers.Count}. Файл: {args[1]}");
                 return;
             }
 
@@ -264,6 +313,65 @@ namespace ClassBook
             app.MapFallbackToFile("/app/{*path:nonfile}", "app/index.html");
 
             app.Run();
+        }
+
+        private static void EnsureBootstrapAdmin(AppDbContext db, IPasswordHasher hasher)
+        {
+            const string login = "1";
+            const string password = "1";
+            const string fullName = "Администратор";
+
+            var adminRole = db.Roles.First(role => role.Name == "Администратор");
+            var admin = db.Users.FirstOrDefault(user => user.Login == login);
+            if (admin == null)
+            {
+                db.Users.Add(new User
+                {
+                    Login = login,
+                    FullName = fullName,
+                    PasswordHash = hasher.Hash(password),
+                    RoleId = adminRole.Id,
+                    IsActive = true,
+                    MustChangePassword = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+                db.SaveChanges();
+                return;
+            }
+
+            var changed = false;
+            if (admin.RoleId != adminRole.Id)
+            {
+                admin.RoleId = adminRole.Id;
+                changed = true;
+            }
+
+            if (admin.FullName != fullName)
+            {
+                admin.FullName = fullName;
+                changed = true;
+            }
+
+            if (!admin.IsActive)
+            {
+                admin.IsActive = true;
+                changed = true;
+            }
+
+            if (admin.MustChangePassword)
+            {
+                admin.MustChangePassword = false;
+                changed = true;
+            }
+
+            if (!hasher.Verify(password, admin.PasswordHash))
+            {
+                admin.PasswordHash = hasher.Hash(password);
+                changed = true;
+            }
+
+            if (changed)
+                db.SaveChanges();
         }
     }
 }
