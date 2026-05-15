@@ -37,7 +37,9 @@ namespace ClassBook.Application.Facades
                     .CountAsync();
 
                 var gradesCount = lesson.Grades?.Count ?? 0;
-                var attendanceCount = lesson.Attendances?.Count ?? 0;
+                var explicitAttendanceCount = lesson.Attendances?.Count ?? 0;
+                var absentCount = lesson.Attendances?.Count(a => a.Status == 0) ?? 0;
+                var attendanceCount = studentsInClass > 0 ? studentsInClass : explicitAttendanceCount;
 
                 report.Add(new DailyCompletionLessonDto
                 {
@@ -50,7 +52,7 @@ namespace ClassBook.Application.Facades
                     AttendanceRecorded = attendanceCount,
                     TotalStudents = studentsInClass,
                     GradesPercentage = studentsInClass > 0 ? Math.Round((double)gradesCount / studentsInClass * 100, 2) : 0,
-                    AttendancePercentage = studentsInClass > 0 ? Math.Round((double)attendanceCount / studentsInClass * 100, 2) : 0
+                    AttendancePercentage = studentsInClass > 0 ? Math.Round((double)(studentsInClass - absentCount) / studentsInClass * 100, 2) : 0
                 });
             }
 
@@ -59,7 +61,7 @@ namespace ClassBook.Application.Facades
                 Date = date.Date,
                 TotalLessons = lessonsForDate.Count,
                 LessonsWithCompleteGrades = lessonsForDate.Count(l => (l.Grades?.Count ?? 0) > 0),
-                LessonsWithCompleteAttendance = lessonsForDate.Count(l => (l.Attendances?.Count ?? 0) > 0),
+                LessonsWithCompleteAttendance = lessonsForDate.Count,
                 Report = report
             };
         }
@@ -71,6 +73,11 @@ namespace ClassBook.Application.Facades
 
             foreach (var classItem in classes)
             {
+                var lessonsCount = await _db.Lessons
+                    .Where(l => l.ClassId == classItem.ClassId &&
+                               l.Date >= startDate && l.Date <= endDate)
+                    .CountAsync();
+
                 var attendanceRecords = await _db.Attendances
                     .Where(a => a.Student.ClassId == classItem.ClassId &&
                                a.Lesson.Date >= startDate && a.Lesson.Date <= endDate)
@@ -81,10 +88,10 @@ namespace ClassBook.Application.Facades
                 var totalStudents = await _db.Students
                     .CountAsync(s => s.ClassId == classItem.ClassId);
 
-                var presentCount = attendanceRecords.Count(a => a.Status == 1);
                 var absentCount = attendanceRecords.Count(a => a.Status == 0);
                 var excusedCount = attendanceRecords.Count(a => a.Status == 2);
-                var totalRecords = presentCount + absentCount + excusedCount;
+                var totalRecords = totalStudents * lessonsCount;
+                var presentCount = totalRecords > 0 ? totalRecords - absentCount : 0;
 
                 stats.Add(new AttendanceStatisticsItemDto
                 {
@@ -150,8 +157,8 @@ namespace ClassBook.Application.Facades
 
                 var avgGrade = grades.Count > 0 ? Math.Round((double)grades.Sum(g => g.Value) / grades.Count, 2) : 0;
                 var lowGradeCount = grades.Count(g => g.Value < 3);
-                var totalAttendance = student.Attendances
-                    ?.Count(a => a.Lesson.Date >= startDate && a.Lesson.Date <= endDate) ?? 0;
+                var totalAttendance = await _db.Lessons
+                    .CountAsync(l => l.ClassId == student.ClassId && l.Date >= startDate && l.Date <= endDate);
                 var absencePercentage = totalAttendance > 0
                     ? Math.Round((double)absences / totalAttendance * 100, 2)
                     : 0;
@@ -201,9 +208,15 @@ namespace ClassBook.Application.Facades
                 .ToListAsync();
 
             var lessonsWithCompleteGrades = lessons.Count(l => (l.Grades?.Count ?? 0) > 0);
-            var lessonsWithCompleteAttendance = lessons.Count(l => (l.Attendances?.Count ?? 0) > 0);
+            var lessonsWithCompleteAttendance = lessons.Count;
             var totalGradesEntered = lessons.Sum(l => l.Grades?.Count ?? 0);
-            var totalAttendanceRecorded = lessons.Sum(l => l.Attendances?.Count ?? 0);
+            var lessonClassIds = lessons.Select(l => l.ClassId).Distinct().ToList();
+            var classStudentCounts = await _db.Students
+                .Where(s => lessonClassIds.Contains(s.ClassId))
+                .GroupBy(s => s.ClassId)
+                .Select(g => new { ClassId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(item => item.ClassId, item => item.Count);
+            var totalAttendanceRecorded = lessons.Sum(l => classStudentCounts.GetValueOrDefault(l.ClassId));
 
             var subjectStats = lessons
                 .GroupBy(l => l.Subject.Name)
@@ -212,7 +225,7 @@ namespace ClassBook.Application.Facades
                     Subject = g.Key,
                     LessonCount = g.Count(),
                     GradesEntered = g.Sum(l => l.Grades?.Count ?? 0),
-                    AttendanceRecorded = g.Sum(l => l.Attendances?.Count ?? 0)
+                    AttendanceRecorded = g.Sum(l => classStudentCounts.GetValueOrDefault(l.ClassId))
                 })
                 .ToList();
 

@@ -590,12 +590,6 @@ namespace ClassBook.Application.Facades
 
         public async Task<List<PortalAttendanceEntryDto>> GetStudentAttendanceAsync(int studentId)
         {
-            var studentAddedDate = await _db.StudentParents
-                .Where(sp => sp.StudentId == studentId)
-                .OrderBy(sp => sp.CreatedAt)
-                .Select(sp => (DateTime?)sp.CreatedAt)
-                .FirstOrDefaultAsync();
-
             var student = await _db.Students
                 .FirstOrDefaultAsync(s => s.StudentId == studentId);
 
@@ -603,7 +597,7 @@ namespace ClassBook.Application.Facades
                 throw new KeyNotFoundException("Ученик не найден");
 
             var lessons = await _db.Lessons
-                .Where(l => l.ClassId == student.ClassId && (!studentAddedDate.HasValue || l.Date >= studentAddedDate.Value))
+                .Where(l => l.ClassId == student.ClassId)
                 .Include(l => l.Subject)
                 .OrderBy(l => l.Date)
                 .ToListAsync();
@@ -621,18 +615,20 @@ namespace ClassBook.Application.Facades
                     LessonId = lesson.LessonId,
                     AttendanceId = attendance?.AttendanceId,
                     Subject = lesson.Subject.Name,
-                    Status = attendance?.Status,
-                    StatusLabel = attendance == null
-                        ? "Не отмечено"
-                        : (attendance.Status == 1 ? "Присутствовал"
-                            : (attendance.Status == 0 ? "Отсутствовал"
-                                : (attendance.Status == 2 ? "Опоздание"
-                                    : "Отсутствовал по уважительной причине"))),
+                    Status = attendance?.Status ?? (byte)1,
+                    StatusLabel = AttendanceStatusLabel(attendance?.Status ?? (byte)1),
                     Date = lesson.Date,
                     Topic = lesson.Topic
                 };
             }).OrderByDescending(l => l.Date).ToList();
         }
+
+        private static string AttendanceStatusLabel(byte status) => status switch
+        {
+            0 => "Не явился",
+            2 => "Опоздал",
+            _ => "Присутствовал"
+        };
 
         /// <summary>
         /// Получает детальную информацию о связи ученик-родитель с полными данными

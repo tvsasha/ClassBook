@@ -732,24 +732,32 @@ namespace ClassBook.Application.Facades
         public async Task<List<PortalAttendanceEntryDto>> GetAttendanceForUserAsync(int userId)
         {
             var student = await GetCurrentStudentAsync(userId);
-            return await _db.Attendances
-                .Where(a => a.StudentId == student.StudentId)
-                .Include(a => a.Lesson)
-                .ThenInclude(l => l.Subject)
-                .OrderByDescending(a => a.Lesson.Date)
-                .Select(a => new PortalAttendanceEntryDto
-                {
-                    LessonId = a.LessonId,
-                    AttendanceId = a.AttendanceId,
-                    Subject = a.Lesson.Subject.Name,
-                    Status = a.Status,
-                    StatusLabel = a.Status == 1
-                        ? "Присутствовал"
-                        : (a.Status == 0 ? "Отсутствовал" : "Отсутствовал по уважительной причине"),
-                    Date = a.Lesson.Date,
-                    Topic = a.Lesson.Topic
-                })
+            var lessons = await _db.Lessons
+                .Where(l => l.ClassId == student.ClassId)
+                .Include(l => l.Subject)
+                .OrderByDescending(l => l.Date)
                 .ToListAsync();
+
+            var attendanceRecords = await _db.Attendances
+                .Where(a => a.StudentId == student.StudentId)
+                .ToListAsync();
+
+            return lessons.Select(lesson =>
+            {
+                var attendance = attendanceRecords.FirstOrDefault(a => a.LessonId == lesson.LessonId);
+                var status = attendance?.Status ?? (byte)1;
+
+                return new PortalAttendanceEntryDto
+                {
+                    LessonId = lesson.LessonId,
+                    AttendanceId = attendance?.AttendanceId,
+                    Subject = lesson.Subject.Name,
+                    Status = status,
+                    StatusLabel = AttendanceStatusLabel(status),
+                    Date = lesson.Date,
+                    Topic = lesson.Topic
+                };
+            }).ToList();
         }
 
         public async Task<PortalStudentInfoDto> GetClassInfoForUserAsync(int userId)
@@ -767,6 +775,13 @@ namespace ClassBook.Application.Facades
                 }
             };
         }
+
+        private static string AttendanceStatusLabel(byte status) => status switch
+        {
+            0 => "Не явился",
+            2 => "Опоздал",
+            _ => "Присутствовал"
+        };
 
         private static AdminStudentDto MapStudent(Student student, string? className)
         {

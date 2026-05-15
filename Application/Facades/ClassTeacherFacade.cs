@@ -106,7 +106,7 @@ namespace ClassBook.Application.Facades
                     LessonsCount = lessons.Count,
                     GradesCount = grades.Count,
                     AverageGrade = grades.Count > 0 ? Math.Round(grades.Average(g => g.Value), 2) : 0,
-                    AbsencesCount = attendance.Count(a => a.Status != 1),
+                    AbsencesCount = attendance.Count(a => a.Status == 0),
                     Subjects = lessons
                         .GroupBy(l => new { l.SubjectId, l.Subject.Name, TeacherName = l.Teacher.FullName })
                         .Select(group =>
@@ -122,7 +122,7 @@ namespace ClassBook.Application.Facades
                                 LessonsCount = subjectLessons.Count,
                                 GradesCount = subjectGrades.Count,
                                 AverageGrade = subjectGrades.Count > 0 ? Math.Round(subjectGrades.Average(g => g.Value), 2) : 0,
-                                AbsencesCount = subjectAttendance.Count(a => a.Status != 1)
+                                AbsencesCount = subjectAttendance.Count(a => a.Status == 0)
                             };
                         })
                         .OrderBy(item => item.SubjectName)
@@ -141,7 +141,7 @@ namespace ClassBook.Application.Facades
                                 FullName = $"{student.LastName} {student.FirstName}",
                                 GradesCount = studentGrades.Count,
                                 AverageGrade = studentGrades.Count > 0 ? Math.Round(studentGrades.Average(g => g.Value), 2) : 0,
-                                AbsencesCount = studentAttendance.Count(a => a.Status != 1)
+                                AbsencesCount = studentAttendance.Count(a => a.Status == 0)
                             };
                         })
                         .ToList()
