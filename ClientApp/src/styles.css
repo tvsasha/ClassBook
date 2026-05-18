@@ -755,6 +755,11 @@ td {
   background: rgba(254, 249, 195, 0.78);
 }
 
+.gradebook-cell.gradebook-cell-low-grade {
+  background: rgba(254, 226, 226, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(180, 35, 24, 0.22);
+}
+
 .gradebook-cell .grade-stack {
   align-items: center;
   margin-bottom: 10px;

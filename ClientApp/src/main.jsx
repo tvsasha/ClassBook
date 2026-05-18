@@ -2012,8 +2012,9 @@ function TeacherPage({ role, user }) {
                         const grades = (gradesByLesson[lesson.lessonId] ?? []).filter((grade) => grade.studentId === student.studentId);
                         const attendance = (attendanceByLesson[lesson.lessonId] ?? []).find((item) => item.studentId === student.studentId);
                         const attendanceStatus = attendance?.status ?? 1;
+                        const gradeCellClass = grades.some((grade) => Number(grade.value) === 2) ? "gradebook-cell-low-grade" : "";
                         return (
-                          <td key={`${student.studentId}-${lesson.lessonId}`} className={`gradebook-cell ${attendanceClassName(attendanceStatus)}`}>
+                          <td key={`${student.studentId}-${lesson.lessonId}`} className={`gradebook-cell ${attendanceClassName(attendanceStatus)} ${gradeCellClass}`}>
                             <div className="grade-stack">
                               {grades.map((grade) => (
                                 <button
@@ -2093,10 +2094,15 @@ function StudentPage({ role }) {
     return <AccessWarning title="Кабинет ученика доступен ученику и администратору" />;
   }
 
+  const studentName = info
+    ? `${info.lastName || ""} ${info.firstName || ""}`.trim() || "Ученик"
+    : "Ученик";
+  const studentClassName = info?.class?.name || info?.className || "класс не указан";
+
   return (
     <LearningPage
       title="Кабинет ученика"
-      subtitle={info ? `${info.name || "Ученик"} · ${info.className || "класс не указан"}` : "Учебная информация"}
+      subtitle={info ? `${studentName} · ${studentClassName}` : "Учебная информация"}
       description="Здесь собраны расписание, оценки, домашние задания и посещаемость текущего ученика."
       schedule={schedule}
       grades={grades}
