@@ -2271,6 +2271,7 @@ function SchedulePage({ role }) {
   const [selectedCell, setSelectedCell] = useState(null);
   const [draggedLesson, setDraggedLesson] = useState(null);
   const [dragOverCell, setDragOverCell] = useState(null);
+  const [copiedLesson, setCopiedLesson] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [className, setClassName] = useState("");
@@ -2370,6 +2371,151 @@ function SchedulePage({ role }) {
     }
   }
 
+  function canPlaceLessonInClass(lesson, targetClass) {
+    const subject = subjects.find((item) => Number(item.subjectId) === Number(lesson.subjectId));
+    const allowedClassIds = subject?.classIds ?? [];
+    return allowedClassIds.length === 0 || allowedClassIds.some((classId) => Number(classId) === Number(targetClass.classId));
+  }
+
+  function buildScheduleLessonPayload(lesson, targetClass, targetSlot) {
+    return {
+      classId: targetClass.classId,
+      subjectId: lesson.subjectId,
+      teacherId: lesson.teacherId,
+      scheduleId: targetSlot.scheduleId,
+      date: getLessonDateForSlot(weekStart, targetSlot),
+      homework: lesson.homework ?? ""
+    };
+  }
+
+  function validateLessonPlacement(lesson, targetClass, targetSlot) {
+    if (!lesson || !targetClass || !targetSlot) {
+      return "Не выбран урок или ячейка";
+    }
+
+    const targetKey = `${targetClass.classId}_${targetSlot.scheduleId}`;
+    if (lessonMap.get(targetKey)) {
+      return "В этой ячейке уже есть урок. Сначала освободите слот или удалите лишний урок.";
+    }
+
+    if (!canPlaceLessonInClass(lesson, targetClass)) {
+      return `Предмет "${lesson.subjectName}" не назначен классу ${targetClass.name}`;
+    }
+
+    return "";
+  }
+
+  async function moveScheduleLesson(lesson, targetClass, targetSlot) {
+    const sourceKey = `${lesson?.classId}_${lesson?.scheduleId}`;
+    const targetKey = `${targetClass?.classId}_${targetSlot?.scheduleId}`;
+    if (sourceKey === targetKey) {
+      return;
+    }
+
+    const validationMessage = validateLessonPlacement(lesson, targetClass, targetSlot);
+    if (validationMessage) {
+      setMessage(validationMessage);
+      return;
+    }
+
+    try {
+      await apiRequest(`/schedule/editor/lesson/${lesson.lessonId}`, {
+        method: "PUT",
+        body: JSON.stringify(buildScheduleLessonPayload(lesson, targetClass, targetSlot))
+      });
+      setSelectedCell(null);
+      setMessage(`Урок перенесен: ${targetClass.name}, ${dayName(targetSlot.dayOfWeek)}, ${targetSlot.lessonNumber} урок`);
+      await loadScheduleEditor();
+    } catch (error) {
+      setMessage(error.message || "Не удалось перенести урок");
+    }
+  }
+
+  function copyScheduleLesson(lesson) {
+    if (!lesson) {
+      return;
+    }
+
+    setCopiedLesson(lesson);
+    setMessage(`Скопирован урок: ${lesson.subjectName}, ${lesson.className}`);
+  }
+
+  async function pasteCopiedLesson(targetCell = selectedCell) {
+    if (!copiedLesson) {
+      setMessage("Сначала скопируйте урок");
+      return;
+    }
+
+    if (!targetCell) {
+      setMessage("Выберите свободную ячейку для вставки");
+      return;
+    }
+
+    const validationMessage = validateLessonPlacement(copiedLesson, targetCell.classItem, targetCell.slot);
+    if (validationMessage) {
+      setMessage(validationMessage);
+      return;
+    }
+
+    try {
+      await apiRequest("/schedule/editor/lesson", {
+        method: "POST",
+        body: JSON.stringify(buildScheduleLessonPayload(copiedLesson, targetCell.classItem, targetCell.slot))
+      });
+      setMessage(`Урок вставлен: ${targetCell.classItem.name}, ${dayName(targetCell.slot.dayOfWeek)}, ${targetCell.slot.lessonNumber} урок`);
+      setSelectedCell(null);
+      await loadScheduleEditor();
+    } catch (error) {
+      setMessage(error.message || "Не удалось вставить урок");
+    }
+  }
+
+  async function duplicateLessonToNextFreeSlot(lesson = selectedCell?.lesson) {
+    if (!lesson) {
+      return;
+    }
+
+    const currentClass = classes.find((item) => Number(item.classId) === Number(lesson.classId));
+    if (!currentClass) {
+      setMessage("Класс урока не найден");
+      return;
+    }
+
+    const orderedSlots = [...slots].sort((left, right) =>
+      left.dayOfWeek - right.dayOfWeek || left.lessonNumber - right.lessonNumber
+    );
+    const currentIndex = orderedSlots.findIndex((slot) => Number(slot.scheduleId) === Number(lesson.scheduleId));
+    const rotatedSlots = [...orderedSlots.slice(currentIndex + 1), ...orderedSlots.slice(0, Math.max(currentIndex, 0))];
+    const freeSlot = rotatedSlots.find((slot) => !lessonMap.get(`${currentClass.classId}_${slot.scheduleId}`));
+
+    if (!freeSlot) {
+      setMessage(`В классе ${currentClass.name} нет свободных слотов на этой неделе`);
+      return;
+    }
+
+    await pasteLessonIntoCell(lesson, currentClass, freeSlot, "Урок продублирован");
+  }
+
+  async function pasteLessonIntoCell(lesson, targetClass, targetSlot, successPrefix) {
+    const validationMessage = validateLessonPlacement(lesson, targetClass, targetSlot);
+    if (validationMessage) {
+      setMessage(validationMessage);
+      return;
+    }
+
+    try {
+      await apiRequest("/schedule/editor/lesson", {
+        method: "POST",
+        body: JSON.stringify(buildScheduleLessonPayload(lesson, targetClass, targetSlot))
+      });
+      setMessage(`${successPrefix}: ${targetClass.name}, ${dayName(targetSlot.dayOfWeek)}, ${targetSlot.lessonNumber} урок`);
+      setSelectedCell(null);
+      await loadScheduleEditor();
+    } catch (error) {
+      setMessage(error.message || "Не удалось создать копию урока");
+    }
+  }
+
   async function createClass(event) {
     event.preventDefault();
     if (!className.trim()) {
@@ -2457,21 +2603,26 @@ function SchedulePage({ role }) {
                         key={`${classItem.classId}-${slot.scheduleId}`}
                         onClick={() => editable && selectCell(classItem, slot, lesson)}
                         onDragOver={(event) => {
-                          if (!editable || !draggedLesson) {
+                          if (!editable) {
                             return;
                           }
 
                           event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
                           setDragOverCell(cellKey);
                         }}
                         onDragLeave={() => setDragOverCell((current) => current === cellKey ? null : current)}
                         onDrop={async (event) => {
                           event.preventDefault();
-                          const lessonToMove = draggedLesson;
+                          const draggedLessonId = event.dataTransfer.getData("text/plain");
+                          const lessonToMove = draggedLesson
+                            ?? (week.lessons ?? []).find((item) => String(item.lessonId) === String(draggedLessonId));
                           setDraggedLesson(null);
                           setDragOverCell(null);
                           if (editable && lessonToMove) {
                             await moveScheduleLesson(lessonToMove, classItem, slot);
+                          } else if (editable && copiedLesson && !lesson) {
+                            await pasteCopiedLesson({ classItem, slot, lesson: null });
                           }
                         }}
                       >
@@ -2535,8 +2686,18 @@ function SchedulePage({ role }) {
             <Field label="Домашнее задание / примечание" value={lessonForm.homework} onChange={(value) => setLessonForm({ ...lessonForm, homework: value })} />
             <button className="primary-button" disabled={!selectedCell}>Сохранить урок</button>
             {selectedCell?.lesson && (
-              <button className="danger-button" type="button" onClick={deleteScheduleLesson}>Удалить урок</button>
+              <>
+                <button className="ghost-button" type="button" onClick={() => copyScheduleLesson(selectedCell.lesson)}>Копировать урок</button>
+                <button className="ghost-button" type="button" onClick={() => duplicateLessonToNextFreeSlot(selectedCell.lesson)}>Дублировать в свободный слот</button>
+                <button className="danger-button" type="button" onClick={deleteScheduleLesson}>Удалить урок</button>
+              </>
             )}
+            {!selectedCell?.lesson && copiedLesson && (
+              <button className="ghost-button" type="button" disabled={!selectedCell} onClick={() => pasteCopiedLesson()}>
+                Вставить: {copiedLesson.subjectName}
+              </button>
+            )}
+            {copiedLesson && <small className="row-note">Скопировано: {copiedLesson.subjectName} · {copiedLesson.className}</small>}
           </form>
         )}
       </div>
@@ -2861,52 +3022,6 @@ function calculateMedian(values) {
   const numericValues = values.map(Number).filter(Number.isFinite).sort((left, right) => left - right);
   if (numericValues.length === 0) {
     return 0;
-  }
-
-  async function moveScheduleLesson(lesson, targetClass, targetSlot) {
-    if (!lesson || !targetClass || !targetSlot) {
-      return;
-    }
-
-    const sourceKey = `${lesson.classId}_${lesson.scheduleId}`;
-    const targetKey = `${targetClass.classId}_${targetSlot.scheduleId}`;
-    if (sourceKey === targetKey) {
-      return;
-    }
-
-    const targetLesson = lessonMap.get(targetKey);
-    if (targetLesson) {
-      setMessage("В этой ячейке уже есть урок. Сначала освободите слот или удалите лишний урок.");
-      return;
-    }
-
-    const subject = subjects.find((item) => Number(item.subjectId) === Number(lesson.subjectId));
-    const allowedClassIds = subject?.classIds ?? [];
-    if (allowedClassIds.length > 0 && !allowedClassIds.some((classId) => Number(classId) === Number(targetClass.classId))) {
-      setMessage(`Предмет "${lesson.subjectName}" не назначен классу ${targetClass.name}`);
-      return;
-    }
-
-    const payload = {
-      classId: targetClass.classId,
-      subjectId: lesson.subjectId,
-      teacherId: lesson.teacherId,
-      scheduleId: targetSlot.scheduleId,
-      date: getLessonDateForSlot(weekStart, targetSlot),
-      homework: lesson.homework ?? ""
-    };
-
-    try {
-      await apiRequest(`/schedule/editor/lesson/${lesson.lessonId}`, {
-        method: "PUT",
-        body: JSON.stringify(payload)
-      });
-      setSelectedCell(null);
-      setMessage(`Урок перенесен: ${targetClass.name}, ${dayName(targetSlot.dayOfWeek)}, ${targetSlot.lessonNumber} урок`);
-      await loadScheduleEditor();
-    } catch (error) {
-      setMessage(error.message || "Не удалось перенести урок");
-    }
   }
 
   const middle = Math.floor(numericValues.length / 2);
