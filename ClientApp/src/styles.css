@@ -1072,6 +1072,20 @@ td {
   box-shadow: inset 0 0 0 3px rgba(15, 124, 102, 0.46);
 }
 
+.schedule-cell.drag-target {
+  background: rgba(15, 124, 102, 0.16);
+  box-shadow: inset 0 0 0 3px rgba(15, 124, 102, 0.42);
+}
+
+.schedule-lesson-card {
+  min-height: 64px;
+  cursor: grab;
+}
+
+.schedule-lesson-card:active {
+  cursor: grabbing;
+}
+
 .schedule-cell strong,
 .schedule-cell span,
 .schedule-cell small {

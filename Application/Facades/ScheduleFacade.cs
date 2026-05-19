@@ -107,13 +107,25 @@ namespace ClassBook.Application.Facades
 
             var subjects = await _db.Subjects
                 .Include(s => s.Teacher)
+                .Include(s => s.ClassAssignments!)
+                .ThenInclude(assignment => assignment.Class)
                 .OrderBy(s => s.Name)
                 .Select(s => new ScheduleEditorSubjectDto
                 {
                     SubjectId = s.SubjectId,
                     Name = s.Name,
                     TeacherId = s.TeacherId,
-                    TeacherName = s.Teacher != null ? s.Teacher.FullName : "Не назначен"
+                    TeacherName = s.Teacher != null ? s.Teacher.FullName : "Не назначен",
+                    ClassIds = s.ClassAssignments != null
+                        ? s.ClassAssignments.Select(assignment => assignment.ClassId).Distinct().ToList()
+                        : new List<int>(),
+                    Classes = s.ClassAssignments != null
+                        ? string.Join(", ", s.ClassAssignments
+                            .Where(assignment => assignment.Class != null)
+                            .Select(assignment => assignment.Class!.Name)
+                            .Distinct()
+                            .OrderBy(name => name))
+                        : string.Empty
                 })
                 .ToListAsync();
 
@@ -421,6 +433,14 @@ namespace ClassBook.Application.Facades
 
             if (!await _db.Users.AnyAsync(u => u.Id == request.TeacherId && u.RoleId == SystemRoleIds.Teacher))
                 throw new InvalidOperationException("Преподаватель не найден");
+
+            var hasAssignment = await _db.SubjectClassAssignments.AnyAsync(assignment =>
+                assignment.SubjectId == request.SubjectId &&
+                assignment.ClassId == request.ClassId &&
+                assignment.TeacherId == request.TeacherId);
+
+            if (!hasAssignment)
+                throw new InvalidOperationException("Этот предмет с выбранным преподавателем не назначен выбранному классу");
         }
 
         private async Task EnsureDefaultScheduleSlotsAsync()

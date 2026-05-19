@@ -2269,6 +2269,8 @@ function SchedulePage({ role }) {
   const [week, setWeek] = useState({ lessons: [] });
   const [metadata, setMetadata] = useState(null);
   const [selectedCell, setSelectedCell] = useState(null);
+  const [draggedLesson, setDraggedLesson] = useState(null);
+  const [dragOverCell, setDragOverCell] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [className, setClassName] = useState("");
@@ -2447,18 +2449,51 @@ function SchedulePage({ role }) {
                     const lesson = lessonMap.get(`${classItem.classId}_${slot.scheduleId}`) ?? null;
                     const selected = selectedCell?.classItem.classId === classItem.classId
                       && selectedCell?.slot.scheduleId === slot.scheduleId;
+                    const cellKey = `${classItem.classId}_${slot.scheduleId}`;
+                    const dragTarget = dragOverCell === cellKey;
                     return (
                       <td
-                        className={`schedule-cell ${lesson ? "has-lesson" : "empty"} ${selected ? "selected" : ""}`}
+                        className={`schedule-cell ${lesson ? "has-lesson" : "empty"} ${selected ? "selected" : ""} ${dragTarget ? "drag-target" : ""}`}
                         key={`${classItem.classId}-${slot.scheduleId}`}
                         onClick={() => editable && selectCell(classItem, slot, lesson)}
+                        onDragOver={(event) => {
+                          if (!editable || !draggedLesson) {
+                            return;
+                          }
+
+                          event.preventDefault();
+                          setDragOverCell(cellKey);
+                        }}
+                        onDragLeave={() => setDragOverCell((current) => current === cellKey ? null : current)}
+                        onDrop={async (event) => {
+                          event.preventDefault();
+                          const lessonToMove = draggedLesson;
+                          setDraggedLesson(null);
+                          setDragOverCell(null);
+                          if (editable && lessonToMove) {
+                            await moveScheduleLesson(lessonToMove, classItem, slot);
+                          }
+                        }}
                       >
                         {lesson ? (
-                          <>
+                          <div
+                            className="schedule-lesson-card"
+                            draggable={editable}
+                            onDragStart={(event) => {
+                              event.stopPropagation();
+                              setDraggedLesson(lesson);
+                              event.dataTransfer.effectAllowed = "move";
+                              event.dataTransfer.setData("text/plain", String(lesson.lessonId));
+                            }}
+                            onDragEnd={() => {
+                              setDraggedLesson(null);
+                              setDragOverCell(null);
+                            }}
+                          >
                             <strong>{lesson.subjectName}</strong>
                             <span>{lesson.teacherName}</span>
                             {lesson.homework && <small>ДЗ: {lesson.homework}</small>}
-                          </>
+                          </div>
                         ) : "Свободно"}
                       </td>
                     );
@@ -2826,6 +2861,52 @@ function calculateMedian(values) {
   const numericValues = values.map(Number).filter(Number.isFinite).sort((left, right) => left - right);
   if (numericValues.length === 0) {
     return 0;
+  }
+
+  async function moveScheduleLesson(lesson, targetClass, targetSlot) {
+    if (!lesson || !targetClass || !targetSlot) {
+      return;
+    }
+
+    const sourceKey = `${lesson.classId}_${lesson.scheduleId}`;
+    const targetKey = `${targetClass.classId}_${targetSlot.scheduleId}`;
+    if (sourceKey === targetKey) {
+      return;
+    }
+
+    const targetLesson = lessonMap.get(targetKey);
+    if (targetLesson) {
+      setMessage("В этой ячейке уже есть урок. Сначала освободите слот или удалите лишний урок.");
+      return;
+    }
+
+    const subject = subjects.find((item) => Number(item.subjectId) === Number(lesson.subjectId));
+    const allowedClassIds = subject?.classIds ?? [];
+    if (allowedClassIds.length > 0 && !allowedClassIds.some((classId) => Number(classId) === Number(targetClass.classId))) {
+      setMessage(`Предмет "${lesson.subjectName}" не назначен классу ${targetClass.name}`);
+      return;
+    }
+
+    const payload = {
+      classId: targetClass.classId,
+      subjectId: lesson.subjectId,
+      teacherId: lesson.teacherId,
+      scheduleId: targetSlot.scheduleId,
+      date: getLessonDateForSlot(weekStart, targetSlot),
+      homework: lesson.homework ?? ""
+    };
+
+    try {
+      await apiRequest(`/schedule/editor/lesson/${lesson.lessonId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      });
+      setSelectedCell(null);
+      setMessage(`Урок перенесен: ${targetClass.name}, ${dayName(targetSlot.dayOfWeek)}, ${targetSlot.lessonNumber} урок`);
+      await loadScheduleEditor();
+    } catch (error) {
+      setMessage(error.message || "Не удалось перенести урок");
+    }
   }
 
   const middle = Math.floor(numericValues.length / 2);
