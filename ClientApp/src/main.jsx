@@ -2646,8 +2646,9 @@ function SchedulePage({ role }) {
         return;
       }
 
-      const key = event.key.toLowerCase();
-      if ((event.ctrlKey || event.metaKey) && key === "c") {
+      const isCopyShortcut = (event.ctrlKey || event.metaKey) && event.code === "KeyC";
+      const isPasteShortcut = (event.ctrlKey || event.metaKey) && event.code === "KeyV";
+      if (isCopyShortcut) {
         if (selectedCell?.lesson) {
           event.preventDefault();
           copyScheduleLesson(selectedCell.lesson);
@@ -2655,7 +2656,7 @@ function SchedulePage({ role }) {
         return;
       }
 
-      if ((event.ctrlKey || event.metaKey) && key === "v") {
+      if (isPasteShortcut) {
         if (selectedCell && !selectedCell.lesson && copiedLesson) {
           event.preventDefault();
           pasteCopiedLesson(selectedCell);
