@@ -1115,6 +1115,10 @@ td {
 
 .schedule-context-menu button {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
   padding: 10px 12px;
   border: 0;
   border-radius: 8px;
@@ -1123,6 +1127,16 @@ td {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.schedule-context-menu button span {
+  padding: 0;
+}
+
+.schedule-context-menu kbd {
+  color: rgba(87, 101, 112, 0.48);
+  font: 0.76rem/1.1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
 }
 
 .schedule-context-menu button:hover {

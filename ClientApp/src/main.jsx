@@ -2860,14 +2860,21 @@ function SchedulePage({ role }) {
             <small>{scheduleMenu.classItem.name}, {dayName(scheduleMenu.slot.dayOfWeek)}, {scheduleMenu.slot.lessonNumber} урок</small>
             {scheduleMenu.lesson && (
               <>
-                <button type="button" onClick={() => copyScheduleLesson(scheduleMenu.lesson)}>Копировать Ctrl+C</button>
+                <button type="button" onClick={() => copyScheduleLesson(scheduleMenu.lesson)}>
+                  <span>Копировать</span>
+                  <kbd>Ctrl+C</kbd>
+                </button>
                 <button type="button" onClick={() => duplicateLessonToNextFreeSlot(scheduleMenu.lesson)}>Дублировать</button>
-                <button type="button" className="danger-menu-item" onClick={() => deleteScheduleLesson(scheduleMenu.lesson)}>Удалить Del</button>
+                <button type="button" className="danger-menu-item" onClick={() => deleteScheduleLesson(scheduleMenu.lesson)}>
+                  <span>Удалить</span>
+                  <kbd>Del</kbd>
+                </button>
               </>
             )}
             {!scheduleMenu.lesson && copiedLesson && (
               <button type="button" onClick={() => pasteCopiedLesson({ classItem: scheduleMenu.classItem, slot: scheduleMenu.slot, lesson: null })}>
-                Вставить Ctrl+V
+                <span>Вставить</span>
+                <kbd>Ctrl+V</kbd>
               </button>
             )}
             {!scheduleMenu.lesson && !copiedLesson && <span>Скопируйте урок, чтобы вставить его сюда</span>}
