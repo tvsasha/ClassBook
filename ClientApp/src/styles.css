@@ -1024,6 +1024,7 @@ td {
 }
 
 .schedule-editor {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
@@ -1087,7 +1088,7 @@ td {
 }
 
 .schedule-context-menu {
-  position: fixed;
+  position: absolute;
   z-index: 80;
   display: grid;
   min-width: 220px;

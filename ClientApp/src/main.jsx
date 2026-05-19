@@ -2376,11 +2376,16 @@ function SchedulePage({ role }) {
     event.preventDefault();
     event.stopPropagation();
     selectCell(classItem, slot, lesson);
+    const editorRect = event.currentTarget.closest(".schedule-editor")?.getBoundingClientRect();
     const menuWidth = 280;
     const menuHeight = 220;
+    const relativeX = editorRect ? event.clientX - editorRect.left : event.clientX;
+    const relativeY = editorRect ? event.clientY - editorRect.top : event.clientY;
+    const maxX = editorRect ? editorRect.width - menuWidth - 12 : window.innerWidth - menuWidth - 12;
+    const maxY = editorRect ? editorRect.height - menuHeight - 12 : window.innerHeight - menuHeight - 12;
     setScheduleMenu({
-      x: Math.max(12, Math.min(event.clientX, window.innerWidth - menuWidth - 12)),
-      y: Math.max(12, Math.min(event.clientY, window.innerHeight - menuHeight - 12)),
+      x: Math.max(12, Math.min(relativeX, maxX)),
+      y: Math.max(12, Math.min(relativeY, maxY)),
       classItem,
       slot,
       lesson
