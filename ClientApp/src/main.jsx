@@ -2272,6 +2272,7 @@ function SchedulePage({ role }) {
   const [draggedLesson, setDraggedLesson] = useState(null);
   const [dragOverCell, setDragOverCell] = useState(null);
   const [copiedLesson, setCopiedLesson] = useState(null);
+  const [scheduleMenu, setScheduleMenu] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [className, setClassName] = useState("");
@@ -2307,6 +2308,7 @@ function SchedulePage({ role }) {
   }, [allowed, weekStart]);
 
   function selectCell(classItem, slot, lesson) {
+    setScheduleMenu(null);
     setSelectedCell({ classItem, slot, lesson });
     const subjectId = lesson?.subjectId ?? "";
     const teacherId = lesson?.teacherId
@@ -2316,6 +2318,72 @@ function SchedulePage({ role }) {
       subjectId,
       teacherId,
       homework: lesson?.homework ?? ""
+    });
+  }
+
+  function updateWeekLessons(updater) {
+    setWeek((current) => ({
+      ...current,
+      lessons: updater(current.lessons ?? [])
+    }));
+  }
+
+  function replaceWeekLesson(lessonId, nextLesson) {
+    updateWeekLessons((lessons) => lessons.map((lesson) =>
+      String(lesson.lessonId) === String(lessonId) ? nextLesson : lesson
+    ));
+  }
+
+  function removeWeekLesson(lessonId) {
+    updateWeekLessons((lessons) => lessons.filter((lesson) => String(lesson.lessonId) !== String(lessonId)));
+  }
+
+  function makeScheduleLesson(lesson, targetClass, targetSlot, payload = null) {
+    const subjectId = payload?.subjectId ?? lesson.subjectId;
+    const teacherId = payload?.teacherId ?? lesson.teacherId;
+    const subject = subjects.find((item) => Number(item.subjectId) === Number(subjectId));
+    const teacher = teachers.find((item) => Number(item.id) === Number(teacherId));
+    return {
+      ...lesson,
+      classId: targetClass.classId,
+      className: targetClass.name,
+      subjectId,
+      subjectName: subject?.name ?? lesson.subjectName,
+      teacherId,
+      teacherName: teacher?.fullName ?? lesson.teacherName,
+      scheduleId: targetSlot.scheduleId,
+      dayOfWeek: targetSlot.dayOfWeek,
+      lessonNumber: targetSlot.lessonNumber,
+      startTime: targetSlot.startTime,
+      endTime: targetSlot.endTime,
+      date: payload?.date ?? getLessonDateForSlot(weekStart, targetSlot),
+      homework: payload?.homework ?? lesson.homework ?? ""
+    };
+  }
+
+  function makeTempLesson(lesson, targetClass, targetSlot, payload = null) {
+    return makeScheduleLesson({
+      ...lesson,
+      lessonId: `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    }, targetClass, targetSlot, payload);
+  }
+
+  function openScheduleMenu(event, classItem, slot, lesson) {
+    if (!editable) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    selectCell(classItem, slot, lesson);
+    const menuWidth = 280;
+    const menuHeight = 220;
+    setScheduleMenu({
+      x: Math.max(12, Math.min(event.clientX, window.innerWidth - menuWidth - 12)),
+      y: Math.max(12, Math.min(event.clientY, window.innerHeight - menuHeight - 12)),
+      classItem,
+      slot,
+      lesson
     });
   }
 
@@ -2337,36 +2405,47 @@ function SchedulePage({ role }) {
 
     try {
       if (selectedCell.lesson) {
-        await apiRequest(`/schedule/editor/lesson/${selectedCell.lesson.lessonId}`, {
+        const lessonId = selectedCell.lesson.lessonId;
+        const optimisticLesson = makeScheduleLesson(selectedCell.lesson, selectedCell.classItem, selectedCell.slot, payload);
+        replaceWeekLesson(lessonId, optimisticLesson);
+        setSelectedCell(null);
+        const savedLesson = await apiRequest(`/schedule/editor/lesson/${lessonId}`, {
           method: "PUT",
           body: JSON.stringify(payload)
         });
+        replaceWeekLesson(lessonId, savedLesson ?? optimisticLesson);
         setMessage("Урок обновлен");
       } else {
-        await apiRequest("/schedule/editor/lesson", {
+        const optimisticLesson = makeTempLesson({}, selectedCell.classItem, selectedCell.slot, payload);
+        updateWeekLessons((lessons) => [...lessons, optimisticLesson]);
+        setSelectedCell(null);
+        const savedLesson = await apiRequest("/schedule/editor/lesson", {
           method: "POST",
           body: JSON.stringify(payload)
         });
+        replaceWeekLesson(optimisticLesson.lessonId, savedLesson ?? optimisticLesson);
         setMessage("Урок добавлен в сетку");
       }
-      setSelectedCell(null);
-      await loadScheduleEditor();
     } catch (error) {
+      await loadScheduleEditor();
       setMessage(error.message || "Не удалось сохранить урок");
     }
   }
 
-  async function deleteScheduleLesson() {
-    if (!selectedCell?.lesson) {
+  async function deleteScheduleLesson(lesson = selectedCell?.lesson) {
+    if (!lesson) {
       return;
     }
 
+    const removedLesson = lesson;
+    removeWeekLesson(lesson.lessonId);
+    setSelectedCell(null);
+    setScheduleMenu(null);
     try {
-      await apiRequest(`/schedule/editor/lesson/${selectedCell.lesson.lessonId}`, { method: "DELETE" });
+      await apiRequest(`/schedule/editor/lesson/${lesson.lessonId}`, { method: "DELETE" });
       setMessage("Урок удален из сетки");
-      setSelectedCell(null);
-      await loadScheduleEditor();
     } catch (error) {
+      updateWeekLessons((lessons) => [...lessons, removedLesson]);
       setMessage(error.message || "Не удалось удалить урок");
     }
   }
@@ -2418,15 +2497,19 @@ function SchedulePage({ role }) {
       return;
     }
 
+    const optimisticLesson = makeScheduleLesson(lesson, targetClass, targetSlot);
+    replaceWeekLesson(lesson.lessonId, optimisticLesson);
+    setSelectedCell(null);
+    setScheduleMenu(null);
     try {
-      await apiRequest(`/schedule/editor/lesson/${lesson.lessonId}`, {
+      const savedLesson = await apiRequest(`/schedule/editor/lesson/${lesson.lessonId}`, {
         method: "PUT",
         body: JSON.stringify(buildScheduleLessonPayload(lesson, targetClass, targetSlot))
       });
-      setSelectedCell(null);
+      replaceWeekLesson(lesson.lessonId, savedLesson ?? optimisticLesson);
       setMessage(`Урок перенесен: ${targetClass.name}, ${dayName(targetSlot.dayOfWeek)}, ${targetSlot.lessonNumber} урок`);
-      await loadScheduleEditor();
     } catch (error) {
+      replaceWeekLesson(lesson.lessonId, lesson);
       setMessage(error.message || "Не удалось перенести урок");
     }
   }
@@ -2437,6 +2520,7 @@ function SchedulePage({ role }) {
     }
 
     setCopiedLesson(lesson);
+    setScheduleMenu(null);
     setMessage(`Скопирован урок: ${lesson.subjectName}, ${lesson.className}`);
   }
 
@@ -2457,15 +2541,19 @@ function SchedulePage({ role }) {
       return;
     }
 
+    const optimisticLesson = makeTempLesson(copiedLesson, targetCell.classItem, targetCell.slot);
+    updateWeekLessons((lessons) => [...lessons, optimisticLesson]);
+    setSelectedCell(null);
+    setScheduleMenu(null);
     try {
-      await apiRequest("/schedule/editor/lesson", {
+      const savedLesson = await apiRequest("/schedule/editor/lesson", {
         method: "POST",
         body: JSON.stringify(buildScheduleLessonPayload(copiedLesson, targetCell.classItem, targetCell.slot))
       });
+      replaceWeekLesson(optimisticLesson.lessonId, savedLesson ?? optimisticLesson);
       setMessage(`Урок вставлен: ${targetCell.classItem.name}, ${dayName(targetCell.slot.dayOfWeek)}, ${targetCell.slot.lessonNumber} урок`);
-      setSelectedCell(null);
-      await loadScheduleEditor();
     } catch (error) {
+      removeWeekLesson(optimisticLesson.lessonId);
       setMessage(error.message || "Не удалось вставить урок");
     }
   }
@@ -2503,15 +2591,19 @@ function SchedulePage({ role }) {
       return;
     }
 
+    const optimisticLesson = makeTempLesson(lesson, targetClass, targetSlot);
+    updateWeekLessons((lessons) => [...lessons, optimisticLesson]);
+    setSelectedCell(null);
+    setScheduleMenu(null);
     try {
-      await apiRequest("/schedule/editor/lesson", {
+      const savedLesson = await apiRequest("/schedule/editor/lesson", {
         method: "POST",
         body: JSON.stringify(buildScheduleLessonPayload(lesson, targetClass, targetSlot))
       });
+      replaceWeekLesson(optimisticLesson.lessonId, savedLesson ?? optimisticLesson);
       setMessage(`${successPrefix}: ${targetClass.name}, ${dayName(targetSlot.dayOfWeek)}, ${targetSlot.lessonNumber} урок`);
-      setSelectedCell(null);
-      await loadScheduleEditor();
     } catch (error) {
+      removeWeekLesson(optimisticLesson.lessonId);
       setMessage(error.message || "Не удалось создать копию урока");
     }
   }
@@ -2534,6 +2626,58 @@ function SchedulePage({ role }) {
       setMessage(error.message || "Не удалось создать класс");
     }
   }
+
+  useEffect(() => {
+    if (!editable) {
+      return undefined;
+    }
+
+    const closeMenu = () => setScheduleMenu(null);
+    const handleKeyDown = (event) => {
+      const target = event.target;
+      const tagName = target?.tagName?.toLowerCase();
+      const isTyping = target?.isContentEditable || ["input", "select", "textarea"].includes(tagName);
+      if (isTyping) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && key === "c") {
+        if (selectedCell?.lesson) {
+          event.preventDefault();
+          copyScheduleLesson(selectedCell.lesson);
+        }
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && key === "v") {
+        if (selectedCell && !selectedCell.lesson && copiedLesson) {
+          event.preventDefault();
+          pasteCopiedLesson(selectedCell);
+        }
+        return;
+      }
+
+      if (event.key === "Delete" && selectedCell?.lesson) {
+        event.preventDefault();
+        deleteScheduleLesson(selectedCell.lesson);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setScheduleMenu(null);
+      }
+    };
+
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [editable, selectedCell, copiedLesson, week.lessons, metadata]);
 
   if (!allowed) {
     return <AccessWarning title="Расписание доступно менеджеру расписания, директору и администратору" />;
@@ -2602,6 +2746,7 @@ function SchedulePage({ role }) {
                         className={`schedule-cell ${lesson ? "has-lesson" : "empty"} ${selected ? "selected" : ""} ${dragTarget ? "drag-target" : ""}`}
                         key={`${classItem.classId}-${slot.scheduleId}`}
                         onClick={() => editable && selectCell(classItem, slot, lesson)}
+                        onContextMenu={(event) => openScheduleMenu(event, classItem, slot, lesson)}
                         onDragOver={(event) => {
                           if (!editable) {
                             return;
@@ -2699,6 +2844,29 @@ function SchedulePage({ role }) {
             )}
             {copiedLesson && <small className="row-note">Скопировано: {copiedLesson.subjectName} · {copiedLesson.className}</small>}
           </form>
+        )}
+        {editable && scheduleMenu && (
+          <div
+            className="schedule-context-menu"
+            style={{ left: scheduleMenu.x, top: scheduleMenu.y }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <strong>{scheduleMenu.lesson ? scheduleMenu.lesson.subjectName : "Свободная ячейка"}</strong>
+            <small>{scheduleMenu.classItem.name}, {dayName(scheduleMenu.slot.dayOfWeek)}, {scheduleMenu.slot.lessonNumber} урок</small>
+            {scheduleMenu.lesson && (
+              <>
+                <button type="button" onClick={() => copyScheduleLesson(scheduleMenu.lesson)}>Копировать Ctrl+C</button>
+                <button type="button" onClick={() => duplicateLessonToNextFreeSlot(scheduleMenu.lesson)}>Дублировать</button>
+                <button type="button" className="danger-menu-item" onClick={() => deleteScheduleLesson(scheduleMenu.lesson)}>Удалить Del</button>
+              </>
+            )}
+            {!scheduleMenu.lesson && copiedLesson && (
+              <button type="button" onClick={() => pasteCopiedLesson({ classItem: scheduleMenu.classItem, slot: scheduleMenu.slot, lesson: null })}>
+                Вставить Ctrl+V
+              </button>
+            )}
+            {!scheduleMenu.lesson && !copiedLesson && <span>Скопируйте урок, чтобы вставить его сюда</span>}
+          </div>
         )}
       </div>
     </section>

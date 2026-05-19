@@ -1086,6 +1086,56 @@ td {
   cursor: grabbing;
 }
 
+.schedule-context-menu {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  min-width: 220px;
+  max-width: min(280px, calc(100vw - 24px));
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(24, 32, 38, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 48px rgba(24, 32, 38, 0.18);
+}
+
+.schedule-context-menu strong,
+.schedule-context-menu small,
+.schedule-context-menu span {
+  padding: 0 4px;
+}
+
+.schedule-context-menu small,
+.schedule-context-menu span {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.schedule-context-menu button {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-context-menu button:hover {
+  background: rgba(15, 124, 102, 0.1);
+}
+
+.schedule-context-menu .danger-menu-item {
+  color: #b22222;
+}
+
+.schedule-context-menu .danger-menu-item:hover {
+  background: rgba(178, 34, 34, 0.1);
+}
+
 .schedule-cell strong,
 .schedule-cell span,
 .schedule-cell small {
