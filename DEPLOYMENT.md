@@ -72,7 +72,7 @@ docker exec classbook-sqlserver /opt/mssql-tools18/bin/sqlcmd \
   -Q "BACKUP DATABASE [ClassBookDb] TO DISK = N'/var/opt/mssql/backup/ClassBookDb.bak' WITH INIT"
 ```
 
-Перед этим создайте папку для backup внутри контейнера или добавьте отдельный volume под `/var/opt/mssql/backup`.
+В `docker-compose.yml` уже добавлен отдельный volume под `/var/opt/mssql/backup`.
 
 ## Важные замечания
 
