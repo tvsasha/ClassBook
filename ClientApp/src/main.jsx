@@ -3051,9 +3051,9 @@ function SchedulePage({ role }) {
           <table className="schedule-grid-table">
             <thead>
               <tr>
-                <th>День</th>
-                <th>Время</th>
-                <th>№</th>
+                <th className="schedule-day-head">День</th>
+                <th className="schedule-time-head">Время</th>
+                <th className="schedule-number-head">№</th>
                 {classes.map((classItem) => (
                   <th key={classItem.classId}>{classItem.name}</th>
                 ))}
@@ -3062,9 +3062,9 @@ function SchedulePage({ role }) {
             <tbody>
               {groupSlotsByDay(slots).map(({ day, daySlots }) => daySlots.map((slot, slotIndex) => (
                 <tr key={`${day}-${slot.scheduleId}`}>
-                  {slotIndex === 0 && <td rowSpan={daySlots.length} className="day-cell">{dayName(day)}</td>}
-                  <td>{slot.startTime} - {slot.endTime}</td>
-                  <td>{slot.lessonNumber}</td>
+                  {slotIndex === 0 && <td rowSpan={daySlots.length} className="day-cell schedule-day-col">{dayName(day)}</td>}
+                  <td className="schedule-time-col">{slot.startTime} - {slot.endTime}</td>
+                  <td className="schedule-number-col">{slot.lessonNumber}</td>
                   {classes.map((classItem) => {
                     const lesson = lessonMap.get(`${classItem.classId}_${slot.scheduleId}`) ?? null;
                     const selected = selectedCell?.classItem.classId === classItem.classId
