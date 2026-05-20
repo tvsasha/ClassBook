@@ -654,6 +654,167 @@ td {
   margin: 0;
 }
 
+.learning-week-card,
+.attendance-week-card {
+  overflow: hidden;
+}
+
+.learning-week-title {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.learning-week-title strong,
+.learning-week-title span {
+  display: block;
+}
+
+.learning-week-title span {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.learning-week-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.learning-week-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(160px, 1fr));
+  gap: 1px;
+  background: rgba(24, 32, 38, 0.08);
+  overflow-x: auto;
+}
+
+.learning-day-column {
+  min-width: 168px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.learning-day-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px;
+  border-bottom: 1px solid rgba(24, 32, 38, 0.08);
+  background: rgba(249, 251, 248, 0.96);
+}
+
+.learning-day-heading strong,
+.learning-day-heading span {
+  display: block;
+}
+
+.learning-day-heading span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.learning-day-lessons {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.learning-lesson-card {
+  display: grid;
+  gap: 7px;
+  min-height: 132px;
+  padding: 12px;
+  border: 1px solid rgba(24, 32, 38, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.learning-lesson-card.attendance-present {
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
+.learning-lesson-card.attendance-absent {
+  border-color: rgba(180, 35, 24, 0.28);
+  background: rgba(254, 226, 226, 0.72);
+}
+
+.learning-lesson-card.attendance-late {
+  border-color: rgba(146, 92, 0, 0.26);
+  background: rgba(254, 249, 195, 0.72);
+}
+
+.learning-lesson-card strong,
+.learning-lesson-card small,
+.learning-lesson-card p {
+  margin: 0;
+}
+
+.learning-lesson-card small,
+.learning-lesson-card p {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.lesson-time-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--accent-strong);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.homework-note {
+  padding-top: 6px;
+  border-top: 1px dashed rgba(24, 32, 38, 0.14);
+}
+
+.attendance-week-list {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.attendance-week-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 14px;
+  border: 1px solid rgba(24, 32, 38, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.attendance-week-row span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.attendance-week-row b {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: rgba(15, 124, 102, 0.09);
+}
+
+.attendance-week-row.attendance-absent b {
+  color: var(--danger);
+  background: rgba(180, 35, 24, 0.1);
+}
+
+.attendance-week-row.attendance-late b {
+  color: var(--warning);
+  background: rgba(146, 92, 0, 0.12);
+}
+
 .journal-list {
   display: grid;
   gap: 10px;
@@ -1432,6 +1593,54 @@ td {
   .schedule-toolbar,
   .class-create-form {
     align-items: stretch;
+  }
+
+  .learning-week-title {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 14px;
+  }
+
+  .learning-week-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .learning-week-actions .compact {
+    width: 100%;
+  }
+
+  .learning-week-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .learning-day-column {
+    min-width: 0;
+    border: 1px solid rgba(24, 32, 38, 0.08);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .learning-day-heading {
+    position: static;
+  }
+
+  .learning-day-lessons {
+    padding: 10px;
+  }
+
+  .learning-lesson-card {
+    min-height: auto;
+  }
+
+  .attendance-week-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .schedule-toolbar .compact,

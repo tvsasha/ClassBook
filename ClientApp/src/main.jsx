@@ -379,6 +379,9 @@ function RouteContent({ route, role, user }) {
       if (role === "Учитель") {
         return <TeacherPersonalSchedule user={user} />;
       }
+      if (role === "Ученик") {
+        return <StudentPage role={role} view="schedule" />;
+      }
       return <SchedulePage role={role} />;
     default:
       return <DashboardPage user={user} />;
@@ -2056,7 +2059,7 @@ function TeacherPage({ role, user }) {
   );
 }
 
-function StudentPage({ role }) {
+function StudentPage({ role, view = "full" }) {
   const allowed = role === "Ученик" || role === "Администратор";
   const [info, setInfo] = useState(null);
   const [schedule, setSchedule] = useState([]);
@@ -2101,7 +2104,7 @@ function StudentPage({ role }) {
 
   return (
     <LearningPage
-      title="Кабинет ученика"
+      title={view === "schedule" ? "Мое расписание" : "Кабинет ученика"}
       subtitle={info ? `${studentName} · ${studentClassName}` : "Учебная информация"}
       description="Здесь собраны расписание, оценки, домашние задания и посещаемость текущего ученика."
       schedule={schedule}
@@ -2110,6 +2113,7 @@ function StudentPage({ role }) {
       attendance={attendance}
       loading={loading}
       message={message}
+      view={view}
     />
   );
 }
@@ -2196,21 +2200,28 @@ function ParentPage({ role }) {
   );
 }
 
-function LearningPage({ title, subtitle, description, schedule, grades, homework, attendance, loading, message }) {
+function LearningPage({ title, subtitle, description, schedule, grades, homework, attendance, loading, message, view = "full" }) {
   return (
     <section className="page-stack">
       <PageHeader title={title} subtitle={subtitle} text={description} />
       <StatusLine loading={loading} message={message} />
-      <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} />
+      <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} view={view} />
     </section>
   );
 }
 
-function LearningSections({ schedule, grades, homework, attendance }) {
+function LearningSections({ schedule, grades, homework, attendance, view = "full" }) {
   const averageGrade = grades.length
     ? grades.reduce((sum, item) => sum + Number(item.value ?? 0), 0) / grades.length
     : 0;
   const present = attendance.filter((item) => Number(item.status) === 1).length;
+  const [learningWeekStart, setLearningWeekStart] = useState(() => getInitialLearningWeekStart(schedule, attendance));
+
+  useEffect(() => {
+    setLearningWeekStart((current) => current || getInitialLearningWeekStart(schedule, attendance));
+  }, [schedule, attendance]);
+
+  const showOnlySchedule = view === "schedule";
 
   return (
     <>
@@ -2220,45 +2231,122 @@ function LearningSections({ schedule, grades, homework, attendance }) {
         <MetricCard label="Средний балл" value={formatNumber(averageGrade)} />
         <MetricCard label="Присутствий" value={present} />
       </div>
-      <DataTable
-        title="Расписание"
-        columns={["Дата", "Время", "Предмет", "Тема", "Учитель"]}
-        rows={schedule.slice(0, 12).map((lesson) => [
-          formatDate(lesson.date),
-          formatTimeRange(lesson),
-          lesson.subject || lesson.subjectName || lesson.name || "—",
-          lesson.topic || "—",
-          lesson.teacher || lesson.teacherName || "—"
-        ])}
+      <WeeklyLearningSchedule
+        schedule={schedule}
+        attendance={attendance}
+        weekStart={learningWeekStart}
+        onWeekStartChange={setLearningWeekStart}
       />
-      <DataTable
-        title="Оценки"
-        columns={["Дата", "Предмет", "Тема", "Оценка"]}
-        rows={grades.slice(0, 16).map((grade) => [
-          formatDate(grade.date),
-          grade.subject || grade.subjectName || "—",
-          grade.topic || "—",
-          grade.value
-        ])}
-      />
-      <CardGrid
-        title="Домашние задания"
-        items={homework.slice(0, 8).map((item) => ({
-          title: item.subject || item.subjectName || item.name || "Предмет",
-          text: item.homework || item.task || "Домашнее задание не указано",
-          meta: `${formatDate(item.date)} · ${item.topic || "без темы"}`
-        }))}
-      />
-      <DataTable
-        title="Посещаемость"
-        columns={["Дата", "Предмет", "Статус"]}
-        rows={attendance.slice(0, 16).map((item) => [
-          formatDate(item.date),
-          item.subject || item.subjectName || item.name || "—",
-          attendanceLabel(item.status)
-        ])}
-      />
+      {!showOnlySchedule && (
+        <>
+          <DataTable
+            title="Оценки"
+            columns={["Дата", "Предмет", "Тема", "Оценка"]}
+            rows={grades.slice(0, 16).map((grade) => [
+              formatDate(grade.date),
+              grade.subject || grade.subjectName || "—",
+              grade.topic || "—",
+              grade.value
+            ])}
+          />
+          <CardGrid
+            title="Домашние задания"
+            items={homework.slice(0, 8).map((item) => ({
+              title: item.subject || item.subjectName || item.name || "Предмет",
+              text: item.homework || item.task || "Домашнее задание не указано",
+              meta: `${formatDate(item.date)} · ${item.topic || "без темы"}`
+            }))}
+          />
+          <WeeklyAttendancePanel schedule={schedule} attendance={attendance} weekStart={learningWeekStart} />
+        </>
+      )}
     </>
+  );
+}
+
+function WeeklyLearningSchedule({ schedule, attendance, weekStart, onWeekStartChange }) {
+  const weekDays = getLearningWeekDays(weekStart);
+  const weekLessons = filterItemsByWeek(schedule, weekStart);
+  const attendanceByLesson = new Map(attendance.map((item) => [Number(item.lessonId), item]));
+
+  return (
+    <section className="table-card learning-week-card">
+      <div className="learning-week-title">
+        <div>
+          <strong>Расписание недели</strong>
+          <span>{getWeekCaption(weekStart)}</span>
+        </div>
+        <div className="learning-week-actions">
+          <button className="ghost-button compact" type="button" onClick={() => onWeekStartChange(shiftWeek(weekStart, -7))}>Назад</button>
+          <button className="ghost-button compact" type="button" onClick={() => onWeekStartChange(toIsoDate(getMonday(new Date())))}>Сегодня</button>
+          <button className="ghost-button compact" type="button" onClick={() => onWeekStartChange(shiftWeek(weekStart, 7))}>Вперед</button>
+        </div>
+      </div>
+      <div className="learning-week-grid">
+        {weekDays.map((date) => {
+          const dayLessons = weekLessons
+            .filter((lesson) => toIsoDate(new Date(lesson.date)) === date)
+            .sort(comparePortalLessons);
+
+          return (
+            <div className="learning-day-column" key={date}>
+              <div className="learning-day-heading">
+                <strong>{dayName(getDayIndex(date))}</strong>
+                <span>{formatDate(date)}</span>
+              </div>
+              <div className="learning-day-lessons">
+                {dayLessons.length === 0 ? (
+                  <p className="empty-text">Уроков нет</p>
+                ) : dayLessons.map((lesson) => {
+                  const attendanceItem = attendanceByLesson.get(Number(lesson.lessonId));
+                  const status = attendanceItem?.status ?? 1;
+                  return (
+                    <article className={`learning-lesson-card ${attendanceClassName(status)}`} key={lesson.lessonId}>
+                      <div className="lesson-time-row">
+                        <span>{lesson.lessonNumber ? `${lesson.lessonNumber} урок` : "Урок"}</span>
+                        <span>{formatTimeRange(lesson)}</span>
+                      </div>
+                      <strong>{lesson.subject || lesson.subjectName || lesson.name || "Предмет"}</strong>
+                      <small>{lesson.teacher || lesson.teacherName || "Учитель не указан"}</small>
+                      {lesson.topic && <p>{lesson.topic}</p>}
+                      {lesson.homework && <p className="homework-note">ДЗ: {lesson.homework}</p>}
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function WeeklyAttendancePanel({ schedule, attendance, weekStart }) {
+  const weekLessons = filterItemsByWeek(schedule, weekStart).sort(comparePortalLessons);
+  const attendanceByLesson = new Map(attendance.map((item) => [Number(item.lessonId), item]));
+
+  return (
+    <section className="table-card attendance-week-card">
+      <div className="table-title">Посещаемость за неделю</div>
+      <div className="attendance-week-list">
+        {weekLessons.length === 0 ? (
+          <p className="empty-text padded">Нет уроков на выбранной неделе</p>
+        ) : weekLessons.map((lesson) => {
+          const attendanceItem = attendanceByLesson.get(Number(lesson.lessonId));
+          const status = attendanceItem?.status ?? 1;
+          return (
+            <article className={`attendance-week-row ${attendanceClassName(status)}`} key={lesson.lessonId}>
+              <div>
+                <strong>{lesson.subject || lesson.subjectName || lesson.name || "Предмет"}</strong>
+                <span>{formatDate(lesson.date)} · {formatTimeRange(lesson)}</span>
+              </div>
+              <b>{attendanceLabel(status)}</b>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -3323,8 +3411,66 @@ function shiftWeek(weekStart, days) {
 function getWeekCaption(weekStart) {
   const start = new Date(weekStart);
   const end = new Date(start);
-  end.setDate(end.getDate() + 4);
+  end.setDate(end.getDate() + 5);
   return `${formatDate(start)} - ${formatDate(end)}`;
+}
+
+function getInitialLearningWeekStart(schedule = [], attendance = []) {
+  const todayWeek = toIsoDate(getMonday(new Date()));
+  const allItems = [...schedule, ...attendance].filter((item) => item?.date);
+  if (allItems.some((item) => toIsoDate(getMonday(new Date(item.date))) === todayWeek)) {
+    return todayWeek;
+  }
+
+  const upcoming = allItems
+    .map((item) => new Date(item.date))
+    .filter((date) => !Number.isNaN(date.getTime()) && date >= getTodayStart())
+    .sort((left, right) => left - right)[0];
+
+  if (upcoming) {
+    return toIsoDate(getMonday(upcoming));
+  }
+
+  const latest = allItems
+    .map((item) => new Date(item.date))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((left, right) => right - left)[0];
+
+  return latest ? toIsoDate(getMonday(latest)) : todayWeek;
+}
+
+function getLearningWeekDays(weekStart) {
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(date.getDate() + index);
+    return toIsoDate(date);
+  });
+}
+
+function getDayIndex(dateValue) {
+  const day = new Date(dateValue).getDay();
+  return day === 0 ? 6 : day - 1;
+}
+
+function filterItemsByWeek(items, weekStart) {
+  const start = new Date(weekStart);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return (items ?? []).filter((item) => {
+    const date = new Date(item.date);
+    return !Number.isNaN(date.getTime()) && date >= start && date < end;
+  });
+}
+
+function comparePortalLessons(left, right) {
+  const leftDate = new Date(left.date);
+  const rightDate = new Date(right.date);
+  const dateDiff = leftDate - rightDate;
+  if (dateDiff !== 0) {
+    return dateDiff;
+  }
+
+  return Number(left.lessonNumber ?? 999) - Number(right.lessonNumber ?? 999);
 }
 
 function getLessonDateForSlot(weekStart, slot) {
