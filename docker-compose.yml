@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: classbook-app
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=${CLASSBOOK_DB_NAME:-ClassBookDb};User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=true;"
+      Cookie__SameSite: "${CLASSBOOK_COOKIE_SAMESITE:-None}"
+      Cookie__SecurePolicy: "${CLASSBOOK_COOKIE_SECURE_POLICY:-Always}"
+    ports:
+      - "${CLASSBOOK_HTTP_PORT:-8080}:8080"
+    volumes:
+      - classbook_app_data:/app/App_Data
+    depends_on:
+      - sqlserver
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: classbook-sqlserver
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Express"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+    ports:
+      - "127.0.0.1:${CLASSBOOK_SQL_PORT:-14333}:1433"
+    volumes:
+      - classbook_sql_data:/var/opt/mssql
+      - classbook_sql_backups:/var/opt/mssql/backup
+
+volumes:
+  classbook_app_data:
+  classbook_sql_data:
+  classbook_sql_backups:

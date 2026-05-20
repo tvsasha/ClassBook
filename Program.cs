@@ -7,6 +7,7 @@ using ClassBook.Domain.Entities;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.OpenApi.Models;
 using System.IO;
 using System.Security.Claims;
@@ -32,13 +33,20 @@ namespace ClassBook
                     options.AccessDeniedPath = "/access-denied";
                     options.ExpireTimeSpan = TimeSpan.FromDays(7);
                     options.SlidingExpiration = true;
-                    options.Cookie.SameSite = SameSiteMode.None;  
-                    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;  
+                    options.Cookie.SameSite = builder.Configuration.GetValue("Cookie:SameSite", SameSiteMode.None);
+                    options.Cookie.SecurePolicy = builder.Configuration.GetValue("Cookie:SecurePolicy", CookieSecurePolicy.Always);
                 });
 
             builder.Services.AddDataProtection()
                 .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys")))
                 .SetApplicationName("ClassBook");
+
+            builder.Services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+                options.KnownIPNetworks.Clear();
+                options.KnownProxies.Clear();
+            });
 
             builder.Services.AddAuthorization(options =>
             {
@@ -117,7 +125,8 @@ namespace ClassBook
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                db.Database.Migrate();
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                ApplyMigrationsWithRetry(db, logger);
                 var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
                 EnsureBootstrapAdmin(db, hasher);
             }
@@ -270,6 +279,7 @@ namespace ClassBook
 
             app.UseDefaultFiles();
             app.UseStaticFiles();
+            app.UseForwardedHeaders();
             app.UseHttpsRedirection();
             app.UseCors("AllowAll");
             app.UseAuthentication();
@@ -372,6 +382,26 @@ namespace ClassBook
 
             if (changed)
                 db.SaveChanges();
+        }
+
+        private static void ApplyMigrationsWithRetry(AppDbContext db, ILogger logger)
+        {
+            const int maxAttempts = 12;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    db.Database.Migrate();
+                    return;
+                }
+                catch (Exception exception) when (attempt < maxAttempts)
+                {
+                    logger.LogWarning(exception, "База данных пока недоступна, повтор миграций {Attempt}/{MaxAttempts}", attempt, maxAttempts);
+                    Thread.Sleep(TimeSpan.FromSeconds(5));
+                }
+            }
+
+            db.Database.Migrate();
         }
     }
 }
