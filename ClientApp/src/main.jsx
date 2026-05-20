@@ -2211,36 +2211,43 @@ function LearningPage({ title, subtitle, description, schedule, grades, homework
 }
 
 function LearningSections({ schedule, grades, homework, attendance, view = "full" }) {
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
+  const [attendanceFilter, setAttendanceFilter] = useState("problem");
+  const [attendanceSort, setAttendanceSort] = useState("date-desc");
   const averageGrade = grades.length
     ? grades.reduce((sum, item) => sum + Number(item.value ?? 0), 0) / grades.length
     : 0;
-  const present = attendance.filter((item) => Number(item.status) === 1).length;
+  const present = attendance.filter((item) => Number(item.status ?? 1) === 1).length;
+  const problemAttendance = attendance.filter((item) => Number(item.status ?? 1) !== 1).length;
   const [learningWeekStart, setLearningWeekStart] = useState(() => getInitialLearningWeekStart(schedule, attendance));
 
   useEffect(() => {
-    setLearningWeekStart((current) => current || getInitialLearningWeekStart(schedule, attendance));
+    setLearningWeekStart(getInitialLearningWeekStart(schedule, attendance));
   }, [schedule, attendance]);
 
   const showOnlySchedule = view === "schedule";
+  const todaySchedule = getTodaySchedule(schedule);
 
   return (
     <>
       <div className="metric-grid">
-        <MetricCard label="Уроков в расписании" value={schedule.length} />
+        <MetricCard label={showOnlySchedule ? "Уроков в расписании" : "Уроков сегодня"} value={showOnlySchedule ? schedule.length : todaySchedule.length} />
         <MetricCard label="Оценок" value={grades.length} />
         <MetricCard label="Средний балл" value={formatNumber(averageGrade)} />
-        <MetricCard label="Присутствий" value={present} />
+        <MetricCard label="Пропусков/опозданий" value={problemAttendance} />
       </div>
-      <WeeklyLearningSchedule
-        schedule={schedule}
-        attendance={attendance}
-        weekStart={learningWeekStart}
-        onWeekStartChange={setLearningWeekStart}
-      />
-      {!showOnlySchedule && (
+      {showOnlySchedule ? (
+        <WeeklyLearningSchedule
+          schedule={schedule}
+          attendance={attendance}
+          weekStart={learningWeekStart}
+          onWeekStartChange={setLearningWeekStart}
+        />
+      ) : (
         <>
+          <TodaySchedulePanel schedule={todaySchedule} attendance={attendance} />
           <DataTable
-            title="Оценки"
+            title="Последние оценки"
             columns={["Дата", "Предмет", "Тема", "Оценка"]}
             rows={grades.slice(0, 16).map((grade) => [
               formatDate(grade.date),
@@ -2257,10 +2264,48 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
               meta: `${formatDate(item.date)} · ${item.topic || "без темы"}`
             }))}
           />
-          <WeeklyAttendancePanel schedule={schedule} attendance={attendance} weekStart={learningWeekStart} />
+          <AttendanceReviewPanel
+            attendance={attendance}
+            isOpen={attendanceOpen}
+            filter={attendanceFilter}
+            sort={attendanceSort}
+            onToggle={() => setAttendanceOpen((current) => !current)}
+            onFilterChange={setAttendanceFilter}
+            onSortChange={setAttendanceSort}
+          />
         </>
       )}
     </>
+  );
+}
+
+function TodaySchedulePanel({ schedule, attendance }) {
+  const attendanceByLesson = new Map(attendance.map((item) => [Number(item.lessonId), item]));
+
+  return (
+    <section className="table-card today-schedule-card">
+      <div className="table-title">Сегодняшнее расписание</div>
+      <div className="today-schedule-list">
+        {schedule.length === 0 ? (
+          <p className="empty-text padded">На сегодня уроков нет</p>
+        ) : schedule.map((lesson) => {
+          const status = attendanceByLesson.get(Number(lesson.lessonId))?.status ?? 1;
+          return (
+            <article className={`today-lesson-row ${attendanceClassName(status)}`} key={lesson.lessonId}>
+              <div className="lesson-time-row">
+                <span>{lesson.lessonNumber ? `${lesson.lessonNumber} урок` : "Урок"}</span>
+                <span>{formatTimeRange(lesson)}</span>
+              </div>
+              <div>
+                <strong>{lesson.subject || lesson.subjectName || lesson.name || "Предмет"}</strong>
+                <small>{lesson.teacher || lesson.teacherName || "Учитель не указан"}</small>
+              </div>
+              {lesson.homework && <p className="homework-note">ДЗ: {lesson.homework}</p>}
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -2285,7 +2330,7 @@ function WeeklyLearningSchedule({ schedule, attendance, weekStart, onWeekStartCh
       <div className="learning-week-grid">
         {weekDays.map((date) => {
           const dayLessons = weekLessons
-            .filter((lesson) => toIsoDate(new Date(lesson.date)) === date)
+            .filter((lesson) => getDateKey(lesson.date) === date)
             .sort(comparePortalLessons);
 
           return (
@@ -2346,6 +2391,62 @@ function WeeklyAttendancePanel({ schedule, attendance, weekStart }) {
           );
         })}
       </div>
+    </section>
+  );
+}
+
+function AttendanceReviewPanel({ attendance, isOpen, filter, sort, onToggle, onFilterChange, onSortChange }) {
+  const filteredAttendance = getFilteredAttendance(attendance, filter, sort);
+  const problemCount = attendance.filter((item) => Number(item.status ?? 1) !== 1).length;
+
+  return (
+    <section className="table-card attendance-review-card">
+      <button className="attendance-review-header" type="button" onClick={onToggle} aria-expanded={isOpen}>
+        <span>
+          <strong>Посещаемость</strong>
+          <small>{problemCount ? `Пропусков и опозданий: ${problemCount}` : "Все отмеченные уроки без проблем"}</small>
+        </span>
+        <b>{isOpen ? "Свернуть" : "Развернуть"}</b>
+      </button>
+      {isOpen && (
+        <>
+          <div className="attendance-review-filters">
+            <label className="field">
+              <span>Показать</span>
+              <select value={filter} onChange={(event) => onFilterChange(event.target.value)}>
+                <option value="problem">Только отсутствия и опоздания</option>
+                <option value="absent">Только отсутствия</option>
+                <option value="late">Только опоздания</option>
+                <option value="all">Все записи</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Сортировка</span>
+              <select value={sort} onChange={(event) => onSortChange(event.target.value)}>
+                <option value="date-desc">Сначала новые</option>
+                <option value="date-asc">Сначала старые</option>
+                <option value="subject">По предмету</option>
+              </select>
+            </label>
+          </div>
+          <div className="attendance-week-list">
+            {filteredAttendance.length === 0 ? (
+              <p className="empty-text padded">Записей по выбранному фильтру нет</p>
+            ) : filteredAttendance.map((item) => {
+              const status = item.status ?? 1;
+              return (
+                <article className={`attendance-week-row ${attendanceClassName(status)}`} key={`${item.lessonId}-${item.attendanceId ?? "default"}`}>
+                  <div>
+                    <strong>{item.subject || item.subjectName || item.name || "Предмет"}</strong>
+                    <span>{formatDate(item.date)} · {item.topic || "без темы"}</span>
+                  </div>
+                  <b>{attendanceLabel(status)}</b>
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -3331,7 +3432,7 @@ function formatDate(value) {
     return "—";
   }
 
-  const date = new Date(value);
+  const date = parseLocalDate(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("ru-RU");
 }
 
@@ -3388,8 +3489,26 @@ function toIsoDate(date) {
   return `${year}-${month}-${day}`;
 }
 
+function parseLocalDate(value) {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  const text = String(value || "");
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+
+  return new Date(value);
+}
+
+function getDateKey(value) {
+  return toIsoDate(parseLocalDate(value));
+}
+
 function getMonday(date) {
-  const result = new Date(date);
+  const result = parseLocalDate(date);
   const day = result.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   result.setDate(result.getDate() + diff);
@@ -3403,13 +3522,13 @@ function getTodayStart() {
 }
 
 function shiftWeek(weekStart, days) {
-  const date = new Date(weekStart);
+  const date = parseLocalDate(weekStart);
   date.setDate(date.getDate() + days);
   return toIsoDate(getMonday(date));
 }
 
 function getWeekCaption(weekStart) {
-  const start = new Date(weekStart);
+  const start = parseLocalDate(weekStart);
   const end = new Date(start);
   end.setDate(end.getDate() + 5);
   return `${formatDate(start)} - ${formatDate(end)}`;
@@ -3418,12 +3537,12 @@ function getWeekCaption(weekStart) {
 function getInitialLearningWeekStart(schedule = [], attendance = []) {
   const todayWeek = toIsoDate(getMonday(new Date()));
   const allItems = [...schedule, ...attendance].filter((item) => item?.date);
-  if (allItems.some((item) => toIsoDate(getMonday(new Date(item.date))) === todayWeek)) {
+  if (allItems.some((item) => toIsoDate(getMonday(parseLocalDate(item.date))) === todayWeek)) {
     return todayWeek;
   }
 
   const upcoming = allItems
-    .map((item) => new Date(item.date))
+    .map((item) => parseLocalDate(item.date))
     .filter((date) => !Number.isNaN(date.getTime()) && date >= getTodayStart())
     .sort((left, right) => left - right)[0];
 
@@ -3432,7 +3551,7 @@ function getInitialLearningWeekStart(schedule = [], attendance = []) {
   }
 
   const latest = allItems
-    .map((item) => new Date(item.date))
+    .map((item) => parseLocalDate(item.date))
     .filter((date) => !Number.isNaN(date.getTime()))
     .sort((left, right) => right - left)[0];
 
@@ -3441,30 +3560,30 @@ function getInitialLearningWeekStart(schedule = [], attendance = []) {
 
 function getLearningWeekDays(weekStart) {
   return Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(weekStart);
+    const date = parseLocalDate(weekStart);
     date.setDate(date.getDate() + index);
     return toIsoDate(date);
   });
 }
 
 function getDayIndex(dateValue) {
-  const day = new Date(dateValue).getDay();
+  const day = parseLocalDate(dateValue).getDay();
   return day === 0 ? 6 : day - 1;
 }
 
 function filterItemsByWeek(items, weekStart) {
-  const start = new Date(weekStart);
+  const start = parseLocalDate(weekStart);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   return (items ?? []).filter((item) => {
-    const date = new Date(item.date);
+    const date = parseLocalDate(item.date);
     return !Number.isNaN(date.getTime()) && date >= start && date < end;
   });
 }
 
 function comparePortalLessons(left, right) {
-  const leftDate = new Date(left.date);
-  const rightDate = new Date(right.date);
+  const leftDate = parseLocalDate(left.date);
+  const rightDate = parseLocalDate(right.date);
   const dateDiff = leftDate - rightDate;
   if (dateDiff !== 0) {
     return dateDiff;
@@ -3473,8 +3592,49 @@ function comparePortalLessons(left, right) {
   return Number(left.lessonNumber ?? 999) - Number(right.lessonNumber ?? 999);
 }
 
+function getTodaySchedule(schedule) {
+  const today = toIsoDate(new Date());
+  return (schedule ?? [])
+    .filter((lesson) => getDateKey(lesson.date) === today)
+    .sort(comparePortalLessons);
+}
+
+function getFilteredAttendance(attendance, filter, sort) {
+  const filtered = (attendance ?? []).filter((item) => {
+    const status = Number(item.status ?? 1);
+    if (filter === "absent") {
+      return status === 0;
+    }
+
+    if (filter === "late") {
+      return status === 2;
+    }
+
+    if (filter === "problem") {
+      return status !== 1;
+    }
+
+    return true;
+  });
+
+  return filtered.sort((left, right) => {
+    if (sort === "date-asc") {
+      return parseLocalDate(left.date) - parseLocalDate(right.date);
+    }
+
+    if (sort === "subject") {
+      return String(left.subject || left.subjectName || "").localeCompare(String(right.subject || right.subjectName || ""), "ru", {
+        numeric: true,
+        sensitivity: "base"
+      });
+    }
+
+    return parseLocalDate(right.date) - parseLocalDate(left.date);
+  });
+}
+
 function getLessonDateForSlot(weekStart, slot) {
-  const date = new Date(weekStart);
+  const date = parseLocalDate(weekStart);
   date.setDate(date.getDate() + Number(slot.dayOfWeek ?? 0));
   return toIsoDate(date);
 }

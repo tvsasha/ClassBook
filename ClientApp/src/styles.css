@@ -773,6 +773,40 @@ td {
   border-top: 1px dashed rgba(24, 32, 38, 0.14);
 }
 
+.today-schedule-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.today-lesson-row {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid rgba(24, 32, 38, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.today-lesson-row small,
+.today-lesson-row p {
+  display: block;
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.today-lesson-row.attendance-absent {
+  border-color: rgba(180, 35, 24, 0.28);
+  background: rgba(254, 226, 226, 0.72);
+}
+
+.today-lesson-row.attendance-late {
+  border-color: rgba(146, 92, 0, 0.26);
+  background: rgba(254, 249, 195, 0.72);
+}
+
 .attendance-week-list {
   display: grid;
   gap: 10px;
@@ -813,6 +847,49 @@ td {
 .attendance-week-row.attendance-late b {
   color: var(--warning);
   background: rgba(146, 92, 0, 0.12);
+}
+
+.attendance-review-header {
+  width: 100%;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.attendance-review-header strong,
+.attendance-review-header small {
+  display: block;
+}
+
+.attendance-review-header small {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.attendance-review-header b {
+  flex: 0 0 auto;
+  color: var(--accent-strong);
+}
+
+.attendance-review-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  border-bottom: 1px solid rgba(24, 32, 38, 0.08);
+}
+
+.attendance-review-filters .field {
+  margin: 0;
 }
 
 .journal-list {
@@ -1641,6 +1718,22 @@ td {
   .attendance-week-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .today-schedule-list {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+
+  .attendance-review-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 14px;
+  }
+
+  .attendance-review-filters {
+    grid-template-columns: 1fr;
+    padding: 12px;
   }
 
   .schedule-toolbar .compact,
