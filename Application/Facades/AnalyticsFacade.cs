@@ -292,5 +292,97 @@ namespace ClassBook.Application.Facades
                 ClassSummary = summary
             };
         }
+
+        public async Task<TeacherSummaryReportDto> GetTeacherSummaryAsync(DateTime startDate, DateTime endDate)
+        {
+            var teachers = await _db.Users
+                .Where(user => user.Role.Name == "Учитель")
+                .OrderBy(user => user.FullName)
+                .ToListAsync();
+
+            var lessons = await _db.Lessons
+                .Where(lesson => lesson.Date >= startDate && lesson.Date <= endDate)
+                .Include(lesson => lesson.Grades)
+                .Include(lesson => lesson.Attendances)
+                .ToListAsync();
+
+            var items = teachers.Select(teacher =>
+            {
+                var teacherLessons = lessons
+                    .Where(lesson => lesson.TeacherId == teacher.Id)
+                    .ToList();
+                var lessonsWithGrades = teacherLessons.Count(lesson => (lesson.Grades?.Count ?? 0) > 0);
+
+                return new TeacherSummaryItemDto
+                {
+                    TeacherId = teacher.Id,
+                    Teacher = teacher.FullName,
+                    LessonsCount = teacherLessons.Count,
+                    GradesEntered = teacherLessons.Sum(lesson => lesson.Grades?.Count ?? 0),
+                    AttendanceProblems = teacherLessons.Sum(lesson => lesson.Attendances?.Count(attendance => attendance.Status != 1) ?? 0),
+                    GradesCompletionPercentage = teacherLessons.Count > 0
+                        ? Math.Round((double)lessonsWithGrades / teacherLessons.Count * 100, 2)
+                        : 0
+                };
+            })
+            .Where(item => item.LessonsCount > 0 || item.GradesEntered > 0 || item.AttendanceProblems > 0)
+            .OrderByDescending(item => item.LessonsCount)
+            .ToList();
+
+            return new TeacherSummaryReportDto
+            {
+                StartDate = startDate.Date,
+                EndDate = endDate.Date,
+                Teachers = items
+            };
+        }
+
+        public async Task<ClassTeacherSummaryReportDto> GetClassTeacherSummaryAsync(DateTime startDate, DateTime endDate)
+        {
+            var assignments = await _db.ClassTeachers
+                .Include(assignment => assignment.Class)
+                .ThenInclude(classItem => classItem.Students)
+                .Include(assignment => assignment.Teacher)
+                .OrderBy(assignment => assignment.Class.Name)
+                .ThenBy(assignment => assignment.Teacher.FullName)
+                .ToListAsync();
+
+            var classIds = assignments.Select(assignment => assignment.ClassId).Distinct().ToList();
+            var lessons = await _db.Lessons
+                .Where(lesson => classIds.Contains(lesson.ClassId) && lesson.Date >= startDate && lesson.Date <= endDate)
+                .Include(lesson => lesson.Grades)
+                .Include(lesson => lesson.Attendances)
+                .ToListAsync();
+
+            var items = assignments.Select(assignment =>
+            {
+                var classLessons = lessons
+                    .Where(lesson => lesson.ClassId == assignment.ClassId)
+                    .ToList();
+                var grades = classLessons.SelectMany(lesson => lesson.Grades ?? []).ToList();
+                var averageGrade = grades.Count > 0
+                    ? Math.Round(grades.Average(grade => grade.Value), 2)
+                    : 0;
+
+                return new ClassTeacherSummaryItemDto
+                {
+                    TeacherId = assignment.TeacherId,
+                    Teacher = assignment.Teacher.FullName,
+                    ClassName = assignment.Class.Name,
+                    StudentsCount = assignment.Class.Students?.Count ?? 0,
+                    LessonsCount = classLessons.Count,
+                    Absences = classLessons.Sum(lesson => lesson.Attendances?.Count(attendance => attendance.Status == 0) ?? 0),
+                    LowGrades = grades.Count(grade => grade.Value < 3),
+                    AverageGrade = averageGrade
+                };
+            }).ToList();
+
+            return new ClassTeacherSummaryReportDto
+            {
+                StartDate = startDate.Date,
+                EndDate = endDate.Date,
+                ClassTeachers = items
+            };
+        }
     }
 }

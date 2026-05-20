@@ -1533,24 +1533,33 @@ function AdminPage({ role }) {
 
 function DirectorPage({ role }) {
   const allowed = role === "Директор" || role === "Администратор";
+  const [periodMode, setPeriodMode] = useState("week");
+  const [period, setPeriod] = useState(() => getDirectorPeriod("week"));
   const [summary, setSummary] = useState(null);
   const [attendance, setAttendance] = useState(null);
   const [daily, setDaily] = useState(null);
+  const [teachers, setTeachers] = useState(null);
+  const [classTeachers, setClassTeachers] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function loadReports() {
     setLoading(true);
     setMessage("");
+    const query = `startDate=${period.start}&endDate=${period.end}`;
     try {
-      const [classSummary, attendanceStats, dailyReport] = await Promise.all([
-        apiRequest("/director/report/class-summary"),
-        apiRequest("/director/report/attendance"),
-        apiRequest("/director/report/daily")
+      const [classSummary, attendanceStats, dailyReport, teacherSummary, classTeacherSummary] = await Promise.all([
+        apiRequest(`/director/report/class-summary?${query}`),
+        apiRequest(`/director/report/attendance?${query}`),
+        apiRequest(`/director/report/daily?date=${period.end}`),
+        apiRequest(`/director/report/teachers?${query}`),
+        apiRequest(`/director/report/class-teachers?${query}`)
       ]);
       setSummary(classSummary);
       setAttendance(attendanceStats);
       setDaily(dailyReport);
+      setTeachers(teacherSummary);
+      setClassTeachers(classTeacherSummary);
     } catch (error) {
       setMessage(error.message || "Не удалось загрузить отчеты директора");
     } finally {
@@ -1562,7 +1571,7 @@ function DirectorPage({ role }) {
     if (allowed) {
       loadReports();
     }
-  }, [allowed]);
+  }, [allowed, period.start, period.end]);
 
   if (!allowed) {
     return <AccessWarning title="Отчеты доступны директору и администратору" />;
@@ -1571,53 +1580,179 @@ function DirectorPage({ role }) {
   const classRows = sortItems(summary?.classSummary ?? [], "className", { className: (item) => classSortValue(item.className) });
   const attendanceRows = sortItems(attendance?.statistics ?? [], "className", { className: (item) => classSortValue(item.className) });
   const dailyRows = daily?.report ?? [];
+  const teacherRows = teachers?.teachers ?? [];
+  const classTeacherRows = classTeachers?.classTeachers ?? [];
+  const averageAttendance = attendanceRows.length
+    ? attendanceRows.reduce((sum, item) => sum + Number(item.presentPercentage ?? 0), 0) / attendanceRows.length
+    : 0;
+  const averageClassGrade = calculateAverage(classRows.map((item) => item.averageGrade).filter((value) => Number(value) > 0));
+
+  function applyMode(mode) {
+    setPeriodMode(mode);
+    setPeriod(getDirectorPeriod(mode));
+  }
 
   return (
     <section className="page-stack">
       <PageHeader
         title="Отчеты директора"
-        subtitle="Аналитика учебного процесса"
-        text="Сводная аналитика по классам, посещаемости, заполнению журнала и действиям пользователей."
+        subtitle={`${formatDate(period.start)} - ${formatDate(period.end)}`}
+        text="Сводная аналитика по классам, учителям, классным руководителям и заполнению журнала за выбранный период."
       />
       <StatusLine loading={loading} message={message} />
-      <div className="metric-grid">
-        <MetricCard label="Уроков за день" value={daily?.totalLessons ?? 0} />
-        <MetricCard label="Оценки заполнены" value={daily?.lessonsWithCompleteGrades ?? 0} />
-        <MetricCard label="Посещаемость заполнена" value={daily?.lessonsWithCompleteAttendance ?? 0} />
-        <MetricCard label="Классов в сводке" value={classRows.length} />
+      <div className="director-filter-panel">
+        <div className="period-buttons">
+          <button className={periodMode === "day" ? "active" : ""} type="button" onClick={() => applyMode("day")}>День</button>
+          <button className={periodMode === "week" ? "active" : ""} type="button" onClick={() => applyMode("week")}>Неделя</button>
+          <button className={periodMode === "month" ? "active" : ""} type="button" onClick={() => applyMode("month")}>Месяц</button>
+        </div>
+        <label className="field">
+          <span>Начало</span>
+          <input type="date" value={period.start} onChange={(event) => {
+            setPeriodMode("custom");
+            setPeriod({ ...period, start: event.target.value });
+          }} />
+        </label>
+        <label className="field">
+          <span>Конец</span>
+          <input type="date" value={period.end} onChange={(event) => {
+            setPeriodMode("custom");
+            setPeriod({ ...period, end: event.target.value });
+          }} />
+        </label>
       </div>
-      <DataTable
-        title="Сводка по классам"
-        columns={["Класс", "Учеников", "Средние пропуски", "Средняя оценка"]}
-        rows={classRows.map((item) => [
-          item.className,
-          item.studentCount,
-          formatNumber(item.averageAbsences),
-          formatNumber(item.averageGrade)
-        ])}
-      />
-      <DataTable
-        title="Посещаемость"
-        columns={["Класс", "Всего", "Присутствуют", "Отсутствуют", "% присутствия"]}
-        rows={attendanceRows.map((item) => [
-          item.className,
-          item.totalStudents,
-          item.present,
-          item.absent,
-          `${formatNumber(item.presentPercentage)}%`
-        ])}
-      />
-      <DataTable
-        title="Ежедневный контроль"
-        columns={["Урок", "Учитель", "Класс", "Оценки", "Посещаемость"]}
-        rows={dailyRows.slice(0, 12).map((item) => [
-          item.name,
-          item.teacher,
-          item.class,
-          `${formatNumber(item.gradesPercentage)}%`,
-          `${formatNumber(item.attendancePercentage)}%`
-        ])}
-      />
+      <div className="metric-grid">
+        <MetricCard label="Уроков в контрольный день" value={daily?.totalLessons ?? 0} />
+        <MetricCard label="Средняя посещаемость" value={`${formatNumber(averageAttendance)}%`} />
+        <MetricCard label="Средняя оценка" value={formatNumber(averageClassGrade)} />
+        <MetricCard label="Учителей в периоде" value={teacherRows.length} />
+      </div>
+      <div className="director-chart-grid">
+        <BarChartCard
+          title="Средняя оценка по классам"
+          items={classRows.filter((item) => Number(item.averageGrade) > 0).map((item) => ({
+            label: item.className,
+            value: Number(item.averageGrade),
+            max: 5,
+            suffix: ""
+          }))}
+        />
+        <BarChartCard
+          title="Посещаемость по классам"
+          items={attendanceRows.map((item) => ({
+            label: item.className,
+            value: Number(item.presentPercentage ?? 0),
+            max: 100,
+            suffix: "%"
+          }))}
+        />
+      </div>
+      <ReportSection title="По классам" subtitle={`${classRows.length} классов`} defaultOpen>
+        <DataTable
+          title="Сводка"
+          columns={["Класс", "Учеников", "Средние пропуски", "Средняя оценка"]}
+          rows={classRows.map((item) => [
+            item.className,
+            item.studentCount,
+            formatNumber(item.averageAbsences),
+            formatNumber(item.averageGrade)
+          ])}
+        />
+      </ReportSection>
+      <ReportSection title="По учителям" subtitle={`${teacherRows.length} учителей`}>
+        <BarChartCard
+          title="Заполнение оценок"
+          items={teacherRows.slice(0, 12).map((item) => ({
+            label: item.teacher,
+            value: Number(item.gradesCompletionPercentage ?? 0),
+            max: 100,
+            suffix: "%"
+          }))}
+        />
+        <DataTable
+          title="Учителя"
+          columns={["Учитель", "Уроков", "Оценок", "Проблем посещаемости", "Заполнение"]}
+          rows={teacherRows.map((item) => [
+            item.teacher,
+            item.lessonsCount,
+            item.gradesEntered,
+            item.attendanceProblems,
+            `${formatNumber(item.gradesCompletionPercentage)}%`
+          ])}
+        />
+      </ReportSection>
+      <ReportSection title="По классным руководителям" subtitle={`${classTeacherRows.length} назначений`}>
+        <DataTable
+          title="Классное руководство"
+          columns={["Класс", "Классный руководитель", "Учеников", "Пропуски", "Низкие оценки", "Средняя"]}
+          rows={classTeacherRows.map((item) => [
+            item.className,
+            item.teacher,
+            item.studentsCount,
+            item.absences,
+            item.lowGrades,
+            formatNumber(item.averageGrade)
+          ])}
+        />
+      </ReportSection>
+      <ReportSection title="Ежедневный контроль" subtitle={`${dailyRows.length} уроков за ${formatDate(period.end)}`}>
+        <DataTable
+          title="Уроки дня"
+          columns={["Урок", "Учитель", "Класс", "Оценки", "Посещаемость"]}
+          rows={dailyRows.map((item) => [
+            item.name,
+            item.teacher,
+            item.class,
+            `${formatNumber(item.gradesPercentage)}%`,
+            `${formatNumber(item.attendancePercentage)}%`
+          ])}
+        />
+      </ReportSection>
+    </section>
+  );
+}
+
+function ReportSection({ title, subtitle, defaultOpen = false, children }) {
+  return (
+    <details className="report-section" open={defaultOpen}>
+      <summary>
+        <span>
+          <strong>{title}</strong>
+          {subtitle && <small>{subtitle}</small>}
+        </span>
+        <b>Открыть</b>
+      </summary>
+      <div className="report-section-body">{children}</div>
+    </details>
+  );
+}
+
+function BarChartCard({ title, items }) {
+  const safeItems = (items ?? []).filter((item) => Number.isFinite(Number(item.value)));
+
+  return (
+    <section className="table-card chart-card">
+      <div className="table-title">{title}</div>
+      <div className="bar-chart-list">
+        {safeItems.length === 0 ? (
+          <p className="empty-text padded">Данных для графика пока нет</p>
+        ) : safeItems.map((item, index) => {
+          const max = Number(item.max || 100);
+          const value = Number(item.value || 0);
+          const width = max > 0 ? Math.max(2, Math.min(100, value / max * 100)) : 0;
+          return (
+            <div className="bar-chart-row" key={`${item.label}-${index}`}>
+              <div className="bar-chart-label">
+                <span>{item.label}</span>
+                <strong>{formatNumber(value)}{item.suffix ?? ""}</strong>
+              </div>
+              <div className="bar-track" aria-hidden="true">
+                <div className="bar-fill" style={{ width: `${width}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -3631,6 +3766,24 @@ function getFilteredAttendance(attendance, filter, sort) {
 
     return parseLocalDate(right.date) - parseLocalDate(left.date);
   });
+}
+
+function getDirectorPeriod(mode) {
+  const today = getTodayStart();
+  const end = toIsoDate(today);
+
+  if (mode === "day") {
+    return { start: end, end };
+  }
+
+  if (mode === "month") {
+    const start = new Date(today);
+    start.setDate(start.getDate() - 29);
+    return { start: toIsoDate(start), end };
+  }
+
+  const start = getMonday(today);
+  return { start: toIsoDate(start), end };
 }
 
 function getLessonDateForSlot(weekStart, slot) {

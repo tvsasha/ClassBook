@@ -170,6 +170,54 @@ namespace ClassBook.Controllers
             }
         }
 
+        [HttpGet("report/teachers")]
+        public async Task<IActionResult> GetTeacherSummary([FromQuery] string? startDate = null, [FromQuery] string? endDate = null)
+        {
+            try
+            {
+                var (start, end) = QueryDateParser.ParseRangeOrDefault(
+                    startDate,
+                    endDate,
+                    () => DateTime.Now.AddDays(-7),
+                    () => DateTime.Now);
+                var summary = await _analyticsFacade.GetTeacherSummaryAsync(start, end);
+                return Ok(summary);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при формировании сводки по учителям");
+                return InternalServerError("Не удалось сформировать сводку по учителям");
+            }
+        }
+
+        [HttpGet("report/class-teachers")]
+        public async Task<IActionResult> GetClassTeacherSummary([FromQuery] string? startDate = null, [FromQuery] string? endDate = null)
+        {
+            try
+            {
+                var (start, end) = QueryDateParser.ParseRangeOrDefault(
+                    startDate,
+                    endDate,
+                    () => DateTime.Now.AddDays(-7),
+                    () => DateTime.Now);
+                var summary = await _analyticsFacade.GetClassTeacherSummaryAsync(start, end);
+                return Ok(summary);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при формировании сводки по классным руководителям");
+                return InternalServerError("Не удалось сформировать сводку по классным руководителям");
+            }
+        }
+
         /// <summary>
         /// История изменений (аудит лог) по типу сущности за период
         /// </summary>

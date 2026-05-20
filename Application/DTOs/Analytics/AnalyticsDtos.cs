@@ -98,4 +98,40 @@ namespace ClassBook.Application.DTOs
         public string Period { get; set; } = string.Empty;
         public List<ClassSummaryItemDto> ClassSummary { get; set; } = [];
     }
+
+    public sealed class TeacherSummaryItemDto
+    {
+        public int TeacherId { get; set; }
+        public string Teacher { get; set; } = string.Empty;
+        public int LessonsCount { get; set; }
+        public int GradesEntered { get; set; }
+        public int AttendanceProblems { get; set; }
+        public double GradesCompletionPercentage { get; set; }
+    }
+
+    public sealed class TeacherSummaryReportDto
+    {
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public List<TeacherSummaryItemDto> Teachers { get; set; } = [];
+    }
+
+    public sealed class ClassTeacherSummaryItemDto
+    {
+        public int TeacherId { get; set; }
+        public string Teacher { get; set; } = string.Empty;
+        public string ClassName { get; set; } = string.Empty;
+        public int StudentsCount { get; set; }
+        public int LessonsCount { get; set; }
+        public int Absences { get; set; }
+        public int LowGrades { get; set; }
+        public double AverageGrade { get; set; }
+    }
+
+    public sealed class ClassTeacherSummaryReportDto
+    {
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public List<ClassTeacherSummaryItemDto> ClassTeachers { get; set; } = [];
+    }
 }
