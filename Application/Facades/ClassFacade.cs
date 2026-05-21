@@ -21,6 +21,7 @@ namespace ClassBook.Application.Facades
         public async Task<IEnumerable<ClassListItemDto>> GetAllClassesAsync()
         {
             return await _db.Classes
+                .AsNoTracking()
                 .OrderBy(c => c.Name)
                 .Select(c => new ClassListItemDto
                 {
@@ -50,18 +51,76 @@ namespace ClassBook.Application.Facades
             };
         }
 
-        public async Task DeleteClassAsync(int classId)
+        public async Task DeleteClassAsync(int classId, string studentAction = "keepWithoutClass", int? targetClassId = null)
         {
             var classEntity = await _db.Classes.FindAsync(classId);
             if (classEntity == null)
                 throw new KeyNotFoundException("Класс не найден");
 
-            if (await _db.Students.AnyAsync(s => s.ClassId == classId) ||
-                await _db.Lessons.AnyAsync(l => l.ClassId == classId))
+            if (targetClassId == classId)
+                throw new InvalidOperationException("Нельзя перевести учеников в удаляемый класс");
+
+            if (targetClassId.HasValue && !await _db.Classes.AnyAsync(c => c.ClassId == targetClassId.Value))
+                throw new KeyNotFoundException("Класс для перевода не найден");
+
+            if (await _db.Lessons.AnyAsync(l => l.ClassId == classId))
             {
-                throw new InvalidOperationException("Нельзя удалить класс с привязанными учениками или уроками");
+                throw new InvalidOperationException("Нельзя удалить класс, по которому уже созданы уроки. Сначала перенесите или удалите уроки в расписании.");
             }
 
+            var students = await _db.Students
+                .Where(s => s.ClassId == classId)
+                .ToListAsync();
+
+            switch ((studentAction ?? "keepWithoutClass").Trim())
+            {
+                case "deleteStudents":
+                    var studentIds = students.Select(student => student.StudentId).ToList();
+                    if (studentIds.Count > 0)
+                    {
+                        var grades = await _db.Grades
+                            .Where(grade => studentIds.Contains(grade.StudentId))
+                            .ToListAsync();
+                        var attendances = await _db.Attendances
+                            .Where(attendance => studentIds.Contains(attendance.StudentId))
+                            .ToListAsync();
+                        var parentLinks = await _db.StudentParents
+                            .Where(link => studentIds.Contains(link.StudentId))
+                            .ToListAsync();
+
+                        _db.Grades.RemoveRange(grades);
+                        _db.Attendances.RemoveRange(attendances);
+                        _db.StudentParents.RemoveRange(parentLinks);
+                    }
+                    _db.Students.RemoveRange(students);
+                    break;
+                case "moveStudents":
+                    if (!targetClassId.HasValue)
+                        throw new InvalidOperationException("Выберите класс, в который нужно перевести учеников");
+                    foreach (var student in students)
+                    {
+                        student.ClassId = targetClassId.Value;
+                    }
+                    break;
+                case "keepWithoutClass":
+                    foreach (var student in students)
+                    {
+                        student.ClassId = null;
+                    }
+                    break;
+                default:
+                    throw new InvalidOperationException("Неизвестное действие с учениками");
+            }
+
+            var classTeachers = await _db.ClassTeachers
+                .Where(assignment => assignment.ClassId == classId)
+                .ToListAsync();
+            var subjectAssignments = await _db.SubjectClassAssignments
+                .Where(assignment => assignment.ClassId == classId)
+                .ToListAsync();
+
+            _db.ClassTeachers.RemoveRange(classTeachers);
+            _db.SubjectClassAssignments.RemoveRange(subjectAssignments);
             _db.Classes.Remove(classEntity);
             await _db.SaveChangesAsync();
         }
@@ -110,7 +169,7 @@ namespace ClassBook.Application.Facades
             var student = await _db.Students.FindAsync(studentId);
             if (student == null) throw new KeyNotFoundException("Ученик не найден");
 
-            student.ClassId = 0;
+            student.ClassId = null;
             await _db.SaveChangesAsync();
         }
     }

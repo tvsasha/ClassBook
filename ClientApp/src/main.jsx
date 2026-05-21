@@ -493,6 +493,12 @@ function AdminPage({ role }) {
     classId: "",
     teacherId: ""
   });
+  const [classForm, setClassForm] = useState({ name: "" });
+  const [classDeleteTarget, setClassDeleteTarget] = useState(null);
+  const [classDeleteForm, setClassDeleteForm] = useState({
+    studentAction: "keepWithoutClass",
+    targetClassId: ""
+  });
   const [userFilters, setUserFilters] = useState({
     search: "",
     roleId: "",
@@ -828,6 +834,63 @@ function AdminPage({ role }) {
     }
   }
 
+  async function createAdminClass(event) {
+    event.preventDefault();
+    if (!classForm.name.trim()) {
+      setMessage("Укажите название класса");
+      return;
+    }
+
+    try {
+      await apiRequest("/classes", {
+        method: "POST",
+        body: JSON.stringify({ name: classForm.name.trim() })
+      });
+      setClassForm({ name: "" });
+      setMessage("Класс добавлен");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось добавить класс");
+    }
+  }
+
+  function openClassDeleteDialog(classItem) {
+    setClassDeleteTarget(classItem);
+    setClassDeleteForm({
+      studentAction: "keepWithoutClass",
+      targetClassId: ""
+    });
+  }
+
+  async function deleteAdminClass(event) {
+    event.preventDefault();
+    if (!classDeleteTarget) {
+      return;
+    }
+
+    if (classDeleteForm.studentAction === "moveStudents" && !classDeleteForm.targetClassId) {
+      setMessage("Выберите класс для перевода учеников");
+      return;
+    }
+
+    try {
+      await apiRequest(`/classes/${classDeleteTarget.classId}`, {
+        method: "DELETE",
+        body: JSON.stringify({
+          studentAction: classDeleteForm.studentAction,
+          targetClassId: classDeleteForm.studentAction === "moveStudents"
+            ? Number(classDeleteForm.targetClassId)
+            : null
+        })
+      });
+      setClassDeleteTarget(null);
+      setMessage("Класс удален");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось удалить класс");
+    }
+  }
+
   async function removeClassTeacher(classId, teacherId) {
     try {
       const assignments = await apiRequest(`/class-teacher/assignments/${classId}/${teacherId}`, {
@@ -1096,6 +1159,16 @@ function AdminPage({ role }) {
     teacher: (item) => item.teacherName || "",
     classes: (item) => (item.classAssignments ?? []).map((assignment) => classSortValue(assignment.className)).join("|")
   });
+  const classStudentCounts = students.reduce((acc, student) => {
+    if (student.classId) {
+      acc.set(Number(student.classId), (acc.get(Number(student.classId)) ?? 0) + 1);
+    }
+    return acc;
+  }, new Map());
+  const classTeacherByClass = classTeacherAssignments.reduce((acc, assignment) => {
+    acc.set(Number(assignment.classId), assignment);
+    return acc;
+  }, new Map());
   const usersWithoutActiveAccount = users.filter((item) => !item.isActive).length;
   const missingStudentAccounts = students.filter((item) => !item.hasAccount).length;
   const adminTabs = [
@@ -1401,6 +1474,64 @@ function AdminPage({ role }) {
           </form>
         </Modal>
       )}
+      {classDeleteTarget && adminTab === "access" && (
+        <Modal title={`Удаление класса ${classDeleteTarget.name}`} onClose={() => setClassDeleteTarget(null)}>
+          <form className="modal-form" onSubmit={deleteAdminClass}>
+            <p className="modal-hint">Выберите, что сделать с учениками этого класса перед удалением.</p>
+            <label className="field">
+              <span>Действие с учениками</span>
+              <select value={classDeleteForm.studentAction} onChange={(event) => setClassDeleteForm({
+                ...classDeleteForm,
+                studentAction: event.target.value,
+                targetClassId: event.target.value === "moveStudents" ? classDeleteForm.targetClassId : ""
+              })}>
+                <option value="keepWithoutClass">Оставить без класса</option>
+                <option value="moveStudents">Перевести в другой класс</option>
+                <option value="deleteStudents">Удалить вместе с классом</option>
+              </select>
+            </label>
+            {classDeleteForm.studentAction === "moveStudents" && (
+              <label className="field">
+                <span>Класс для перевода</span>
+                <select value={classDeleteForm.targetClassId} onChange={(event) => setClassDeleteForm({ ...classDeleteForm, targetClassId: event.target.value })}>
+                  <option value="">Выберите класс</option>
+                  {sortedClasses
+                    .filter((item) => Number(item.classId) !== Number(classDeleteTarget.classId))
+                    .map((item) => (
+                      <option key={item.classId} value={item.classId}>{item.name}</option>
+                    ))}
+                </select>
+              </label>
+            )}
+            {classDeleteForm.studentAction === "deleteStudents" && (
+              <p className="modal-hint danger-hint">Ученики класса будут удалены вместе с их оценками, посещаемостью и привязками родителей.</p>
+            )}
+            <button className="danger-button">Удалить класс</button>
+            <button className="ghost-button compact" type="button" onClick={() => setClassDeleteTarget(null)}>Отмена</button>
+          </form>
+        </Modal>
+      )}
+      <section className={`table-card admin-section ${adminTab === "access" ? "active" : ""}`}>
+        <div className="table-title">Классы</div>
+        <form className="inline-form attach-form" onSubmit={createAdminClass}>
+          <Field label="Новый класс" value={classForm.name} onChange={(value) => setClassForm({ name: value })} />
+          <button className="primary-button">Добавить класс</button>
+        </form>
+        <DataTable
+          title={`Классы (${sortedClasses.length})`}
+          className="nested-table"
+          columns={["Класс", "Ученики", "Классный руководитель", "Действие"]}
+          rows={sortedClasses.map((item) => {
+            const classTeacher = classTeacherByClass.get(Number(item.classId));
+            return [
+              item.name,
+              classStudentCounts.get(Number(item.classId)) ?? 0,
+              classTeacher?.teacherName ?? "Не назначен",
+              <button className="table-action" type="button" onClick={() => openClassDeleteDialog(item)}>Удалить</button>
+            ];
+          })}
+        />
+      </section>
       <section className={`table-card admin-section ${adminTab === "access" ? "active" : ""}`}>
         <div className="table-title">Классные руководители</div>
         <form className="inline-form attach-form" onSubmit={assignClassTeacher}>
@@ -1422,7 +1553,7 @@ function AdminPage({ role }) {
               ))}
             </select>
           </label>
-          <button className="primary-button">Назначить</button>
+          <button className="primary-button">Назначить / переназначить</button>
         </form>
         <DataTable
           title={`Назначения (${classTeacherAssignments.length})`}

@@ -212,9 +212,9 @@ namespace ClassBook.Application.Facades
             var totalGradesEntered = lessons.Sum(l => l.Grades?.Count ?? 0);
             var lessonClassIds = lessons.Select(l => l.ClassId).Distinct().ToList();
             var classStudentCounts = await _db.Students
-                .Where(s => lessonClassIds.Contains(s.ClassId))
+                .Where(s => s.ClassId.HasValue && lessonClassIds.Contains(s.ClassId.Value))
                 .GroupBy(s => s.ClassId)
-                .Select(g => new { ClassId = g.Key, Count = g.Count() })
+                .Select(g => new { ClassId = g.Key!.Value, Count = g.Count() })
                 .ToDictionaryAsync(item => item.ClassId, item => item.Count);
             var totalAttendanceRecorded = lessons.Sum(l => classStudentCounts.GetValueOrDefault(l.ClassId));
 

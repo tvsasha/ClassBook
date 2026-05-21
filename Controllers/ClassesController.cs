@@ -53,13 +53,14 @@ namespace ClassBook.Controllers
         /// Удаляет учебный класс, если к нему не привязаны ученики и уроки.
         /// </summary>
         /// <param name="id">Идентификатор класса.</param>
+        /// <param name="dto">Правило обработки учеников перед удалением класса.</param>
         /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteClass(int id)
+        public async Task<IActionResult> DeleteClass(int id, [FromBody] DeleteClassDto? dto = null)
         {
             try
             {
-                await _classFacade.DeleteClassAsync(id);
+                await _classFacade.DeleteClassAsync(id, dto?.StudentAction ?? "keepWithoutClass", dto?.TargetClassId);
                 return NoContent();
             }
             catch (KeyNotFoundException ex)

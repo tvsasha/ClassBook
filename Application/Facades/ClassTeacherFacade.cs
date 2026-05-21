@@ -44,9 +44,16 @@ namespace ClassBook.Application.Facades
             if (!teacherExists)
                 throw new KeyNotFoundException("Учитель не найден");
 
-            var exists = await _db.ClassTeachers.AnyAsync(ct => ct.ClassId == classId && ct.TeacherId == teacherId);
-            if (exists)
+            var existingAssignments = await _db.ClassTeachers
+                .Where(ct => ct.ClassId == classId)
+                .ToListAsync();
+            if (existingAssignments.Any(ct => ct.TeacherId == teacherId))
                 return;
+
+            if (existingAssignments.Count > 0)
+            {
+                _db.ClassTeachers.RemoveRange(existingAssignments);
+            }
 
             _db.ClassTeachers.Add(new ClassTeacher
             {

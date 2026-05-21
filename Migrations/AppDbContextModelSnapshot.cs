@@ -349,7 +349,7 @@ namespace ClassBook.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SubjectClassAssignmentId"));
 
-                    b.Property<int>("ClassId")
+                    b.Property<int?>("ClassId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
@@ -630,8 +630,7 @@ namespace ClassBook.Migrations
                     b.HasOne("ClassBook.Domain.Entities.Class", "Class")
                         .WithMany("Students")
                         .HasForeignKey("ClassId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("ClassBook.Domain.Entities.User", "User")
                         .WithOne("Student")

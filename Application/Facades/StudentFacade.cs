@@ -46,7 +46,7 @@ namespace ClassBook.Application.Facades
                 FirstName = firstName.Trim(),
                 LastName = lastName.Trim(),
                 BirthDate = birthDate,
-                ClassId = classId ?? 0
+                ClassId = classId
             };
 
             _db.Students.Add(student);
@@ -69,15 +69,15 @@ namespace ClassBook.Application.Facades
             student.FirstName = firstName.Trim();
             student.LastName = lastName.Trim();
             student.BirthDate = birthDate;
-            student.ClassId = classId ?? 0;
+            student.ClassId = classId;
 
             await _db.SaveChangesAsync();
 
             string? className = null;
-            if (student.ClassId > 0)
+            if (student.ClassId.HasValue)
             {
                 className = await _db.Classes
-                    .Where(c => c.ClassId == student.ClassId)
+                    .Where(c => c.ClassId == student.ClassId.Value)
                     .Select(c => c.Name)
                     .FirstOrDefaultAsync();
             }

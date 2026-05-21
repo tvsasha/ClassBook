@@ -1354,6 +1354,10 @@ td {
   line-height: 1.55;
 }
 
+.danger-hint {
+  color: #991b1b;
+}
+
 .access-card div {
   display: grid;
   gap: 6px;
