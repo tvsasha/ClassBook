@@ -2775,7 +2775,9 @@ function SchedulePage({ role }) {
   const [className, setClassName] = useState("");
   const [lessonForm, setLessonForm] = useState({
     subjectId: "",
+    subjectName: "",
     teacherId: "",
+    teacherName: "",
     homework: ""
   });
 
@@ -2814,9 +2816,15 @@ function SchedulePage({ role }) {
     const teacherId = lesson?.teacherId
       ?? metadata?.subjects?.find((item) => Number(item.subjectId) === Number(subjectId))?.teacherId
       ?? "";
+    const teacherName = metadata?.teachers?.find((item) => Number(item.id) === Number(teacherId))?.fullName ?? "";
+    const subjectName = lesson?.subjectName
+      ?? metadata?.subjects?.find((item) => Number(item.subjectId) === Number(subjectId))?.name
+      ?? "";
     setLessonForm({
       subjectId,
+      subjectName,
       teacherId,
+      teacherName,
       homework: lesson?.homework ?? ""
     });
   }
@@ -2853,7 +2861,7 @@ function SchedulePage({ role }) {
       classId: targetClass.classId,
       className: targetClass.name,
       subjectId,
-      subjectName: subject?.name ?? lesson.subjectName,
+      subjectName: subject?.name ?? payload?.subjectName ?? lesson.subjectName,
       teacherId,
       teacherName: teacher?.fullName ?? lesson.teacherName,
       scheduleId: targetSlot.scheduleId,
@@ -2899,14 +2907,18 @@ function SchedulePage({ role }) {
 
   async function saveLesson(event) {
     event.preventDefault();
-    if (!selectedCell || !lessonForm.subjectId || !lessonForm.teacherId) {
+    const subjectName = lessonForm.subjectName.trim();
+    const canCreateSubjectInSchedule = editable;
+    const shouldRefreshMetadataAfterSave = !lessonForm.subjectId;
+    if (!selectedCell || (!lessonForm.subjectId && (!canCreateSubjectInSchedule || !subjectName)) || !lessonForm.teacherId) {
       setMessage("Выберите ячейку, предмет и преподавателя");
       return;
     }
 
     const payload = {
       classId: selectedCell.classItem.classId,
-      subjectId: Number(lessonForm.subjectId),
+      subjectId: Number(lessonForm.subjectId || 0),
+      subjectName,
       teacherId: Number(lessonForm.teacherId),
       scheduleId: selectedCell.slot.scheduleId,
       date: getLessonDateForSlot(weekStart, selectedCell.slot),
@@ -2937,6 +2949,9 @@ function SchedulePage({ role }) {
         });
         replaceWeekLesson(optimisticLesson.lessonId, savedLesson ?? optimisticLesson);
         setMessage("Урок добавлен в сетку");
+      }
+      if (shouldRefreshMetadataAfterSave) {
+        await loadScheduleEditor({ refreshMetadata: true });
       }
     } catch (error) {
       await loadScheduleEditor();
@@ -3204,6 +3219,9 @@ function SchedulePage({ role }) {
   const lessonMap = buildScheduleLessonMap(week.lessons ?? []);
   const weekCaption = getWeekCaption(weekStart);
   const selectedClassId = selectedCell?.classItem?.classId ?? null;
+    const canCreateSubjectInSchedule = editable;
+  const teacherOptionsId = "schedule-teacher-options";
+  const subjectOptionsId = "schedule-subject-options";
   const filteredSubjects = subjects.filter((subject) => {
     const subjectTeacherIds = subject.teacherIds?.length ? subject.teacherIds : [subject.teacherId];
     const subjectClassIds = subject.classIds ?? [];
@@ -3334,8 +3352,10 @@ function SchedulePage({ role }) {
               <div className="lesson-editor-grid">
                 <label className="field">
                   <span>Преподаватель</span>
-                  <select value={lessonForm.teacherId} onChange={(event) => {
-                    const teacherId = event.target.value;
+                  <input list={teacherOptionsId} value={lessonForm.teacherName} onChange={(event) => {
+                    const teacherName = event.target.value;
+                    const teacher = teachers.find((item) => item.fullName === teacherName);
+                    const teacherId = teacher?.id ? String(teacher.id) : "";
                     const currentSubject = subjects.find((item) => Number(item.subjectId) === Number(lessonForm.subjectId));
                     const currentSubjectTeacherIds = currentSubject?.teacherIds?.length
                       ? currentSubject.teacherIds
@@ -3348,29 +3368,30 @@ function SchedulePage({ role }) {
 
                     setLessonForm({
                       ...lessonForm,
+                      teacherName,
                       teacherId,
-                      subjectId: subjectStillMatches ? lessonForm.subjectId : ""
+                      subjectId: subjectStillMatches ? lessonForm.subjectId : "",
+                      subjectName: subjectStillMatches ? lessonForm.subjectName : ""
                     });
-                  }}>
-                    <option value="">Выберите преподавателя</option>
-                    {teachers.map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
-                    ))}
-                  </select>
+                  }} placeholder="??????? ??????? ?????????????" />
+                  <datalist id={teacherOptionsId}>
+                    {teachers.map((teacher) => <option key={teacher.id} value={teacher.fullName} />)}
+                  </datalist>
                 </label>
                 <label className="field">
                   <span>Предмет</span>
-                  <select value={lessonForm.subjectId} disabled={!lessonForm.teacherId} onChange={(event) => {
+                  <input list={subjectOptionsId} value={lessonForm.subjectName} disabled={!lessonForm.teacherId} onChange={(event) => {
+                    const subjectName = event.target.value;
+                    const subject = filteredSubjects.find((item) => item.name === subjectName);
                     setLessonForm({
                       ...lessonForm,
-                      subjectId: event.target.value
+                      subjectName,
+                      subjectId: subject?.subjectId ? String(subject.subjectId) : ""
                     });
-                  }}>
-                    <option value="">{lessonForm.teacherId ? "Выберите предмет" : "Сначала выберите преподавателя"}</option>
-                    {filteredSubjects.map((subject) => (
-                      <option key={subject.subjectId} value={subject.subjectId}>{subject.name}</option>
-                    ))}
-                  </select>
+                  }} placeholder={canCreateSubjectInSchedule ? "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0438\u043b\u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u0435\u0434\u043c\u0435\u0442" : "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0440\u0435\u0434\u043c\u0435\u0442"} />
+                  <datalist id={subjectOptionsId}>
+                    {filteredSubjects.map((subject) => <option key={subject.subjectId} value={subject.name} />)}
+                  </datalist>
                 </label>
               </div>
               <label className="field">

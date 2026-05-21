@@ -289,7 +289,7 @@ namespace ClassBook.Application.Facades
         /// </summary>
         public async Task<ScheduleEditorLessonMutationResultDto> CreateEditorLessonAsync(ScheduleEditorLessonRequest request)
         {
-            await ValidateEditorLessonRequestAsync(request);
+            await PrepareEditorLessonRequestAsync(request);
 
             var lessonDate = request.Date.Date;
 
@@ -328,7 +328,7 @@ namespace ClassBook.Application.Facades
         /// </summary>
         public async Task<ScheduleEditorLessonMutationResultDto> UpdateEditorLessonAsync(int lessonId, ScheduleEditorLessonRequest request)
         {
-            await ValidateEditorLessonRequestAsync(request);
+            await PrepareEditorLessonRequestAsync(request);
 
             var lesson = await _db.Lessons.FindAsync(lessonId);
             if (lesson == null)
@@ -456,6 +456,88 @@ namespace ClassBook.Application.Facades
         public async Task<Schedule?> GetScheduleSlotAsync(int scheduleId)
         {
             return await _db.Schedules.FindAsync(scheduleId);
+        }
+
+        private async Task PrepareEditorLessonRequestAsync(ScheduleEditorLessonRequest request)
+        {
+            if (request.ClassId <= 0)
+                throw new ArgumentException("Класс обязателен");
+            if (request.ScheduleId <= 0)
+                throw new ArgumentException("Слот расписания обязателен");
+            if (request.TeacherId <= 0)
+                throw new ArgumentException("Преподаватель обязателен");
+
+            if (!await _db.Classes.AnyAsync(c => c.ClassId == request.ClassId))
+                throw new InvalidOperationException("Класс не найден");
+
+            if (!await _db.Schedules.AnyAsync(s => s.ScheduleId == request.ScheduleId))
+                throw new InvalidOperationException("Слот расписания не найден");
+
+            if (!await _db.Users.AnyAsync(u => u.Id == request.TeacherId && u.RoleId == SystemRoleIds.Teacher))
+                throw new InvalidOperationException("Преподаватель не найден");
+
+            await ResolveEditorSubjectAsync(request);
+            await EnsureEditorSubjectAssignmentAsync(request.SubjectId, request.ClassId, request.TeacherId);
+        }
+
+        private async Task ResolveEditorSubjectAsync(ScheduleEditorLessonRequest request)
+        {
+            if (request.SubjectId > 0)
+            {
+                if (!await _db.Subjects.AnyAsync(s => s.SubjectId == request.SubjectId))
+                    throw new InvalidOperationException("Предмет не найден");
+
+                return;
+            }
+
+            var normalizedName = NormalizeSubjectName(request.SubjectName);
+            if (string.IsNullOrWhiteSpace(normalizedName))
+                throw new ArgumentException("Предмет обязателен");
+
+            var normalizedLower = normalizedName.ToLower();
+            var subject = await _db.Subjects
+                .FirstOrDefaultAsync(s => s.Name.ToLower() == normalizedLower);
+
+            if (subject == null)
+            {
+                subject = new Subject
+                {
+                    Name = normalizedName,
+                    TeacherId = request.TeacherId
+                };
+                _db.Subjects.Add(subject);
+                await _db.SaveChangesAsync();
+            }
+
+            request.SubjectId = subject.SubjectId;
+        }
+
+        private async Task EnsureEditorSubjectAssignmentAsync(int subjectId, int classId, int teacherId)
+        {
+            var hasAssignment = await _db.SubjectClassAssignments.AnyAsync(assignment =>
+                assignment.SubjectId == subjectId &&
+                assignment.ClassId == classId &&
+                assignment.TeacherId == teacherId);
+
+            if (hasAssignment)
+                return;
+
+            _db.SubjectClassAssignments.Add(new SubjectClassAssignment
+            {
+                SubjectId = subjectId,
+                ClassId = classId,
+                TeacherId = teacherId,
+                CreatedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+        }
+
+        private static string NormalizeSubjectName(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return string.Empty;
+
+            return Regex.Replace(name.Trim(), @"\s+", " ");
         }
 
         private async Task ValidateEditorLessonRequestAsync(ScheduleEditorLessonRequest request)

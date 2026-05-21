@@ -104,6 +104,7 @@ namespace ClassBook.Application.DTOs
     {
         public int ClassId { get; set; }
         public int SubjectId { get; set; }
+        public string? SubjectName { get; set; }
         public int TeacherId { get; set; }
         public int ScheduleId { get; set; }
         public DateTime Date { get; set; }
