@@ -152,7 +152,8 @@ select {
   margin-bottom: 16px;
 }
 
-.field label {
+.field label,
+.field > span {
   color: var(--muted);
   font-size: 0.92rem;
 }
@@ -1623,10 +1624,10 @@ td {
   line-height: 1.35;
 }
 
-.schedule-side-editor {
+.schedule-side-editor,
+.schedule-modal-editor {
   display: grid;
   gap: 14px;
-  padding: 4px 0 0;
 }
 
 .schedule-side-editor h3,
@@ -1637,6 +1638,51 @@ td {
 .schedule-side-editor p {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.schedule-modal-editor {
+  gap: 16px;
+}
+
+.lesson-editor-summary {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid rgba(15, 124, 102, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(15, 124, 102, 0.1), rgba(255, 255, 255, 0.86));
+}
+
+.lesson-editor-summary span,
+.lesson-editor-summary small {
+  color: var(--muted);
+}
+
+.lesson-editor-summary strong {
+  font-size: 1.1rem;
+}
+
+.lesson-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.lesson-editor-actions,
+.lesson-editor-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.lesson-editor-actions {
+  padding-top: 2px;
+}
+
+.lesson-editor-secondary {
+  padding-top: 4px;
+  border-top: 1px solid rgba(24, 32, 38, 0.08);
 }
 
 .card-grid {
@@ -1895,6 +1941,10 @@ td {
   .schedule-toolbar,
   .class-create-form {
     align-items: stretch;
+  }
+
+  .lesson-editor-grid {
+    grid-template-columns: 1fr;
   }
 
   .learning-week-title {

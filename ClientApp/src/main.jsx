@@ -3181,46 +3181,57 @@ function SchedulePage({ role }) {
         </div>
         {editable && lessonEditorOpen && selectedCell && (
           <Modal title={selectedCell.lesson ? "Редактирование урока" : "Новый урок"} onClose={() => setLessonEditorOpen(false)}>
-            <form className="schedule-side-editor schedule-modal-editor" onSubmit={saveLesson}>
-              <p>{selectedCell ? `${selectedCell.classItem.name}, ${dayName(selectedCell.slot.dayOfWeek)}, ${selectedCell.slot.lessonNumber} урок` : "Выберите ячейку в сетке"}</p>
+            <form className="modal-form schedule-modal-editor" onSubmit={saveLesson}>
+              <div className="lesson-editor-summary">
+                <span>{selectedCell.classItem.name}</span>
+                <strong>{dayName(selectedCell.slot.dayOfWeek)}, {selectedCell.slot.lessonNumber} урок</strong>
+                <small>{selectedCell.slot.startTime} - {selectedCell.slot.endTime}</small>
+              </div>
+              <div className="lesson-editor-grid">
+                <label className="field">
+                  <span>Предмет</span>
+                  <select value={lessonForm.subjectId} onChange={(event) => {
+                    const subject = subjects.find((item) => Number(item.subjectId) === Number(event.target.value));
+                    setLessonForm({
+                      ...lessonForm,
+                      subjectId: event.target.value,
+                      teacherId: lessonForm.teacherId || subject?.teacherId || ""
+                    });
+                  }}>
+                    <option value="">Выберите предмет</option>
+                    {subjects.map((subject) => (
+                      <option key={subject.subjectId} value={subject.subjectId}>{subject.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Преподаватель</span>
+                  <select value={lessonForm.teacherId || selectedSubject?.teacherId || ""} onChange={(event) => setLessonForm({ ...lessonForm, teacherId: event.target.value })}>
+                    <option value="">Выберите преподавателя</option>
+                    {teachers.map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <label className="field">
-                <span>Предмет</span>
-                <select value={lessonForm.subjectId} onChange={(event) => {
-                  const subject = subjects.find((item) => Number(item.subjectId) === Number(event.target.value));
-                  setLessonForm({
-                    ...lessonForm,
-                    subjectId: event.target.value,
-                    teacherId: lessonForm.teacherId || subject?.teacherId || ""
-                  });
-                }}>
-                  <option value="">Выберите предмет</option>
-                  {subjects.map((subject) => (
-                    <option key={subject.subjectId} value={subject.subjectId}>{subject.name}</option>
-                  ))}
-                </select>
+                <span>Домашнее задание / примечание</span>
+                <textarea value={lessonForm.homework} onChange={(event) => setLessonForm({ ...lessonForm, homework: event.target.value })} />
               </label>
-              <label className="field">
-                <span>Преподаватель</span>
-                <select value={lessonForm.teacherId || selectedSubject?.teacherId || ""} onChange={(event) => setLessonForm({ ...lessonForm, teacherId: event.target.value })}>
-                  <option value="">Выберите преподавателя</option>
-                  {teachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
-                  ))}
-                </select>
-              </label>
-              <Field label="Домашнее задание / примечание" value={lessonForm.homework} onChange={(value) => setLessonForm({ ...lessonForm, homework: value })} />
-              <button className="primary-button" disabled={!selectedCell}>Сохранить урок</button>
+              <div className="lesson-editor-actions">
+                <button className="primary-button compact" disabled={!selectedCell}>Сохранить урок</button>
+                {!selectedCell?.lesson && copiedLesson && (
+                  <button className="ghost-button compact" type="button" disabled={!selectedCell} onClick={() => pasteCopiedLesson()}>
+                    Вставить: {copiedLesson.subjectName}
+                  </button>
+                )}
+              </div>
               {selectedCell?.lesson && (
-                <>
-                  <button className="ghost-button" type="button" onClick={() => copyScheduleLesson(selectedCell.lesson)}>Копировать урок</button>
-                  <button className="ghost-button" type="button" onClick={() => duplicateLessonToNextFreeSlot(selectedCell.lesson)}>Дублировать в свободный слот</button>
-                  <button className="danger-button" type="button" onClick={deleteScheduleLesson}>Удалить урок</button>
-                </>
-              )}
-              {!selectedCell?.lesson && copiedLesson && (
-                <button className="ghost-button" type="button" disabled={!selectedCell} onClick={() => pasteCopiedLesson()}>
-                  Вставить: {copiedLesson.subjectName}
-                </button>
+                <div className="lesson-editor-secondary">
+                  <button className="ghost-button compact" type="button" onClick={() => copyScheduleLesson(selectedCell.lesson)}>Копировать урок</button>
+                  <button className="ghost-button compact" type="button" onClick={() => duplicateLessonToNextFreeSlot(selectedCell.lesson)}>Дублировать</button>
+                  <button className="danger-button compact" type="button" onClick={() => deleteScheduleLesson()}>Удалить</button>
+                </div>
               )}
               {copiedLesson && <small className="row-note">Скопировано: {copiedLesson.subjectName} · {copiedLesson.className}</small>}
             </form>
