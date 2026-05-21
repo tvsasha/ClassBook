@@ -14,9 +14,14 @@ import {
 } from "./auth.js";
 
 async function copyTextToClipboard(text) {
-  if (navigator?.clipboard?.writeText) {
+  const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : null;
+  const writeText = clipboard && typeof clipboard.writeText === "function"
+    ? clipboard.writeText.bind(clipboard)
+    : null;
+
+  if (writeText) {
     try {
-      await navigator.clipboard.writeText(text);
+      await writeText(text);
       return;
     } catch {
       // Clipboard API can be blocked on plain HTTP, so fall back below.

@@ -13,12 +13,12 @@ export default defineConfig(({ command }) => {
       emptyOutDir: true,
       rollupOptions: {
         output: {
-          entryFileNames: "assets/app.js",
-          chunkFileNames: "assets/[name].js",
+          entryFileNames: "assets/app-[hash].js",
+          chunkFileNames: "assets/[name]-[hash].js",
           assetFileNames: (assetInfo) => {
             return assetInfo.names?.some((name) => name.endsWith(".css"))
-              ? "assets/app.css"
-              : "assets/[name][extname]";
+              ? "assets/app-[hash].css"
+              : "assets/[name]-[hash][extname]";
           }
         }
       }

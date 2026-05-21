@@ -1696,6 +1696,21 @@ td {
     position: static;
     height: auto;
   }
+
+  .schedule-day-head,
+  .schedule-time-head,
+  .schedule-number-head,
+  .schedule-day-col,
+  .schedule-time-col,
+  .schedule-number-col {
+    position: static;
+    box-shadow: none;
+  }
+
+  .schedule-grid-table th {
+    position: sticky;
+    top: 0;
+  }
 }
 
 @media (max-width: 640px) {
