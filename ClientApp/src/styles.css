@@ -1408,10 +1408,6 @@ td {
 
 .schedule-editor {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 16px;
-  align-items: start;
 }
 
 .schedule-grid-wrap {
@@ -1468,6 +1464,19 @@ td {
   position: sticky;
   top: 0;
   z-index: 9;
+}
+
+.schedule-day-head,
+.schedule-day-col {
+  position: sticky;
+  left: 0;
+  z-index: 8;
+  box-shadow: 1px 0 0 rgba(24, 32, 38, 0.1), 8px 0 16px rgba(24, 32, 38, 0.06);
+}
+
+.schedule-day-head {
+  top: 0;
+  z-index: 12;
 }
 
 .schedule-time-col,
@@ -1598,10 +1607,7 @@ td {
 .schedule-side-editor {
   display: grid;
   gap: 14px;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.74);
+  padding: 4px 0 0;
 }
 
 .schedule-side-editor h3,

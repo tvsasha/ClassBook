@@ -2638,6 +2638,7 @@ function SchedulePage({ role }) {
   const [dragOverCell, setDragOverCell] = useState(null);
   const [copiedLesson, setCopiedLesson] = useState(null);
   const [scheduleMenu, setScheduleMenu] = useState(null);
+  const [lessonEditorOpen, setLessonEditorOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [className, setClassName] = useState("");
@@ -2684,6 +2685,11 @@ function SchedulePage({ role }) {
       teacherId,
       homework: lesson?.homework ?? ""
     });
+  }
+
+  function openLessonEditor(classItem, slot, lesson) {
+    selectCell(classItem, slot, lesson);
+    setLessonEditorOpen(true);
   }
 
   function updateWeekLessons(updater) {
@@ -2778,6 +2784,7 @@ function SchedulePage({ role }) {
         const lessonId = selectedCell.lesson.lessonId;
         const optimisticLesson = makeScheduleLesson(selectedCell.lesson, selectedCell.classItem, selectedCell.slot, payload);
         replaceWeekLesson(lessonId, optimisticLesson);
+        setLessonEditorOpen(false);
         setSelectedCell(null);
         const savedLesson = await apiRequest(`/schedule/editor/lesson/${lessonId}`, {
           method: "PUT",
@@ -2788,6 +2795,7 @@ function SchedulePage({ role }) {
       } else {
         const optimisticLesson = makeTempLesson({}, selectedCell.classItem, selectedCell.slot, payload);
         updateWeekLessons((lessons) => [...lessons, optimisticLesson]);
+        setLessonEditorOpen(false);
         setSelectedCell(null);
         const savedLesson = await apiRequest("/schedule/editor/lesson", {
           method: "POST",
@@ -2809,6 +2817,7 @@ function SchedulePage({ role }) {
 
     const removedLesson = lesson;
     removeWeekLesson(lesson.lessonId);
+    setLessonEditorOpen(false);
     setSelectedCell(null);
     setScheduleMenu(null);
     try {
@@ -3116,7 +3125,7 @@ function SchedulePage({ role }) {
                       <td
                         className={`schedule-cell ${lesson ? "has-lesson" : "empty"} ${selected ? "selected" : ""} ${dragTarget ? "drag-target" : ""}`}
                         key={`${classItem.classId}-${slot.scheduleId}`}
-                        onClick={() => editable && selectCell(classItem, slot, lesson)}
+                        onClick={() => editable && openLessonEditor(classItem, slot, lesson)}
                         onContextMenu={(event) => openScheduleMenu(event, classItem, slot, lesson)}
                         onDragOver={(event) => {
                           if (!editable) {
@@ -3170,51 +3179,52 @@ function SchedulePage({ role }) {
             </tbody>
           </table>
         </div>
-        {editable && (
-          <form className="schedule-side-editor" onSubmit={saveLesson}>
-            <h3>{selectedCell?.lesson ? "Редактирование урока" : "Новый урок"}</h3>
-            <p>{selectedCell ? `${selectedCell.classItem.name}, ${dayName(selectedCell.slot.dayOfWeek)}, ${selectedCell.slot.lessonNumber} урок` : "Выберите ячейку в сетке"}</p>
-            <label className="field">
-              <span>Предмет</span>
-              <select value={lessonForm.subjectId} onChange={(event) => {
-                const subject = subjects.find((item) => Number(item.subjectId) === Number(event.target.value));
-                setLessonForm({
-                  ...lessonForm,
-                  subjectId: event.target.value,
-                  teacherId: lessonForm.teacherId || subject?.teacherId || ""
-                });
-              }}>
-                <option value="">Выберите предмет</option>
-                {subjects.map((subject) => (
-                  <option key={subject.subjectId} value={subject.subjectId}>{subject.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Преподаватель</span>
-              <select value={lessonForm.teacherId || selectedSubject?.teacherId || ""} onChange={(event) => setLessonForm({ ...lessonForm, teacherId: event.target.value })}>
-                <option value="">Выберите преподавателя</option>
-                {teachers.map((teacher) => (
-                  <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
-                ))}
-              </select>
-            </label>
-            <Field label="Домашнее задание / примечание" value={lessonForm.homework} onChange={(value) => setLessonForm({ ...lessonForm, homework: value })} />
-            <button className="primary-button" disabled={!selectedCell}>Сохранить урок</button>
-            {selectedCell?.lesson && (
-              <>
-                <button className="ghost-button" type="button" onClick={() => copyScheduleLesson(selectedCell.lesson)}>Копировать урок</button>
-                <button className="ghost-button" type="button" onClick={() => duplicateLessonToNextFreeSlot(selectedCell.lesson)}>Дублировать в свободный слот</button>
-                <button className="danger-button" type="button" onClick={deleteScheduleLesson}>Удалить урок</button>
-              </>
-            )}
-            {!selectedCell?.lesson && copiedLesson && (
-              <button className="ghost-button" type="button" disabled={!selectedCell} onClick={() => pasteCopiedLesson()}>
-                Вставить: {copiedLesson.subjectName}
-              </button>
-            )}
-            {copiedLesson && <small className="row-note">Скопировано: {copiedLesson.subjectName} · {copiedLesson.className}</small>}
-          </form>
+        {editable && lessonEditorOpen && selectedCell && (
+          <Modal title={selectedCell.lesson ? "Редактирование урока" : "Новый урок"} onClose={() => setLessonEditorOpen(false)}>
+            <form className="schedule-side-editor schedule-modal-editor" onSubmit={saveLesson}>
+              <p>{selectedCell ? `${selectedCell.classItem.name}, ${dayName(selectedCell.slot.dayOfWeek)}, ${selectedCell.slot.lessonNumber} урок` : "Выберите ячейку в сетке"}</p>
+              <label className="field">
+                <span>Предмет</span>
+                <select value={lessonForm.subjectId} onChange={(event) => {
+                  const subject = subjects.find((item) => Number(item.subjectId) === Number(event.target.value));
+                  setLessonForm({
+                    ...lessonForm,
+                    subjectId: event.target.value,
+                    teacherId: lessonForm.teacherId || subject?.teacherId || ""
+                  });
+                }}>
+                  <option value="">Выберите предмет</option>
+                  {subjects.map((subject) => (
+                    <option key={subject.subjectId} value={subject.subjectId}>{subject.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Преподаватель</span>
+                <select value={lessonForm.teacherId || selectedSubject?.teacherId || ""} onChange={(event) => setLessonForm({ ...lessonForm, teacherId: event.target.value })}>
+                  <option value="">Выберите преподавателя</option>
+                  {teachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
+                  ))}
+                </select>
+              </label>
+              <Field label="Домашнее задание / примечание" value={lessonForm.homework} onChange={(value) => setLessonForm({ ...lessonForm, homework: value })} />
+              <button className="primary-button" disabled={!selectedCell}>Сохранить урок</button>
+              {selectedCell?.lesson && (
+                <>
+                  <button className="ghost-button" type="button" onClick={() => copyScheduleLesson(selectedCell.lesson)}>Копировать урок</button>
+                  <button className="ghost-button" type="button" onClick={() => duplicateLessonToNextFreeSlot(selectedCell.lesson)}>Дублировать в свободный слот</button>
+                  <button className="danger-button" type="button" onClick={deleteScheduleLesson}>Удалить урок</button>
+                </>
+              )}
+              {!selectedCell?.lesson && copiedLesson && (
+                <button className="ghost-button" type="button" disabled={!selectedCell} onClick={() => pasteCopiedLesson()}>
+                  Вставить: {copiedLesson.subjectName}
+                </button>
+              )}
+              {copiedLesson && <small className="row-note">Скопировано: {copiedLesson.subjectName} · {copiedLesson.className}</small>}
+            </form>
+          </Modal>
         )}
         {editable && scheduleMenu && (
           <div
