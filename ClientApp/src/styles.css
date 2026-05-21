@@ -380,12 +380,14 @@ select {
 }
 
 .content-panel {
+  min-width: 0;
   min-height: calc(100vh - 64px);
   padding: 30px;
 }
 
 .page-stack {
   display: grid;
+  min-width: 0;
   gap: 22px;
 }
 
@@ -1408,18 +1410,33 @@ td {
 
 .schedule-editor {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .schedule-grid-wrap {
-  --schedule-day-width: 132px;
-  --schedule-time-width: 122px;
+  --schedule-day-width: 118px;
+  --schedule-time-width: 104px;
   --schedule-number-width: 58px;
-  max-height: calc(100vh - 220px);
+  width: 100%;
+  max-width: 100%;
+  max-height: min(68vh, calc(100vh - 210px));
   overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--line);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.68);
   -webkit-overflow-scrolling: touch;
+}
+
+.schedule-grid-table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.schedule-grid-table th,
+.schedule-grid-table td {
+  padding: 10px 12px;
 }
 
 .schedule-grid-table th {
@@ -1492,8 +1509,9 @@ td {
 }
 
 .schedule-cell {
-  min-width: 170px;
-  height: 92px;
+  min-width: 148px;
+  max-width: 168px;
+  height: 78px;
   cursor: pointer;
   vertical-align: top;
   white-space: normal;
@@ -1519,7 +1537,7 @@ td {
 }
 
 .schedule-lesson-card {
-  min-height: 64px;
+  min-height: 54px;
   cursor: grab;
 }
 
