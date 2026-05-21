@@ -13,6 +13,34 @@ import {
   readStoredUser
 } from "./auth.js";
 
+async function copyTextToClipboard(text) {
+  if (navigator?.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Clipboard API can be blocked on plain HTTP, so fall back below.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  if (!copied) {
+    throw new Error("copy_failed");
+  }
+}
+
 function App() {
   const [user, setUser] = useState(readStoredUser);
   const [loading, setLoading] = useState(true);
@@ -674,16 +702,24 @@ function AdminPage({ role }) {
 
   async function copyAccessText(access) {
     const text = `Логин: ${access.login}\nВременный пароль: ${access.temporaryPassword}\nПри первом входе система попросит задать постоянный пароль.`;
-    await navigator.clipboard.writeText(text);
-    setMessage("Данные доступа скопированы");
+    try {
+      await copyTextToClipboard(text);
+      setMessage("Данные доступа скопированы");
+    } catch {
+      setMessage("Не удалось скопировать автоматически. Выделите логин и пароль в окне и скопируйте вручную.");
+    }
   }
 
   async function copyBatchAccess(items) {
     const text = items
       .map((item) => `${item.fullName}\nЛогин: ${item.login}\nВременный пароль: ${item.temporaryPassword}\n`)
       .join("\n");
-    await navigator.clipboard.writeText(text);
-    setMessage("Список доступов скопирован");
+    try {
+      await copyTextToClipboard(text);
+      setMessage("Список доступов скопирован");
+    } catch {
+      setMessage("Не удалось скопировать список автоматически. Выделите данные в окне и скопируйте вручную.");
+    }
   }
 
   async function attachStudentAccount(event) {
