@@ -349,7 +349,7 @@ namespace ClassBook.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SubjectClassAssignmentId"));
 
-                    b.Property<int?>("ClassId")
+                    b.Property<int>("ClassId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
@@ -365,10 +365,10 @@ namespace ClassBook.Migrations
 
                     b.HasIndex("ClassId");
 
+                    b.HasIndex("TeacherId", "ClassId");
+
                     b.HasIndex("SubjectId", "ClassId", "TeacherId")
                         .IsUnique();
-
-                    b.HasIndex("TeacherId", "ClassId");
 
                     b.ToTable("SubjectClassAssignments");
                 });
@@ -428,7 +428,7 @@ namespace ClassBook.Migrations
                     b.Property<DateTime>("BirthDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("ClassId")
+                    b.Property<int?>("ClassId")
                         .HasColumnType("int");
 
                     b.Property<string>("FirstName")
