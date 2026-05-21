@@ -22,6 +22,7 @@ namespace ClassBook.Application.Facades
         public async Task<List<Schedule>> GetAllScheduleSlotsAsync()
         {
             return await _db.Schedules
+                .AsNoTracking()
                 .OrderBy(s => s.DayOfWeek)
                 .ThenBy(s => s.LessonNumber)
                 .ToListAsync();
@@ -36,6 +37,7 @@ namespace ClassBook.Application.Facades
                 throw new ArgumentException("День недели должен быть от 0 (Пн) до 4 (Пт)");
 
             return await _db.Schedules
+                .AsNoTracking()
                 .Where(s => s.DayOfWeek == dayOfWeek)
                 .OrderBy(s => s.LessonNumber)
                 .ToListAsync();
@@ -47,6 +49,7 @@ namespace ClassBook.Application.Facades
         public async Task<Dictionary<int, List<Schedule>>> GetFullWeekScheduleAsync()
         {
             var schedules = await _db.Schedules
+                .AsNoTracking()
                 .OrderBy(s => s.DayOfWeek)
                 .ThenBy(s => s.LessonNumber)
                 .ToListAsync();
@@ -70,22 +73,31 @@ namespace ClassBook.Application.Facades
             if (dayOfWeek > 5) dayOfWeek -= 1;
 
             var schedules = await _db.Schedules
+                .AsNoTracking()
                 .Where(s => s.DayOfWeek == dayOfWeek)
                 .OrderBy(s => s.LessonNumber)
                 .ToListAsync();
 
-            var result = new List<(Schedule, Lesson?)>();
-            foreach (var schedule in schedules)
-            {
-                var lesson = await _db.Lessons
-                    .Where(l => l.ClassId == classId && l.ScheduleId == schedule.ScheduleId &&
-                                (date == null || l.Date.Date == date.Value.Date))
-                    .Include(l => l.Subject)
-                    .Include(l => l.Teacher)
-                    .FirstOrDefaultAsync();
+            var scheduleIds = schedules.Select(schedule => schedule.ScheduleId).ToList();
+            var lessonsQuery = _db.Lessons
+                .AsNoTracking()
+                .Where(l => l.ClassId == classId && l.ScheduleId.HasValue && scheduleIds.Contains(l.ScheduleId.Value));
 
-                result.Add((schedule, lesson));
+            if (date.HasValue)
+            {
+                var targetDate = date.Value.Date;
+                var nextDate = targetDate.AddDays(1);
+                lessonsQuery = lessonsQuery.Where(l => l.Date >= targetDate && l.Date < nextDate);
             }
+
+            var lessonsBySchedule = await lessonsQuery
+                .Include(l => l.Subject)
+                .Include(l => l.Teacher)
+                .ToDictionaryAsync(l => l.ScheduleId!.Value);
+
+            var result = schedules
+                .Select(schedule => (schedule, lessonsBySchedule.GetValueOrDefault(schedule.ScheduleId)))
+                .ToList();
 
             return result;
         }
@@ -98,6 +110,7 @@ namespace ClassBook.Application.Facades
             await EnsureDefaultScheduleSlotsAsync();
 
             var classes = await _db.Classes
+                .AsNoTracking()
                 .Select(c => new ClassListItemDto
                 {
                     ClassId = c.ClassId,
@@ -106,33 +119,18 @@ namespace ClassBook.Application.Facades
                 .ToListAsync();
 
             var subjects = await _db.Subjects
-                .Include(s => s.Teacher)
-                .Include(s => s.ClassAssignments!)
-                .ThenInclude(assignment => assignment.Class)
+                .AsNoTracking()
                 .OrderBy(s => s.Name)
                 .Select(s => new ScheduleEditorSubjectDto
                 {
                     SubjectId = s.SubjectId,
                     Name = s.Name,
-                    TeacherId = s.TeacherId,
-                    TeacherName = s.Teacher != null ? s.Teacher.FullName : "Не назначен",
-                    TeacherIds = s.ClassAssignments != null && s.ClassAssignments.Any()
-                        ? s.ClassAssignments.Select(assignment => assignment.TeacherId).Distinct().ToList()
-                        : new List<int> { s.TeacherId },
-                    ClassIds = s.ClassAssignments != null
-                        ? s.ClassAssignments.Select(assignment => assignment.ClassId).Distinct().ToList()
-                        : new List<int>(),
-                    Classes = s.ClassAssignments != null
-                        ? string.Join(", ", s.ClassAssignments
-                            .Where(assignment => assignment.Class != null)
-                            .Select(assignment => assignment.Class!.Name)
-                            .Distinct()
-                            .OrderBy(name => name))
-                        : string.Empty
+                    TeacherId = s.TeacherId
                 })
                 .ToListAsync();
 
             var teachers = await _db.Users
+                .AsNoTracking()
                 .Where(u => u.RoleId == SystemRoleIds.Teacher)
                 .OrderBy(u => u.FullName)
                 .Select(u => new TeacherLookupDto
@@ -143,7 +141,56 @@ namespace ClassBook.Application.Facades
                 })
                 .ToListAsync();
 
+            var teacherNames = teachers.ToDictionary(teacher => teacher.Id, teacher => teacher.FullName);
+            foreach (var subject in subjects)
+            {
+                subject.TeacherName = teacherNames.GetValueOrDefault(subject.TeacherId) ?? "Не назначен";
+            }
+
+            var classNames = classes.ToDictionary(classItem => classItem.ClassId, classItem => classItem.Name);
+            var assignments = await _db.SubjectClassAssignments
+                .AsNoTracking()
+                .Select(assignment => new
+                {
+                    assignment.SubjectId,
+                    assignment.ClassId,
+                    assignment.TeacherId
+                })
+                .ToListAsync();
+
+            var assignmentsBySubject = assignments
+                .GroupBy(assignment => assignment.SubjectId)
+                .ToDictionary(group => group.Key, group => group.ToList());
+
+            foreach (var subject in subjects)
+            {
+                if (!assignmentsBySubject.TryGetValue(subject.SubjectId, out var subjectAssignments))
+                {
+                    subject.TeacherIds = [subject.TeacherId];
+                    subject.ClassIds = [];
+                    subject.Classes = string.Empty;
+                    continue;
+                }
+
+                subject.TeacherIds = subjectAssignments
+                    .Select(assignment => assignment.TeacherId)
+                    .Distinct()
+                    .ToList();
+                subject.ClassIds = subjectAssignments
+                    .Select(assignment => assignment.ClassId)
+                    .Distinct()
+                    .ToList();
+                subject.Classes = string.Join(", ", subjectAssignments
+                    .Select(assignment => classNames.GetValueOrDefault(assignment.ClassId))
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct()
+                    .OrderBy(name => ExtractClassNumber(name!))
+                    .ThenBy(name => ExtractClassSuffix(name!))
+                    .ThenBy(name => name));
+            }
+
             var slots = await _db.Schedules
+                .AsNoTracking()
                 .OrderBy(s => s.DayOfWeek)
                 .ThenBy(s => s.LessonNumber)
                 .Select(s => new ScheduleSlotDto
@@ -206,11 +253,8 @@ namespace ClassBook.Application.Facades
             var weekEndDate = normalizedWeekStart.AddDays(7);
 
             var lessons = await _db.Lessons
+                .AsNoTracking()
                 .Where(l => l.Date >= normalizedWeekStart && l.Date < weekEndDate)
-                .Include(l => l.Subject)
-                .Include(l => l.Class)
-                .Include(l => l.Teacher)
-                .Include(l => l.Schedule)
                 .OrderBy(l => l.Date)
                 .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
                 .Select(l => new ScheduleEditorLessonDto

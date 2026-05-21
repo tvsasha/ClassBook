@@ -2648,16 +2648,19 @@ function SchedulePage({ role }) {
     homework: ""
   });
 
-  async function loadScheduleEditor() {
+  async function loadScheduleEditor(options = {}) {
     setLoading(true);
     setMessage("");
     try {
+      const shouldRefreshMetadata = options.refreshMetadata || !metadata;
       const [weekData, metadataData] = await Promise.all([
         apiRequest(`/schedule/editor/week?weekStart=${weekStart}`),
-        apiRequest("/schedule/editor/metadata")
+        shouldRefreshMetadata ? apiRequest("/schedule/editor/metadata") : Promise.resolve(metadata)
       ]);
       setWeek(weekData ?? { lessons: [] });
-      setMetadata(metadataData);
+      if (shouldRefreshMetadata) {
+        setMetadata(metadataData);
+      }
     } catch (error) {
       setMessage(error.message || "Не удалось загрузить редактор расписания");
     } finally {
@@ -3000,7 +3003,7 @@ function SchedulePage({ role }) {
       });
       setClassName("");
       setMessage("Класс добавлен");
-      await loadScheduleEditor();
+      await loadScheduleEditor({ refreshMetadata: true });
     } catch (error) {
       setMessage(error.message || "Не удалось создать класс");
     }
