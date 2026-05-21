@@ -217,6 +217,38 @@ namespace ClassBook.Application.Facades
 
             subject.Name = name.Trim();
             subject.TeacherId = teacherId;
+
+            var assignments = await _db.SubjectClassAssignments
+                .Where(assignment => assignment.SubjectId == subjectId)
+                .OrderBy(assignment => assignment.CreatedAt)
+                .ToListAsync();
+
+            foreach (var classAssignments in assignments.GroupBy(assignment => assignment.ClassId))
+            {
+                var assignmentToKeep = classAssignments.FirstOrDefault(assignment => assignment.TeacherId == teacherId)
+                    ?? classAssignments.First();
+
+                assignmentToKeep.TeacherId = teacherId;
+
+                var duplicates = classAssignments
+                    .Where(assignment => assignment.SubjectClassAssignmentId != assignmentToKeep.SubjectClassAssignmentId)
+                    .ToList();
+
+                if (duplicates.Count > 0)
+                {
+                    _db.SubjectClassAssignments.RemoveRange(duplicates);
+                }
+            }
+
+            var lessons = await _db.Lessons
+                .Where(lesson => lesson.SubjectId == subjectId)
+                .ToListAsync();
+
+            foreach (var lesson in lessons)
+            {
+                lesson.TeacherId = teacherId;
+            }
+
             await _db.SaveChangesAsync();
 
             return new SubjectAdminResponseDto
