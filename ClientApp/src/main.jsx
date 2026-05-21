@@ -3069,7 +3069,17 @@ function SchedulePage({ role }) {
   const slots = metadata?.slots ?? [];
   const lessonMap = buildScheduleLessonMap(week.lessons ?? []);
   const weekCaption = getWeekCaption(weekStart);
-  const selectedSubject = subjects.find((item) => Number(item.subjectId) === Number(lessonForm.subjectId));
+  const selectedClassId = selectedCell?.classItem?.classId ?? null;
+  const filteredSubjects = subjects.filter((subject) => {
+    const subjectTeacherIds = subject.teacherIds?.length ? subject.teacherIds : [subject.teacherId];
+    const subjectClassIds = subject.classIds ?? [];
+    const teacherMatches = !lessonForm.teacherId
+      || subjectTeacherIds.some((teacherId) => Number(teacherId) === Number(lessonForm.teacherId));
+    const classMatches = !selectedClassId
+      || subjectClassIds.length === 0
+      || subjectClassIds.some((classId) => Number(classId) === Number(selectedClassId));
+    return teacherMatches && classMatches;
+  });
 
   return (
     <section className="page-stack">
@@ -3189,27 +3199,42 @@ function SchedulePage({ role }) {
               </div>
               <div className="lesson-editor-grid">
                 <label className="field">
-                  <span>Предмет</span>
-                  <select value={lessonForm.subjectId} onChange={(event) => {
-                    const subject = subjects.find((item) => Number(item.subjectId) === Number(event.target.value));
+                  <span>Преподаватель</span>
+                  <select value={lessonForm.teacherId} onChange={(event) => {
+                    const teacherId = event.target.value;
+                    const currentSubject = subjects.find((item) => Number(item.subjectId) === Number(lessonForm.subjectId));
+                    const currentSubjectTeacherIds = currentSubject?.teacherIds?.length
+                      ? currentSubject.teacherIds
+                      : [currentSubject?.teacherId];
+                    const currentSubjectClassIds = currentSubject?.classIds ?? [];
+                    const subjectStillMatches = currentSubject
+                      && currentSubjectTeacherIds.some((item) => Number(item) === Number(teacherId))
+                      && (currentSubjectClassIds.length === 0
+                        || currentSubjectClassIds.some((classId) => Number(classId) === Number(selectedClassId)));
+
                     setLessonForm({
                       ...lessonForm,
-                      subjectId: event.target.value,
-                      teacherId: lessonForm.teacherId || subject?.teacherId || ""
+                      teacherId,
+                      subjectId: subjectStillMatches ? lessonForm.subjectId : ""
                     });
                   }}>
-                    <option value="">Выберите предмет</option>
-                    {subjects.map((subject) => (
-                      <option key={subject.subjectId} value={subject.subjectId}>{subject.name}</option>
+                    <option value="">Выберите преподавателя</option>
+                    {teachers.map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
                     ))}
                   </select>
                 </label>
                 <label className="field">
-                  <span>Преподаватель</span>
-                  <select value={lessonForm.teacherId || selectedSubject?.teacherId || ""} onChange={(event) => setLessonForm({ ...lessonForm, teacherId: event.target.value })}>
-                    <option value="">Выберите преподавателя</option>
-                    {teachers.map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
+                  <span>Предмет</span>
+                  <select value={lessonForm.subjectId} disabled={!lessonForm.teacherId} onChange={(event) => {
+                    setLessonForm({
+                      ...lessonForm,
+                      subjectId: event.target.value
+                    });
+                  }}>
+                    <option value="">{lessonForm.teacherId ? "Выберите предмет" : "Сначала выберите преподавателя"}</option>
+                    {filteredSubjects.map((subject) => (
+                      <option key={subject.subjectId} value={subject.subjectId}>{subject.name}</option>
                     ))}
                   </select>
                 </label>

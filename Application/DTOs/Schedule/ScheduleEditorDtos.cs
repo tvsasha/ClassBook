@@ -6,6 +6,7 @@ namespace ClassBook.Application.DTOs
         public string Name { get; set; } = string.Empty;
         public int TeacherId { get; set; }
         public string TeacherName { get; set; } = string.Empty;
+        public List<int> TeacherIds { get; set; } = [];
         public List<int> ClassIds { get; set; } = [];
         public string Classes { get; set; } = string.Empty;
     }

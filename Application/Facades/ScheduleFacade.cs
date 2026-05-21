@@ -116,6 +116,9 @@ namespace ClassBook.Application.Facades
                     Name = s.Name,
                     TeacherId = s.TeacherId,
                     TeacherName = s.Teacher != null ? s.Teacher.FullName : "Не назначен",
+                    TeacherIds = s.ClassAssignments != null && s.ClassAssignments.Any()
+                        ? s.ClassAssignments.Select(assignment => assignment.TeacherId).Distinct().ToList()
+                        : new List<int> { s.TeacherId },
                     ClassIds = s.ClassAssignments != null
                         ? s.ClassAssignments.Select(assignment => assignment.ClassId).Distinct().ToList()
                         : new List<int>(),
