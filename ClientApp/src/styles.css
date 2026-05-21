@@ -1439,47 +1439,35 @@ td {
 .schedule-day-col,
 .schedule-time-col,
 .schedule-number-col {
-  position: sticky;
   background: rgba(249, 251, 248, 0.98);
   box-shadow: 1px 0 0 rgba(24, 32, 38, 0.08);
 }
 
 .schedule-day-head,
 .schedule-day-col {
-  left: 0;
   min-width: var(--schedule-day-width);
   width: var(--schedule-day-width);
-  z-index: 7;
 }
 
 .schedule-time-head,
 .schedule-time-col {
-  left: var(--schedule-day-width);
   min-width: var(--schedule-time-width);
   width: var(--schedule-time-width);
-  z-index: 7;
 }
 
 .schedule-number-head,
 .schedule-number-col {
-  left: calc(var(--schedule-day-width) + var(--schedule-time-width));
   min-width: var(--schedule-number-width);
   width: var(--schedule-number-width);
   text-align: center;
-  z-index: 7;
 }
 
 .schedule-day-head,
 .schedule-time-head,
 .schedule-number-head {
+  position: sticky;
   top: 0;
   z-index: 9;
-}
-
-.schedule-day-col,
-.schedule-time-col,
-.schedule-number-col {
-  z-index: 5;
 }
 
 .schedule-time-col,
@@ -1695,16 +1683,6 @@ td {
   .side-panel {
     position: static;
     height: auto;
-  }
-
-  .schedule-day-head,
-  .schedule-time-head,
-  .schedule-number-head,
-  .schedule-day-col,
-  .schedule-time-col,
-  .schedule-number-col {
-    position: static;
-    box-shadow: none;
   }
 
   .schedule-grid-table th {
