@@ -814,6 +814,10 @@ summary:focus-visible {
   background: rgba(15, 124, 102, 0.09);
 }
 
+.admin-tab-select {
+  display: none;
+}
+
 .admin-section {
   display: none;
 }
@@ -2285,28 +2289,24 @@ tbody tr:hover td {
   }
 
   .admin-tabs {
-    position: static;
-    z-index: 12;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    margin: 0;
-    padding: 8px;
-    overflow: visible;
-    border-radius: 18px;
-    scrollbar-width: none;
-  }
-
-  .admin-tabs::-webkit-scrollbar {
     display: none;
   }
 
-  .admin-tabs button {
+  .admin-tab-select {
+    display: grid;
     width: 100%;
-    min-height: 44px;
-    padding: 10px 9px;
-    white-space: normal;
-    line-height: 1.2;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 10px 28px rgba(24, 32, 38, 0.08);
+  }
+
+  .admin-tab-select select {
+    min-height: 48px;
+    font-size: 1rem;
+    font-weight: 700;
   }
 
   .admin-section.active.metric-grid {
