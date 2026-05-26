@@ -482,14 +482,6 @@ function DashboardPage({ user }) {
         text={getDashboardIntro(role)}
       />
       <StatusLine loading={loading} message={message} />
-      <label className="admin-tab-select field">
-        <span>Раздел администрирования</span>
-        <select value={adminTab} onChange={(event) => setAdminTab(event.target.value)}>
-          {adminTabs.map((tab) => (
-            <option key={tab.id} value={tab.id}>{tab.label}</option>
-          ))}
-        </select>
-      </label>
       <DashboardOverview dashboard={dashboard} role={role} />
       <div className="module-grid dashboard-actions">
         <ModuleCard
@@ -1600,6 +1592,14 @@ function AdminPage({ role }) {
         text="Управление учетными записями, ролями, карточками учеников и выдачей доступа к электронному журналу."
       />
       <StatusLine loading={loading} message={message} />
+      <label className="admin-tab-select field">
+        <span>Раздел администрирования</span>
+        <select value={adminTab} onChange={(event) => setAdminTab(event.target.value)}>
+          {adminTabs.map((tab) => (
+            <option key={tab.id} value={tab.id}>{tab.label}</option>
+          ))}
+        </select>
+      </label>
       <div className="admin-tabs" role="tablist" aria-label="Разделы администрирования">
         {adminTabs.map((tab) => (
           <button
