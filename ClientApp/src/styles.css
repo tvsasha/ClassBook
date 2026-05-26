@@ -2142,6 +2142,12 @@ tbody tr:hover td {
     gap: 10px;
   }
 
+  .route-admin.app-layout {
+    display: block;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
   .topbar {
     position: static;
     align-items: flex-start;
@@ -2153,13 +2159,32 @@ tbody tr:hover td {
     display: none;
   }
 
+  .route-admin .topbar {
+    display: none;
+  }
+
   .side-panel {
     gap: 14px;
+  }
+
+  .route-admin .side-panel {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: block;
+    height: auto;
+    margin: 0 0 10px;
+    padding: 10px;
   }
 
   .side-panel h1 {
     margin: 12px 0 8px;
     font-size: 1.55rem;
+  }
+
+  .route-admin .side-brand,
+  .route-admin .side-actions {
+    display: none;
   }
 
   .app-nav {
@@ -2189,8 +2214,44 @@ tbody tr:hover td {
     margin-right: 8px;
   }
 
+  .route-admin .app-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .route-admin .app-nav a {
+    justify-content: center;
+    min-height: 42px;
+    padding: 10px 8px;
+    text-align: center;
+    white-space: normal;
+    scroll-snap-align: unset;
+    font-size: 0.9rem;
+  }
+
+  .route-admin .app-nav a.active::before {
+    display: none;
+  }
+
+  .route-admin .content-panel {
+    padding: 12px;
+  }
+
   .page-stack {
     gap: 14px;
+  }
+
+  .admin-page {
+    gap: 12px;
+  }
+
+  .admin-page .page-header {
+    display: none;
   }
 
   .page-header {
@@ -2224,15 +2285,14 @@ tbody tr:hover td {
   }
 
   .admin-tabs {
-    position: sticky;
-    top: 0;
+    position: static;
     z-index: 12;
-    display: flex;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    margin: 0 -2px;
+    margin: 0;
     padding: 8px;
-    overflow-x: auto;
+    overflow: visible;
     border-radius: 18px;
     scrollbar-width: none;
   }
@@ -2242,14 +2302,15 @@ tbody tr:hover td {
   }
 
   .admin-tabs button {
-    flex: 0 0 auto;
-    min-height: 42px;
-    padding: 10px 13px;
-    white-space: nowrap;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 9px;
+    white-space: normal;
+    line-height: 1.2;
   }
 
   .admin-section.active.metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   th,
@@ -2288,8 +2349,8 @@ tbody tr:hover td {
 
   .table-card:not(.learning-week-card):not(.attendance-week-card) .table-wrap table:not(.gradebook-table):not(.schedule-grid-table) td {
     display: grid;
-    grid-template-columns: minmax(96px, 0.45fr) minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: 1fr;
+    gap: 4px;
     align-items: start;
     padding: 0;
     border: 0;
@@ -2305,13 +2366,16 @@ tbody tr:hover td {
   }
 
   .table-card:not(.learning-week-card):not(.attendance-week-card) .row-actions {
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: stretch;
   }
 
   .table-card:not(.learning-week-card):not(.attendance-week-card) .row-actions .table-action {
-    flex: 1 1 140px;
-    min-height: 38px;
+    width: 100%;
+    min-height: 42px;
     text-align: center;
+    white-space: normal;
   }
 
   .field input,
@@ -2332,7 +2396,13 @@ tbody tr:hover td {
   }
 
   .inline-form {
+    grid-template-columns: 1fr;
+    gap: 12px;
     padding: 14px;
+  }
+
+  .admin-page .nested-table {
+    margin: 10px;
   }
 
   .inline-form .primary-button,

@@ -328,9 +328,10 @@ function AuthenticatedShell({ route, user, onLogout }) {
   const navItems = getNavItemsForRole(role);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const currentNavItem = navItems.find((item) => item.route === route);
+  const routeClass = route === "admin" ? "route-admin" : "";
 
   return (
-    <main className={`app-shell app-layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    <main className={`app-shell app-layout ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${routeClass}`}>
       <aside className="side-panel">
         <div className="side-brand">
           <div className="eyebrow">ClassBook</div>
@@ -1584,7 +1585,7 @@ function AdminPage({ role }) {
   ];
 
   return (
-    <section className="page-stack">
+    <section className="page-stack admin-page">
       <PageHeader
         title="Администрирование"
         subtitle="Пользователи, роли и ученики"
