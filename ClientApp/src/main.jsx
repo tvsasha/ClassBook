@@ -336,7 +336,6 @@ function AuthenticatedShell({ route, user, onLogout }) {
           <div className="eyebrow">ClassBook</div>
           <h1>Электронный журнал</h1>
           <p>{user.fullName || user.login}</p>
-          <p className="role-badge">{role}</p>
         </div>
         <nav className="app-nav">
           {navItems.map((item) => (
@@ -359,7 +358,7 @@ function AuthenticatedShell({ route, user, onLogout }) {
             <strong>{currentNavItem?.label || "Главная"}</strong>
           </div>
           <div className="topbar-user">
-            <span>{role}</span>
+            <span>{user.fullName || user.login}</span>
             <b>{(user.fullName || user.login || "C").slice(0, 1).toUpperCase()}</b>
           </div>
         </header>
@@ -440,7 +439,7 @@ function RouteContent({ route, role, user }) {
 
 function DashboardPage({ user }) {
   const role = getRole(user);
-  const primaryTarget = getTargetForUser(user);
+  const primaryTarget = getWorkspaceTargetForRole(role);
   const [dashboard, setDashboard] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -513,6 +512,19 @@ function DashboardPage({ user }) {
       </div>
     </section>
   );
+}
+
+function getWorkspaceTargetForRole(role) {
+  const targets = {
+    "Администратор": "#/admin",
+    "Директор": "#/director",
+    "Учитель": "#/teacher",
+    "Ученик": "#/student",
+    "Родитель": "#/parent",
+    "Менеджер расписания": "#/schedule"
+  };
+
+  return targets[role] || "#/home";
 }
 
 async function loadRoleDashboard(role, user) {
@@ -4052,7 +4064,7 @@ function DataTable({ title, columns, rows, className = "" }) {
             ) : rows.map((row, index) => (
               <tr key={`${title}-${index}`}>
                 {row.map((cell, cellIndex) => (
-                  <td key={`${title}-${index}-${cellIndex}`}>{cell}</td>
+                  <td data-label={columns[cellIndex]} key={`${title}-${index}-${cellIndex}`}>{cell}</td>
                 ))}
               </tr>
             ))}
