@@ -326,11 +326,13 @@ function ChangePasswordPage({ user, onChanged }) {
 function AuthenticatedShell({ route, user, onLogout }) {
   const role = getRole(user);
   const navItems = getNavItemsForRole(role);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const currentNavItem = navItems.find((item) => item.route === route);
 
   return (
-    <main className="app-shell app-layout">
+    <main className={`app-shell app-layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <aside className="side-panel">
-        <div>
+        <div className="side-brand">
           <div className="eyebrow">ClassBook</div>
           <h1>Электронный журнал</h1>
           <p>{user.fullName || user.login}</p>
@@ -341,11 +343,26 @@ function AuthenticatedShell({ route, user, onLogout }) {
             <NavLink key={item.route} route={item.route} current={route}>{item.label}</NavLink>
           ))}
         </nav>
-        <button className="ghost-button" onClick={onLogout}>
-          Выйти
-        </button>
+        <div className="side-actions">
+          <button className="ghost-button compact sidebar-toggle" type="button" onClick={() => setSidebarCollapsed((current) => !current)}>
+            {sidebarCollapsed ? "Развернуть" : "Свернуть"}
+          </button>
+          <button className="ghost-button" onClick={onLogout}>
+            Выйти
+          </button>
+        </div>
       </aside>
       <section className="content-panel">
+        <header className="topbar">
+          <div>
+            <span>Главная / {currentNavItem?.label || "Обзор"}</span>
+            <strong>{currentNavItem?.label || "Главная"}</strong>
+          </div>
+          <div className="topbar-user">
+            <span>{role}</span>
+            <b>{(user.fullName || user.login || "C").slice(0, 1).toUpperCase()}</b>
+          </div>
+        </header>
         <RouteContent route={route} role={role} user={user} />
       </section>
     </main>
@@ -424,15 +441,49 @@ function RouteContent({ route, role, user }) {
 function DashboardPage({ user }) {
   const role = getRole(user);
   const primaryTarget = getTargetForUser(user);
+  const [dashboard, setDashboard] = useState(null);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadDashboard() {
+      setLoading(true);
+      setMessage("");
+      try {
+        const data = await loadRoleDashboard(role, user);
+        if (!ignore) {
+          setDashboard(data);
+        }
+      } catch (error) {
+        if (!ignore) {
+          setMessage(error.message || "Не удалось загрузить главную панель");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadDashboard();
+
+    return () => {
+      ignore = true;
+    };
+  }, [role, user?.id]);
 
   return (
     <section className="page-stack">
       <PageHeader
         title="Главная панель"
         subtitle={`${user.fullName || user.login} · ${role}`}
-        text="Быстрый доступ к основным разделам электронного журнала, доступным вашей учетной записи."
+        text={getDashboardIntro(role)}
       />
-      <div className="module-grid">
+      <StatusLine loading={loading} message={message} />
+      <DashboardOverview dashboard={dashboard} role={role} />
+      <div className="module-grid dashboard-actions">
         <ModuleCard
           href={primaryTarget}
           title="Открыть мой раздел"
@@ -462,6 +513,346 @@ function DashboardPage({ user }) {
       </div>
     </section>
   );
+}
+
+async function loadRoleDashboard(role, user) {
+  if (role === "Администратор") {
+    const [users, students, classes, subjects, classTeachers] = await Promise.all([
+      apiRequest("/users"),
+      apiRequest("/admin/students"),
+      apiRequest("/classes"),
+      apiRequest("/subjects"),
+      apiRequest("/class-teacher/assignments")
+    ]);
+    const assignments = classTeachers ?? [];
+    return {
+      metrics: [
+        { label: "Пользователей", value: users?.length ?? 0 },
+        { label: "Учеников", value: students?.length ?? 0 },
+        { label: "Классов", value: classes?.length ?? 0 },
+        { label: "Предметов", value: subjects?.length ?? 0 }
+      ],
+      sections: [
+        {
+          title: "Что требует внимания",
+          items: [
+            `${(users ?? []).filter((item) => item.mustChangePassword).length} учетных записей с временным паролем`,
+            `${(students ?? []).filter((item) => !item.hasAccount).length} учеников без выданного доступа`,
+            `${(classes ?? []).filter((item) => !assignments.some((assignment) => Number(assignment.classId) === Number(item.classId))).length} классов без классного руководителя`
+          ]
+        },
+        {
+          title: "Последние пользователи",
+          table: {
+            columns: ["ФИО", "Логин", "Роль", "Статус"],
+            rows: (users ?? []).slice(0, 6).map((item) => [
+              item.fullName || "Не указано",
+              item.login,
+              item.roleName,
+              item.isActive ? "Активен" : "Отключен"
+            ])
+          }
+        }
+      ]
+    };
+  }
+
+  if (role === "Директор") {
+    const period = getDirectorPeriod("week");
+    const query = `startDate=${period.start}&endDate=${period.end}`;
+    const [classSummary, attendance, daily, teachers] = await Promise.all([
+      apiRequest(`/director/report/class-summary?${query}`),
+      apiRequest(`/director/report/attendance?${query}`),
+      apiRequest(`/director/report/daily?date=${period.end}`),
+      apiRequest(`/director/report/teachers?${query}`)
+    ]);
+    const attendanceRows = attendance?.statistics ?? [];
+    const averageAttendance = attendanceRows.length
+      ? calculateAverage(attendanceRows.map((item) => item.presentPercentage))
+      : 0;
+    const averageGrade = calculateAverage((classSummary?.classSummary ?? []).map((item) => item.averageGrade).filter((value) => Number(value) > 0));
+    return {
+      metrics: [
+        { label: "Уроков сегодня", value: daily?.totalLessons ?? 0 },
+        { label: "Средняя посещаемость", value: `${formatNumber(averageAttendance)}%` },
+        { label: "Средняя оценка", value: formatNumber(averageGrade) },
+        { label: "Учителей", value: teachers?.teachers?.length ?? 0 }
+      ],
+      sections: [
+        {
+          title: "Ежедневный контроль",
+          table: {
+            columns: ["Урок", "Учитель", "Класс", "Оценки", "Посещаемость"],
+            rows: (daily?.report ?? []).slice(0, 8).map((item) => [
+              item.name,
+              item.teacher,
+              item.class,
+              `${formatNumber(item.gradesPercentage)}%`,
+              `${formatNumber(item.attendancePercentage)}%`
+            ])
+          }
+        },
+        {
+          title: "Классы за неделю",
+          table: {
+            columns: ["Класс", "Учеников", "Средние пропуски", "Средняя"],
+            rows: (classSummary?.classSummary ?? []).slice(0, 8).map((item) => [
+              item.className,
+              item.studentCount,
+              formatNumber(item.averageAbsences),
+              formatNumber(item.averageGrade)
+            ])
+          }
+        }
+      ]
+    };
+  }
+
+  if (role === "Учитель") {
+    const [classes, subjects, lessons, classTeacherDashboard] = await Promise.all([
+      apiRequest(`/teacher/classes?teacherId=${user.id}`),
+      apiRequest(`/teacher/subjects?teacherId=${user.id}`),
+      apiRequest(`/teacher/lessons?teacherId=${user.id}`),
+      apiRequest("/class-teacher/me/dashboard").catch(() => null)
+    ]);
+    const upcomingLessons = (lessons ?? [])
+      .filter((lesson) => parseLocalDate(lesson.date) >= getTodayStart())
+      .sort(comparePortalLessons);
+    return {
+      metrics: [
+        { label: "Моих уроков", value: lessons?.length ?? 0 },
+        { label: "Ближайших", value: upcomingLessons.length },
+        { label: "Классов", value: classes?.length ?? 0 },
+        { label: "Предметов", value: subjects?.length ?? 0 }
+      ],
+      sections: [
+        {
+          title: "Ближайшие уроки",
+          table: {
+            columns: ["Дата", "Класс", "Предмет", "Тема", "ДЗ"],
+            rows: upcomingLessons.slice(0, 8).map((lesson) => [
+              formatDate(lesson.date),
+              lesson.className,
+              lesson.subjectName,
+              formatLessonTopic(lesson.topic),
+              lesson.homework || "Не задано"
+            ])
+          }
+        },
+        {
+          title: "Классное руководство",
+          items: (classTeacherDashboard?.classes ?? []).slice(0, 4).map((item) =>
+            `${item.className}: ${item.studentsCount} учеников, средняя ${formatNumber(item.averageGrade)}, пропусков ${item.absencesCount}`
+          )
+        }
+      ]
+    };
+  }
+
+  if (role === "Ученик") {
+    const [info, schedule, grades, homework, attendance] = await Promise.all([
+      apiRequest("/student/me/class"),
+      apiRequest("/student/me/schedule"),
+      apiRequest("/student/me/grades"),
+      apiRequest("/student/me/homework"),
+      apiRequest("/student/me/attendance")
+    ]);
+    const todaySchedule = getTodaySchedule(schedule ?? []);
+    const problems = (attendance ?? []).filter((item) => Number(item.status ?? 1) !== 1);
+    return {
+      metrics: [
+        { label: "Уроков сегодня", value: todaySchedule.length },
+        { label: "Оценок", value: grades?.length ?? 0 },
+        { label: "Средний балл", value: formatNumber(calculateAverage((grades ?? []).map((item) => item.value))) },
+        { label: "Пропусков/опозданий", value: problems.length }
+      ],
+      sections: [
+        {
+          title: "Сегодня",
+          table: {
+            columns: ["Урок", "Время", "Предмет", "Тема", "ДЗ"],
+            rows: todaySchedule.slice(0, 8).map((lesson) => [
+              lesson.lessonNumber || "—",
+              formatTimeRange(lesson),
+              lesson.subject || lesson.subjectName,
+              formatLessonTopic(lesson.topic),
+              lesson.homework || "Не задано"
+            ])
+          }
+        },
+        {
+          title: `Профиль: ${info?.lastName ?? ""} ${info?.firstName ?? ""}`.trim(),
+          items: [
+            `Класс: ${info?.class?.name || "не указан"}`,
+            `Актуальных домашних заданий: ${(homework ?? []).length}`,
+            `Последняя оценка: ${(grades ?? [])[0]?.value ?? "пока нет"}`
+          ]
+        }
+      ]
+    };
+  }
+
+  if (role === "Родитель") {
+    const students = await apiRequest("/parent/students");
+    const selectedStudent = (students ?? [])[0];
+    if (!selectedStudent) {
+      return {
+        metrics: [
+          { label: "Детей", value: 0 },
+          { label: "Оценок", value: 0 },
+          { label: "ДЗ", value: 0 },
+          { label: "Посещаемость", value: "—" }
+        ],
+        sections: [{ title: "Нет привязанных учеников", items: ["Администратор еще не привязал ребенка к учетной записи родителя."] }]
+      };
+    }
+
+    const [schedule, grades, homework, attendance] = await Promise.all([
+      apiRequest(`/parent/student/${selectedStudent.studentId}/schedule`),
+      apiRequest(`/parent/student/${selectedStudent.studentId}/grades`),
+      apiRequest(`/parent/student/${selectedStudent.studentId}/homework`),
+      apiRequest(`/parent/student/${selectedStudent.studentId}/attendance`)
+    ]);
+    const problems = (attendance ?? []).filter((item) => Number(item.status ?? 1) !== 1);
+    return {
+      metrics: [
+        { label: "Детей", value: students?.length ?? 0 },
+        { label: "Средний балл", value: formatNumber(calculateAverage((grades ?? []).map((item) => item.value))) },
+        { label: "Домашних заданий", value: homework?.length ?? 0 },
+        { label: "Пропусков/опозданий", value: problems.length }
+      ],
+      sections: [
+        {
+          title: `${selectedStudent.firstName} ${selectedStudent.lastName}`,
+          items: [
+            `Класс: ${selectedStudent.class?.name || "не указан"}`,
+            `Уроков в расписании: ${(schedule ?? []).length}`,
+            `Последних оценок: ${(grades ?? []).length}`
+          ]
+        },
+        {
+          title: "Ближайшие занятия",
+          table: {
+            columns: ["Дата", "Предмет", "Тема", "ДЗ"],
+            rows: (schedule ?? []).slice(0, 8).map((lesson) => [
+              formatDate(lesson.date),
+              lesson.subject || lesson.subjectName,
+              formatLessonTopic(lesson.topic),
+              lesson.homework || "Не задано"
+            ])
+          }
+        }
+      ]
+    };
+  }
+
+  if (role === "Менеджер расписания") {
+    const weekStart = toIsoDate(getMonday(new Date()));
+    const [metadata, week] = await Promise.all([
+      apiRequest("/schedule/editor/metadata"),
+      apiRequest(`/schedule/editor/week?weekStart=${weekStart}`)
+    ]);
+    const lessons = week?.lessons ?? [];
+    const emptyTopics = lessons.filter((lesson) => !lesson.topic || isPlaceholderTopic(lesson.topic)).length;
+    return {
+      metrics: [
+        { label: "Уроков недели", value: lessons.length },
+        { label: "Классов", value: metadata?.classes?.length ?? 0 },
+        { label: "Предметов", value: metadata?.subjects?.length ?? 0 },
+        { label: "Тем к уточнению", value: emptyTopics }
+      ],
+      sections: [
+        {
+          title: "Уроки с незаполненной темой",
+          table: {
+            columns: ["Дата", "Класс", "Предмет", "Учитель"],
+            rows: lessons.filter((lesson) => !lesson.topic || isPlaceholderTopic(lesson.topic)).slice(0, 8).map((lesson) => [
+              formatDate(lesson.date),
+              lesson.className,
+              lesson.subjectName,
+              lesson.teacherName
+            ])
+          }
+        }
+      ]
+    };
+  }
+
+  return {
+    metrics: [],
+    sections: []
+  };
+}
+
+function DashboardOverview({ dashboard, role }) {
+  if (!dashboard) {
+    return null;
+  }
+
+  return (
+    <>
+      <div className="metric-grid dashboard-metrics">
+        {(dashboard.metrics ?? []).map((item) => (
+          <MetricCard key={item.label} label={item.label} value={item.value} />
+        ))}
+      </div>
+      <div className="dashboard-section-grid">
+        {(dashboard.sections ?? []).map((section) => (
+          <DashboardSection key={section.title} section={section} role={role} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function DashboardSection({ section }) {
+  return (
+    <details className="report-section dashboard-section" open>
+      <summary>
+        <span>
+          <strong>{section.title}</strong>
+          {section.items && <small>{section.items.length} пункта</small>}
+          {section.table && <small>{section.table.rows.length} строк</small>}
+        </span>
+        <b>Открыть</b>
+      </summary>
+      <div className="report-section-body">
+        {section.items && (
+          <div className="insight-list">
+            {section.items.length === 0 ? (
+              <p className="empty-text padded">Данных пока нет</p>
+            ) : section.items.map((item, index) => (
+              <article className="insight-item" key={`${section.title}-${index}`}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{item}</strong>
+              </article>
+            ))}
+          </div>
+        )}
+        {section.table && (
+          <DataTable
+            title={section.title}
+            columns={section.table.columns}
+            rows={section.table.rows}
+            className="nested-table dashboard-table"
+          />
+        )}
+      </div>
+    </details>
+  );
+}
+
+function getDashboardIntro(role) {
+  const introByRole = {
+    "Администратор": "Оперативная сводка по учетным записям, структуре классов и данным, которые требуют внимания администратора.",
+    "Директор": "Ключевые показатели учебного процесса: заполнение журнала, посещаемость, классы и работа учителей.",
+    "Учитель": "Рабочая сводка преподавателя: ближайшие уроки, классы, предметы и задачи по журналу.",
+    "Ученик": "Короткая учебная картина на день: расписание, оценки, домашние задания и посещаемость.",
+    "Родитель": "Главные данные по ребенку: успеваемость, расписание, домашние задания и посещаемость.",
+    "Менеджер расписания": "Контроль недельной сетки занятий, назначений и уроков с темами, которые нужно уточнить."
+  };
+
+  return introByRole[role] || "Быстрый доступ к основным разделам электронного журнала, доступным вашей учетной записи.";
 }
 
 function AdminPage({ role }) {
@@ -2260,7 +2651,7 @@ function TeacherPage({ role, user }) {
                   .filter((lesson) => !selectedSubjectId || String(lesson.subjectId ?? "") === String(selectedSubjectId))
                   .map((lesson) => (
                   <option key={lesson.lessonId} value={lesson.lessonId}>
-                    {lesson.subjectName} · {lesson.topic} · {formatDate(lesson.date)}
+                    {lesson.subjectName} · {formatLessonTopic(lesson.topic)} · {formatDate(lesson.date)}
                   </option>
                 ))}
               </select>
@@ -2281,7 +2672,7 @@ function TeacherPage({ role, user }) {
             formatDate(lesson.date),
             lesson.subjectName,
             lesson.className,
-            lesson.topic,
+            formatLessonTopic(lesson.topic),
             lesson.homework || "—"
           ])}
         />
@@ -2303,7 +2694,7 @@ function TeacherPage({ role, user }) {
                   {journalLessons.map((lesson, index) => (
                     <th key={lesson.lessonId}>
                       <span>{formatDate(lesson.date)}</span>
-                      <small>{lesson.topic}</small>
+                      <small>{formatLessonTopic(lesson.topic)}</small>
                     </th>
                   ))}
                   <th>Средняя</th>
@@ -2559,7 +2950,7 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
             rows={grades.slice(0, 16).map((grade) => [
               formatDate(grade.date),
               grade.subject || grade.subjectName || "—",
-              grade.topic || "—",
+              formatLessonTopic(grade.topic),
               grade.value
             ])}
           />
@@ -2568,7 +2959,7 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
             items={homework.slice(0, 8).map((item) => ({
               title: item.subject || item.subjectName || item.name || "Предмет",
               text: item.homework || item.task || "Домашнее задание не указано",
-              meta: `${formatDate(item.date)} · ${item.topic || "без темы"}`
+              meta: `${formatDate(item.date)} · ${formatLessonTopic(item.topic)}`
             }))}
           />
           <AttendanceReviewPanel
@@ -2660,7 +3051,7 @@ function WeeklyLearningSchedule({ schedule, attendance, weekStart, onWeekStartCh
                       </div>
                       <strong>{lesson.subject || lesson.subjectName || lesson.name || "Предмет"}</strong>
                       <small>{lesson.teacher || lesson.teacherName || "Учитель не указан"}</small>
-                      {lesson.topic && <p>{lesson.topic}</p>}
+                      {lesson.topic && <p>{formatLessonTopic(lesson.topic)}</p>}
                       {lesson.homework && <p className="homework-note">ДЗ: {lesson.homework}</p>}
                     </article>
                   );
@@ -2745,7 +3136,7 @@ function AttendanceReviewPanel({ attendance, isOpen, filter, sort, onToggle, onF
                 <article className={`attendance-week-row ${attendanceClassName(status)}`} key={`${item.lessonId}-${item.attendanceId ?? "default"}`}>
                   <div>
                     <strong>{item.subject || item.subjectName || item.name || "Предмет"}</strong>
-                    <span>{formatDate(item.date)} · {item.topic || "без темы"}</span>
+                    <span>{formatDate(item.date)} · {formatLessonTopic(item.topic)}</span>
                   </div>
                   <b>{attendanceLabel(status)}</b>
                 </article>
@@ -3373,7 +3764,7 @@ function SchedulePage({ role }) {
                       subjectId: subjectStillMatches ? lessonForm.subjectId : "",
                       subjectName: subjectStillMatches ? lessonForm.subjectName : ""
                     });
-                  }} placeholder="??????? ??????? ?????????????" />
+                  }} placeholder="Выберите преподавателя" />
                   <datalist id={teacherOptionsId}>
                     {teachers.map((teacher) => <option key={teacher.id} value={teacher.fullName} />)}
                   </datalist>
@@ -3490,7 +3881,7 @@ function TeacherPersonalSchedule({ user }) {
           formatDate(lesson.date),
           lesson.className,
           lesson.subjectName,
-          lesson.topic || "—",
+          formatLessonTopic(lesson.topic),
           lesson.homework || "—"
         ])}
       />
@@ -3584,7 +3975,7 @@ function ClassTeacherPage({ role }) {
           formatDate(lesson.date),
           lesson.className,
           lesson.subjectName,
-          lesson.topic || "—",
+          formatLessonTopic(lesson.topic),
           lesson.homework || "—"
         ])}
       />
@@ -3751,6 +4142,19 @@ function Field({ label, value, onChange, type = "text", autoComplete }) {
       />
     </div>
   );
+}
+
+function isPlaceholderTopic(value) {
+  const text = String(value || "").trim().toLowerCase();
+  return !text
+    || text === "????"
+    || text.includes("???")
+    || text.includes("будет указана")
+    || text.includes("не указана");
+}
+
+function formatLessonTopic(value) {
+  return isPlaceholderTopic(value) ? "Тема будет указана позже" : value;
 }
 
 function formatNumber(value) {

@@ -277,6 +277,15 @@ namespace ClassBook
                 });
             });
 
+            app.Use(async (context, next) =>
+            {
+                context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
+                context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
+                context.Response.Headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
+                context.Response.Headers.TryAdd("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+                await next();
+            });
+
             app.UseDefaultFiles();
             app.UseStaticFiles(new StaticFileOptions
             {
