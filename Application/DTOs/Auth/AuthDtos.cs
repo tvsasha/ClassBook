@@ -21,5 +21,6 @@ namespace ClassBook.Application.DTOs
         public bool IsActive { get; set; }
         public bool MustChangePassword { get; set; }
         public string CreatedAt { get; set; } = string.Empty;
+        public string? LastSeenAt { get; set; }
     }
 }

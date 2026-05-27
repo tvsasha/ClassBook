@@ -557,14 +557,14 @@ async function loadRoleDashboard(role, user) {
           ]
         },
         {
-          title: "Последние активные на сайте пользователи",
+          title: "Пользователи онлайн",
           table: {
-            columns: ["ФИО", "Логин", "Роль", "Статус"],
-            rows: (users ?? []).filter((item) => item.isActive).slice(0, 6).map((item) => [
+            columns: ["ФИО", "Логин", "Роль", "Онлайн"],
+            rows: (users ?? []).filter((item) => item.isOnline).slice(0, 6).map((item) => [
               item.fullName || "Не указано",
               item.login,
               item.roleName,
-              item.isActive ? "Активен" : "Отключен"
+              "Онлайн"
             ])
           }
         }

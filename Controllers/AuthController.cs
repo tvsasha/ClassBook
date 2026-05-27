@@ -66,6 +66,11 @@ namespace ClassBook.Controllers
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
+            if (int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            {
+                await _authFacade.MarkOfflineAsync(userId);
+            }
+
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Ok(new MessageResponseDto { Message = "Выход выполнен" });
         }
@@ -129,7 +134,8 @@ namespace ClassBook.Controllers
                 Role = user.Role.Name,
                 IsActive = user.IsActive,
                 MustChangePassword = user.MustChangePassword,
-                CreatedAt = user.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                CreatedAt = user.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                LastSeenAt = user.LastSeenAt?.ToString("yyyy-MM-dd HH:mm:ss")
             };
         }
     }

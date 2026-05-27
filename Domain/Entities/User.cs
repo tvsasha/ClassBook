@@ -11,6 +11,7 @@
         public bool IsActive { get; set; } = true;
         public bool MustChangePassword { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? LastSeenAt { get; set; }
         public ICollection<Subject>? Subjects { get; set; }
         public ICollection<Lesson>? Lessons { get; set; }
         public Student? Student { get; set; }

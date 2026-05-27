@@ -114,8 +114,8 @@ summary:focus-visible {
   max-width: 720px;
   padding-right: clamp(32px, 7vw, 96px);
   margin: 34px 0 18px;
-  font-size: clamp(3rem, 7vw, 6.6rem);
-  line-height: 0.9;
+  font-size: clamp(2.6rem, 5.7vw, 5.35rem);
+  line-height: 0.96;
   letter-spacing: -0.06em;
 }
 
@@ -668,6 +668,16 @@ summary:focus-visible {
 
 .dashboard-actions {
   align-items: stretch;
+}
+
+.dashboard-actions .module-card {
+  display: grid;
+  align-content: start;
+  min-height: 156px;
+}
+
+.dashboard-actions .module-card strong {
+  min-height: 1.45em;
 }
 
 .dashboard-metrics:empty,
@@ -2149,7 +2159,8 @@ tbody tr:hover td {
   .brand-title {
     margin: 22px 0 14px;
     padding-right: 32px;
-    font-size: clamp(2.55rem, 18vw, 4.2rem);
+    font-size: clamp(2.25rem, 14vw, 3.45rem);
+    line-height: 1;
     letter-spacing: -0.045em;
   }
 

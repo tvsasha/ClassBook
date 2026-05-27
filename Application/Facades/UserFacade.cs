@@ -16,6 +16,7 @@ namespace ClassBook.Application.Facades
     {
         private readonly AppDbContext _db;
         private readonly IPasswordHasher _hasher;
+        private static readonly TimeSpan OnlineWindow = TimeSpan.FromMinutes(5);
 
         public UserFacade(AppDbContext db, IPasswordHasher hasher)
         {
@@ -28,6 +29,7 @@ namespace ClassBook.Application.Facades
         /// </summary>
         public async Task<IEnumerable<UserListItemDto>> GetAllUsersAsync()
         {
+            var onlineSince = DateTime.UtcNow - OnlineWindow;
             return await _db.Users
                 .Include(u => u.Role)
                 .OrderBy(u => u.FullName)
@@ -39,8 +41,10 @@ namespace ClassBook.Application.Facades
                     RoleId = u.RoleId,
                     RoleName = u.Role.Name,
                     IsActive = u.IsActive,
+                    IsOnline = u.LastSeenAt != null && u.LastSeenAt >= onlineSince,
                     MustChangePassword = u.MustChangePassword,
-                    CreatedAt = u.CreatedAt
+                    CreatedAt = u.CreatedAt,
+                    LastSeenAt = u.LastSeenAt
                 })
                 .ToListAsync();
         }
@@ -67,6 +71,7 @@ namespace ClassBook.Application.Facades
         /// </summary>
         public async Task<UserListItemDto?> GetUserByIdAsync(int id)
         {
+            var onlineSince = DateTime.UtcNow - OnlineWindow;
             var user = await _db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == id);
             return user == null ? null : new UserListItemDto
             {
@@ -76,8 +81,10 @@ namespace ClassBook.Application.Facades
                 RoleId = user.RoleId,
                 RoleName = user.Role.Name,
                 IsActive = user.IsActive,
+                IsOnline = user.LastSeenAt != null && user.LastSeenAt >= onlineSince,
                 MustChangePassword = user.MustChangePassword,
-                CreatedAt = user.CreatedAt
+                CreatedAt = user.CreatedAt,
+                LastSeenAt = user.LastSeenAt
             };
         }
 

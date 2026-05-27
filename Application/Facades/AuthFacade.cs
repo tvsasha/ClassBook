@@ -40,17 +40,36 @@ namespace ClassBook.Application.Facades
             if (_hasher.NeedsRehash(user.PasswordHash))
             {
                 user.PasswordHash = _hasher.Hash(password);
+            }
+
+            user.LastSeenAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return user;
+        }
+
+        public async Task<User?> GetUserByIdAsync(int userId)
+        {
+            var user = await _db.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+
+            if (user != null)
+            {
+                user.LastSeenAt = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
             }
 
             return user;
         }
 
-        public async Task<User?> GetUserByIdAsync(int userId)
+        public async Task MarkOfflineAsync(int userId)
         {
-            return await _db.Users
-                .Include(u => u.Role)
-                .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+                return;
+
+            user.LastSeenAt = null;
+            await _db.SaveChangesAsync();
         }
 
         /// <summary>
