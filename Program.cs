@@ -311,7 +311,9 @@ namespace ClassBook
                 var isApiRequest = path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase);
                 var isAllowedApi = path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)
                     || path.Equals("/api/auth/logout", StringComparison.OrdinalIgnoreCase)
-                    || path.Equals("/api/auth/change-password", StringComparison.OrdinalIgnoreCase);
+                    || path.Equals("/api/auth/change-password", StringComparison.OrdinalIgnoreCase)
+                    || path.Equals("/api/auth/heartbeat", StringComparison.OrdinalIgnoreCase)
+                    || path.Equals("/api/auth/offline", StringComparison.OrdinalIgnoreCase);
 
                 if (isApiRequest && !isAllowedApi && context.User.Identity?.IsAuthenticated == true)
                 {

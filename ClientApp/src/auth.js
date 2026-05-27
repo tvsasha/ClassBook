@@ -1,4 +1,4 @@
-import { apiRequest } from "./api.js";
+import { apiBase, apiRequest } from "./api.js";
 
 const currentUserKey = "currentUser";
 
@@ -79,4 +79,26 @@ export async function fetchCurrentUser() {
   const user = await apiRequest("/auth/me");
   storeUser(user);
   return user;
+}
+
+export async function heartbeat() {
+  await apiRequest("/auth/heartbeat", { method: "POST" });
+}
+
+export function sendOfflineBeacon() {
+  if (!readStoredUser()) {
+    return;
+  }
+
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(`${apiBase}/auth/offline`, new Blob([], { type: "application/json" }));
+    return;
+  }
+
+  fetch(`${apiBase}/auth/offline`, {
+    method: "POST",
+    credentials: "include",
+    keepalive: true,
+    headers: { "Content-Type": "application/json" }
+  }).catch(() => {});
 }

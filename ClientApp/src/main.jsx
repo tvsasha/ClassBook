@@ -8,9 +8,11 @@ import {
   fetchCurrentUser,
   getRole,
   getTargetForUser,
+  heartbeat,
   login,
   logout,
-  readStoredUser
+  readStoredUser,
+  sendOfflineBeacon
 } from "./auth.js";
 
 async function copyTextToClipboard(text) {
@@ -77,6 +79,41 @@ function App() {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return undefined;
+    }
+
+    let stopped = false;
+    const sendHeartbeat = () => {
+      if (stopped || document.visibilityState !== "visible") {
+        return;
+      }
+
+      heartbeat().catch(() => {});
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        sendHeartbeat();
+      } else {
+        sendOfflineBeacon();
+      }
+    };
+    const handlePageHide = () => sendOfflineBeacon();
+
+    sendHeartbeat();
+    const intervalId = window.setInterval(sendHeartbeat, 30000);
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      stopped = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [user?.id]);
 
   if (loading) {
     return <main className="loading">Проверяем сессию...</main>;
@@ -474,6 +511,30 @@ function DashboardPage({ user }) {
     };
   }, [role, user?.id]);
 
+  useEffect(() => {
+    if (role !== "Администратор") {
+      return undefined;
+    }
+
+    let ignore = false;
+    async function refreshOnlineUsers() {
+      try {
+        const section = await loadOnlineUsersSection();
+        if (!ignore) {
+          setDashboard((current) => updateDashboardSection(current, section));
+        }
+      } catch {
+        // Тихое обновление: если сеть мигнула, не мешаем работе главной панели.
+      }
+    }
+
+    const intervalId = window.setInterval(refreshOnlineUsers, 15000);
+    return () => {
+      ignore = true;
+      window.clearInterval(intervalId);
+    };
+  }, [role]);
+
   return (
     <section className="page-stack">
       <PageHeader
@@ -556,18 +617,7 @@ async function loadRoleDashboard(role, user) {
             `${(classes ?? []).filter((item) => !assignments.some((assignment) => Number(assignment.classId) === Number(item.classId))).length} классов без классного руководителя`
           ]
         },
-        {
-          title: "Пользователи онлайн",
-          table: {
-            columns: ["ФИО", "Логин", "Роль", "Онлайн"],
-            rows: (users ?? []).filter((item) => item.isOnline).slice(0, 6).map((item) => [
-              item.fullName || "Не указано",
-              item.login,
-              item.roleName,
-              "Онлайн"
-            ])
-          }
-        }
+        buildOnlineUsersSection(users ?? [])
       ]
     };
   }
@@ -796,6 +846,40 @@ async function loadRoleDashboard(role, user) {
   return {
     metrics: [],
     sections: []
+  };
+}
+
+async function loadOnlineUsersSection() {
+  const users = await apiRequest("/users");
+  return buildOnlineUsersSection(users ?? []);
+}
+
+function buildOnlineUsersSection(users) {
+  return {
+    title: "Пользователи онлайн",
+    table: {
+      columns: ["ФИО", "Логин", "Роль", "Онлайн"],
+      rows: users.filter((item) => item.isOnline).slice(0, 6).map((item) => [
+        item.fullName || "Не указано",
+        item.login,
+        item.roleName,
+        "Онлайн"
+      ])
+    }
+  };
+}
+
+function updateDashboardSection(dashboard, nextSection) {
+  if (!dashboard) {
+    return dashboard;
+  }
+
+  const sections = dashboard.sections ?? [];
+  return {
+    ...dashboard,
+    sections: sections.map((section) => (
+      section.title === nextSection.title ? nextSection : section
+    ))
   };
 }
 
@@ -3663,7 +3747,10 @@ function SchedulePage({ role }) {
       </div>
       <div className="schedule-toolbar">
         <button className="ghost-button compact" onClick={() => setWeekStart(shiftWeek(weekStart, -7))}>Предыдущая</button>
-        <Field label="Неделя" type="date" value={weekStart} onChange={(value) => setWeekStart(toIsoDate(getMonday(new Date(value))))} />
+        <label className="schedule-week-picker">
+          <span>Неделя</span>
+          <input type="date" value={weekStart} onChange={(event) => setWeekStart(toIsoDate(getMonday(new Date(event.target.value))))} />
+        </label>
         <button className="ghost-button compact" onClick={() => setWeekStart(shiftWeek(weekStart, 7))}>Следующая</button>
         {editable && (
           <form className="class-create-form" onSubmit={createClass}>

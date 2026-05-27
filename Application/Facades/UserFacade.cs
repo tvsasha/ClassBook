@@ -16,7 +16,7 @@ namespace ClassBook.Application.Facades
     {
         private readonly AppDbContext _db;
         private readonly IPasswordHasher _hasher;
-        private static readonly TimeSpan OnlineWindow = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan OnlineWindow = TimeSpan.FromSeconds(90);
 
         public UserFacade(AppDbContext db, IPasswordHasher hasher)
         {

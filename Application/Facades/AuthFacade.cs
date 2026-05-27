@@ -72,6 +72,16 @@ namespace ClassBook.Application.Facades
             await _db.SaveChangesAsync();
         }
 
+        public async Task MarkOnlineAsync(int userId)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+            if (user == null)
+                return;
+
+            user.LastSeenAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+
         /// <summary>
         /// Меняет пароль текущего пользователя.
         /// </summary>

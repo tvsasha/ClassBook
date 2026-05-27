@@ -58,6 +58,28 @@ namespace ClassBook.Controllers
             return Ok(BuildLoginResponse(user));
         }
 
+        [Authorize]
+        [HttpPost("heartbeat")]
+        public async Task<IActionResult> Heartbeat()
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                return UnauthorizedError("Не удалось определить пользователя");
+
+            await _authFacade.MarkOnlineAsync(userId);
+            return NoContent();
+        }
+
+        [Authorize]
+        [HttpPost("offline")]
+        public async Task<IActionResult> Offline()
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                return UnauthorizedError("Не удалось определить пользователя");
+
+            await _authFacade.MarkOfflineAsync(userId);
+            return NoContent();
+        }
+
         /// <summary>
         /// Завершает текущую пользовательскую сессию и удаляет серверную cookie-аутентификацию.
         /// </summary>
