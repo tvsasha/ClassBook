@@ -153,6 +153,29 @@ namespace ClassBook.Controllers
             return Ok(await _scheduleFacade.GetEditorWeekAsync(parsedWeekStart.Date));
         }
 
+        [HttpPost("editor/week/copy")]
+        [Authorize(Policy = "ScheduleManagerOnly")]
+        public async Task<IActionResult> CopyEditorWeek([FromBody] ScheduleEditorWeekCopyRequest request)
+        {
+            try
+            {
+                return Ok(await _scheduleFacade.CopyEditorWeekAsync(request));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при копировании недели расписания");
+                return InternalServerError("Не удалось скопировать неделю расписания");
+            }
+        }
+
         /// <summary>
         /// Создаёт урок в конкретной ячейке редактора расписания.
         /// </summary>

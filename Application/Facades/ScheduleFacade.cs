@@ -284,6 +284,84 @@ namespace ClassBook.Application.Facades
             };
         }
 
+        public async Task<ScheduleEditorWeekCopyResultDto> CopyEditorWeekAsync(ScheduleEditorWeekCopyRequest request)
+        {
+            var sourceWeekStart = request.SourceWeekStart.Date;
+            var targetWeekStart = request.TargetWeekStart.Date;
+
+            if (sourceWeekStart == targetWeekStart)
+                throw new ArgumentException("Недели для копирования должны отличаться");
+
+            var sourceWeekEnd = sourceWeekStart.AddDays(7);
+            var targetWeekEnd = targetWeekStart.AddDays(7);
+
+            var sourceLessons = await _db.Lessons
+                .AsNoTracking()
+                .Where(l => l.Date >= sourceWeekStart && l.Date < sourceWeekEnd && l.ScheduleId != null)
+                .OrderBy(l => l.Date)
+                .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
+                .ToListAsync();
+
+            if (sourceLessons.Count == 0)
+                throw new InvalidOperationException("В исходной неделе нет уроков для копирования");
+
+            var targetHasLessons = await _db.Lessons
+                .AnyAsync(l => l.Date >= targetWeekStart && l.Date < targetWeekEnd);
+
+            if (targetHasLessons)
+                throw new InvalidOperationException("В целевой неделе уже есть уроки. Выберите пустую неделю, чтобы не потерять данные.");
+
+            var lessonsToCreate = sourceLessons.Select(lesson => new Lesson
+            {
+                SubjectId = lesson.SubjectId,
+                ClassId = lesson.ClassId,
+                TeacherId = lesson.TeacherId,
+                ScheduleId = lesson.ScheduleId,
+                Topic = string.IsNullOrWhiteSpace(lesson.Topic)
+                    ? "Тема будет указана преподавателем"
+                    : lesson.Topic,
+                Date = targetWeekStart.AddDays((lesson.Date.Date - sourceWeekStart).Days),
+                Homework = lesson.Homework
+            }).ToList();
+
+            _db.Lessons.AddRange(lessonsToCreate);
+            await _db.SaveChangesAsync();
+
+            var createdIds = lessonsToCreate.Select(l => l.LessonId).ToList();
+            var copiedLessons = await _db.Lessons
+                .AsNoTracking()
+                .Where(l => createdIds.Contains(l.LessonId))
+                .OrderBy(l => l.Date)
+                .ThenBy(l => l.Schedule != null ? l.Schedule.LessonNumber : int.MaxValue)
+                .Select(l => new ScheduleEditorLessonDto
+                {
+                    LessonId = l.LessonId,
+                    ClassId = l.ClassId,
+                    ClassName = l.Class.Name,
+                    SubjectId = l.SubjectId,
+                    SubjectName = l.Subject.Name,
+                    TeacherId = l.TeacherId,
+                    TeacherName = l.Teacher.FullName,
+                    ScheduleId = l.ScheduleId,
+                    DayOfWeek = l.Schedule != null ? l.Schedule.DayOfWeek : (int?)null,
+                    LessonNumber = l.Schedule != null ? l.Schedule.LessonNumber : (int?)null,
+                    StartTime = l.Schedule != null ? l.Schedule.StartTime.ToString(@"hh\:mm") : null,
+                    EndTime = l.Schedule != null ? l.Schedule.EndTime.ToString(@"hh\:mm") : null,
+                    Topic = l.Topic,
+                    Homework = l.Homework,
+                    Date = l.Date
+                })
+                .ToListAsync();
+
+            return new ScheduleEditorWeekCopyResultDto
+            {
+                CopiedCount = copiedLessons.Count,
+                SourceWeekStart = sourceWeekStart,
+                TargetWeekStart = targetWeekStart,
+                Lessons = copiedLessons
+            };
+        }
+
         /// <summary>
         /// Создает урок в ячейке редактора расписания.
         /// </summary>

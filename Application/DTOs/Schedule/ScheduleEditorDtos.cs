@@ -77,6 +77,20 @@ namespace ClassBook.Application.DTOs
         public ScheduleEditorLessonAuditDto OldValues { get; set; } = new();
     }
 
+    public class ScheduleEditorWeekCopyRequest
+    {
+        public DateTime SourceWeekStart { get; set; }
+        public DateTime TargetWeekStart { get; set; }
+    }
+
+    public class ScheduleEditorWeekCopyResultDto
+    {
+        public int CopiedCount { get; set; }
+        public DateTime SourceWeekStart { get; set; }
+        public DateTime TargetWeekStart { get; set; }
+        public List<ScheduleEditorLessonDto> Lessons { get; set; } = [];
+    }
+
     public class ScheduleSlotAuditDto
     {
         public int ScheduleId { get; set; }
