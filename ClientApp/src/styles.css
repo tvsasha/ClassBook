@@ -1709,19 +1709,33 @@ tbody tr:hover td {
 .schedule-toolbar,
 .class-create-form,
 .week-copy-form {
-  display: grid;
   gap: 12px;
   align-items: center;
 }
 
 .schedule-toolbar {
-  grid-template-columns: max-content minmax(210px, max-content) max-content minmax(300px, max-content) minmax(280px, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.schedule-toolbar > button {
+  flex: 0 0 auto;
 }
 
 .class-create-form,
 .week-copy-form {
+  display: grid;
   grid-template-columns: minmax(150px, 1fr) max-content;
+  flex: 1 1 340px;
+  max-width: 100%;
   min-width: 0;
+}
+
+.week-copy-form {
+  flex-basis: 390px;
 }
 
 .schedule-week-picker {
@@ -1734,6 +1748,8 @@ tbody tr:hover td {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.72);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .schedule-week-picker span {
@@ -1743,6 +1759,7 @@ tbody tr:hover td {
 }
 
 .schedule-week-picker input {
+  min-width: 0;
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -1760,7 +1777,8 @@ tbody tr:hover td {
 }
 
 .schedule-toolbar .compact,
-.class-create-form .compact {
+.class-create-form .compact,
+.week-copy-form .compact {
   min-height: 48px;
   margin: 0;
 }
@@ -2529,8 +2547,18 @@ tbody tr:hover td {
   .schedule-toolbar,
   .class-create-form,
   .week-copy-form {
-    grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .schedule-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .class-create-form,
+  .week-copy-form {
+    grid-template-columns: 1fr;
+    flex-basis: auto;
   }
 
   .schedule-week-picker {
