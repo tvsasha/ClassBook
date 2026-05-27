@@ -484,11 +484,13 @@ function DashboardPage({ user }) {
       <StatusLine loading={loading} message={message} />
       <DashboardOverview dashboard={dashboard} role={role} />
       <div className="module-grid dashboard-actions">
-        <ModuleCard
-          href={primaryTarget}
-          title="Открыть мой раздел"
-          text="Основной рабочий экран для текущей роли."
-        />
+        {primaryTarget !== "#/admin" && primaryTarget !== "#/director" && (
+          <ModuleCard
+            href={primaryTarget}
+            title="Открыть мой раздел"
+            text="Основной рабочий экран для текущей роли."
+          />
+        )}
         {role === "Администратор" && (
           <>
             <ModuleCard
@@ -555,10 +557,10 @@ async function loadRoleDashboard(role, user) {
           ]
         },
         {
-          title: "Последние пользователи",
+          title: "Последние активные на сайте пользователи",
           table: {
             columns: ["ФИО", "Логин", "Роль", "Статус"],
-            rows: (users ?? []).slice(0, 6).map((item) => [
+            rows: (users ?? []).filter((item) => item.isActive).slice(0, 6).map((item) => [
               item.fullName || "Не указано",
               item.login,
               item.roleName,

@@ -112,7 +112,7 @@ summary:focus-visible {
 
 .brand-title {
   max-width: 720px;
-  padding-right: 0.18em;
+  padding-right: clamp(32px, 7vw, 96px);
   margin: 34px 0 18px;
   font-size: clamp(3rem, 7vw, 6.6rem);
   line-height: 0.9;
@@ -685,12 +685,36 @@ summary:focus-visible {
   min-width: 0;
 }
 
+.dashboard-section[open] {
+  min-height: 342px;
+}
+
+.dashboard-section summary {
+  min-height: 82px;
+}
+
+.dashboard-section summary span {
+  min-width: 0;
+}
+
+.dashboard-section summary strong {
+  overflow-wrap: anywhere;
+}
+
 .dashboard-section .report-section-body {
   padding: 12px;
 }
 
 .dashboard-table {
   margin: 0;
+}
+
+.dashboard-section .dashboard-table {
+  margin: 0;
+}
+
+.dashboard-table tbody tr {
+  height: 58px;
 }
 
 .insight-list {
@@ -2124,7 +2148,7 @@ tbody tr:hover td {
 
   .brand-title {
     margin: 22px 0 14px;
-    padding-right: 0.24em;
+    padding-right: 32px;
     font-size: clamp(2.55rem, 18vw, 4.2rem);
     letter-spacing: -0.045em;
   }
