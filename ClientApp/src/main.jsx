@@ -3587,50 +3587,6 @@ function SchedulePage({ role }) {
     }
   }
 
-  function copyScheduleLesson(lesson) {
-    if (!lesson) {
-      return;
-    }
-
-    setCopiedLesson(lesson);
-    setScheduleMenu(null);
-    setMessage(`Скопирован урок: ${lesson.subjectName}, ${lesson.className}`);
-  }
-
-  async function pasteCopiedLesson(targetCell = selectedCell) {
-    if (!copiedLesson) {
-      setMessage("Сначала скопируйте урок");
-      return;
-    }
-
-    if (!targetCell) {
-      setMessage("Выберите свободную ячейку для вставки");
-      return;
-    }
-
-    const validationMessage = validateLessonPlacement(copiedLesson, targetCell.classItem, targetCell.slot);
-    if (validationMessage) {
-      setMessage(validationMessage);
-      return;
-    }
-
-    const optimisticLesson = makeTempLesson(copiedLesson, targetCell.classItem, targetCell.slot);
-    updateWeekLessons((lessons) => [...lessons, optimisticLesson]);
-    setSelectedCell(null);
-    setScheduleMenu(null);
-    try {
-      const savedLesson = await apiRequest("/schedule/editor/lesson", {
-        method: "POST",
-        body: JSON.stringify(buildScheduleLessonPayload(copiedLesson, targetCell.classItem, targetCell.slot))
-      });
-      replaceWeekLesson(optimisticLesson.lessonId, savedLesson ?? optimisticLesson);
-      setMessage(`Урок вставлен: ${targetCell.classItem.name}, ${dayName(targetCell.slot.dayOfWeek)}, ${targetCell.slot.lessonNumber} урок`);
-    } catch (error) {
-      removeWeekLesson(optimisticLesson.lessonId);
-      setMessage(error.message || "Не удалось вставить урок");
-    }
-  }
-
   function copyScheduleLesson(lesson, mode = "copy") {
     const lessonsToCopy = getSelectedScheduleLessons(lesson);
     if (lessonsToCopy.length === 0) {
@@ -3912,6 +3868,8 @@ function SchedulePage({ role }) {
   const teachers = metadata?.teachers ?? [];
   const slots = metadata?.slots ?? [];
   const lessonMap = buildScheduleLessonMap(week.lessons ?? []);
+  const selectedLessonIdSet = new Set(selectedLessonIds.map(String));
+  const groupedSlots = groupSlotsByDay(slots);
   const weekCaption = getWeekCaption(weekStart);
   const selectedClassId = selectedCell?.classItem?.classId ?? null;
     const canCreateSubjectInSchedule = editable;
@@ -3979,7 +3937,7 @@ function SchedulePage({ role }) {
               </tr>
             </thead>
             <tbody>
-              {groupSlotsByDay(slots).map(({ day, daySlots }) => daySlots.map((slot, slotIndex) => (
+              {groupedSlots.map(({ day, daySlots }) => daySlots.map((slot, slotIndex) => (
                 <tr key={`${day}-${slot.scheduleId}`}>
                   {slotIndex === 0 && <td rowSpan={daySlots.length} className="day-cell schedule-day-col">{dayName(day)}</td>}
                   <td className="schedule-time-col">{slot.startTime} - {slot.endTime}</td>
@@ -3988,7 +3946,7 @@ function SchedulePage({ role }) {
                     const lesson = lessonMap.get(`${classItem.classId}_${slot.scheduleId}`) ?? null;
                     const selected = selectedCell?.classItem.classId === classItem.classId
                       && selectedCell?.slot.scheduleId === slot.scheduleId;
-                    const lessonSelected = lesson && selectedLessonIds.includes(String(lesson.lessonId));
+                    const lessonSelected = lesson && selectedLessonIdSet.has(String(lesson.lessonId));
                     const cellKey = `${classItem.classId}_${slot.scheduleId}`;
                     const dragTarget = dragOverCell === cellKey;
                     return (
