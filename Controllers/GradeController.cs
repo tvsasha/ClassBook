@@ -9,7 +9,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/teacher/grades")]
-    [Authorize(Roles = "Учитель")]
+    [Authorize(Roles = "Учитель,Администратор")]
     public class GradeController : ApiControllerBase
     {
         private readonly GradeFacade _facade;

@@ -306,10 +306,10 @@ namespace ClassBook.Application.Facades
                 throw new InvalidOperationException("В исходной неделе нет уроков для копирования");
 
             var targetHasLessons = await _db.Lessons
-                .AnyAsync(l => l.Date >= targetWeekStart && l.Date < targetWeekEnd);
+                .AnyAsync(l => l.Date >= targetWeekStart && l.Date < targetWeekEnd && l.ScheduleId != null);
 
             if (targetHasLessons)
-                throw new InvalidOperationException("В целевой неделе уже есть уроки. Выберите пустую неделю, чтобы не потерять данные.");
+                throw new InvalidOperationException("В целевой неделе уже есть уроки из расписания. Выберите неделю без сетки расписания, чтобы не потерять данные.");
 
             var lessonsToCreate = sourceLessons.Select(lesson => new Lesson
             {

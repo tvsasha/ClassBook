@@ -2590,7 +2590,7 @@ function TeacherPage({ role, user }) {
     }
 
     try {
-      await apiRequest("/teacher/grades", {
+      const savedGrade = await apiRequest("/teacher/grades", {
         method: "POST",
         body: JSON.stringify({
           lessonId: Number(lessonId),
@@ -2598,7 +2598,11 @@ function TeacherPage({ role, user }) {
           value: Number(value)
         })
       });
-      await loadLessonMarks(lessonId);
+      setGradesByLesson((current) => ({
+        ...current,
+        [lessonId]: [...(current[lessonId] ?? []), savedGrade]
+      }));
+      setMessage("");
     } catch (error) {
       setMessage(error.message || "Не удалось сохранить оценку");
     }
@@ -2608,7 +2612,10 @@ function TeacherPage({ role, user }) {
     try {
       await apiRequest(`/teacher/grades/${gradeId}`, { method: "DELETE" });
       if (lessonId) {
-        await loadLessonMarks(lessonId);
+        setGradesByLesson((current) => ({
+          ...current,
+          [lessonId]: (current[lessonId] ?? []).filter((grade) => String(grade.gradeId) !== String(gradeId))
+        }));
       }
     } catch (error) {
       setMessage(error.message || "Не удалось удалить оценку");
@@ -2835,7 +2842,11 @@ function TeacherPage({ role, user }) {
                                   {grade.value}
                                 </button>
                               ))}
-                              <select defaultValue="" onChange={(event) => saveGradeForLesson(lesson.lessonId, student.studentId, event.target.value)}>
+                              <select defaultValue="" onChange={(event) => {
+                                const gradeValue = event.target.value;
+                                event.target.value = "";
+                                saveGradeForLesson(lesson.lessonId, student.studentId, gradeValue);
+                              }}>
                                 <option value="">+</option>
                                 {[2, 3, 4, 5].map((value) => (
                                   <option key={value} value={value}>{value}</option>
