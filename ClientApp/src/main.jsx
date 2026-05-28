@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { apiBase, apiRequest } from "./api.js";
+import { apiBase, apiRequest, csrfHeaders } from "./api.js";
 import {
   changePassword,
   clearUser,
@@ -1529,6 +1529,7 @@ function AdminPage({ role }) {
       const response = await fetch(`${apiBase}/admin/students/import-docx`, {
         method: "POST",
         credentials: "include",
+        headers: await csrfHeaders(),
         body: data
       });
 
@@ -1559,6 +1560,7 @@ function AdminPage({ role }) {
       const response = await fetch(`${apiBase}/admin/students/import-parents-docx`, {
         method: "POST",
         credentials: "include",
+        headers: await csrfHeaders(),
         body: data
       });
 

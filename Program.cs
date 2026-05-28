@@ -58,6 +58,7 @@ namespace ClassBook
             });
 
             builder.Services.AddScoped<IPasswordHasher, AspNetIdentityPasswordHasherAdapter>();
+            builder.Services.AddMemoryCache();
 
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
@@ -286,6 +287,34 @@ namespace ClassBook
                 await next();
             });
 
+            app.Use(async (context, next) =>
+            {
+                var path = context.Request.Path.Value ?? string.Empty;
+                var legacyPublicFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "/",
+                    "/index.html",
+                    "/login.html",
+                    "/change-password.html",
+                    "/director-dashboard.html",
+                    "/parent-portal.html",
+                    "/raspisanie.html",
+                    "/student-portal.html",
+                    "/teacher.html",
+                    "/main.js",
+                    "/style.css",
+                    "/12.py"
+                };
+
+                if (legacyPublicFiles.Contains(path))
+                {
+                    context.Response.Redirect("/app/", permanent: false);
+                    return;
+                }
+
+                await next();
+            });
+
             app.UseDefaultFiles();
             app.UseStaticFiles(new StaticFileOptions
             {
@@ -304,6 +333,31 @@ namespace ClassBook
             app.UseHttpsRedirection();
             app.UseCors("AllowAll");
             app.UseAuthentication();
+
+            app.Use(async (context, next) =>
+            {
+                var path = context.Request.Path.Value ?? string.Empty;
+                var method = context.Request.Method;
+                var isUnsafeApi = path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase)
+                    && !HttpMethods.IsGet(method)
+                    && !HttpMethods.IsHead(method)
+                    && !HttpMethods.IsOptions(method)
+                    && !path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+                    && !path.Equals("/api/auth/csrf", StringComparison.OrdinalIgnoreCase)
+                    && !path.Equals("/api/auth/heartbeat", StringComparison.OrdinalIgnoreCase)
+                    && !path.Equals("/api/auth/offline", StringComparison.OrdinalIgnoreCase);
+
+                if (isUnsafeApi && context.User.Identity?.IsAuthenticated == true && !IsValidCsrfToken(context))
+                {
+                    context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    await context.Response.WriteAsJsonAsync(new ClassBook.Controllers.ApiErrorResponse(
+                        "Не удалось подтвердить безопасность запроса. Обновите страницу и попробуйте еще раз.",
+                        "csrf_failed"));
+                    return;
+                }
+
+                await next();
+            });
 
             app.Use(async (context, next) =>
             {
@@ -400,6 +454,20 @@ namespace ClassBook
 
             if (changed)
                 db.SaveChanges();
+        }
+
+        private static bool IsValidCsrfToken(HttpContext context)
+        {
+            const string cookieName = "ClassBook.Csrf";
+            const string headerName = "X-CSRF-TOKEN";
+
+            if (!context.Request.Cookies.TryGetValue(cookieName, out var cookieToken))
+                return false;
+
+            var headerToken = context.Request.Headers[headerName].FirstOrDefault();
+            return !string.IsNullOrWhiteSpace(cookieToken)
+                && !string.IsNullOrWhiteSpace(headerToken)
+                && string.Equals(cookieToken, headerToken, StringComparison.Ordinal);
         }
 
         private static void ApplyMigrationsWithRetry(AppDbContext db, ILogger logger)

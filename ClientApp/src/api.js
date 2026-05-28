@@ -12,17 +12,27 @@ export function resolveApiBase() {
 
 export const apiBase = resolveApiBase();
 
+const csrfCookieName = "ClassBook.Csrf";
+const csrfHeaderName = "X-CSRF-TOKEN";
+const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 export async function apiRequest(path, options = {}) {
   let response;
+  const method = String(options.method || "GET").toUpperCase();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {})
+  };
+
+  if (unsafeMethods.has(method) && !headers[csrfHeaderName]) {
+    headers[csrfHeaderName] = await getCsrfToken();
+  }
 
   try {
     response = await fetch(`${apiBase}${path}`, {
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {})
-      },
-      ...options
+      ...options,
+      headers
     });
   } catch (error) {
     throw new Error(toRussianNetworkError(error));
@@ -39,6 +49,36 @@ export async function apiRequest(path, options = {}) {
 
   const text = await response.text();
   return text ? JSON.parse(text) : null;
+}
+
+export async function csrfHeaders() {
+  return { [csrfHeaderName]: await getCsrfToken() };
+}
+
+function readCookie(name) {
+  return document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1) || "";
+}
+
+async function getCsrfToken() {
+  const existing = readCookie(csrfCookieName);
+  if (existing) {
+    return decodeURIComponent(existing);
+  }
+
+  const response = await fetch(`${apiBase}/auth/csrf`, {
+    credentials: "include"
+  });
+
+  if (!response.ok) {
+    throw new Error("Не удалось подготовить безопасный запрос. Обновите страницу и попробуйте снова.");
+  }
+
+  const created = readCookie(csrfCookieName);
+  return created ? decodeURIComponent(created) : "";
 }
 
 function getFriendlyHttpError(status) {
