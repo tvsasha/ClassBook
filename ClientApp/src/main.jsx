@@ -1167,7 +1167,28 @@ function AdminPage({ role }) {
       setMessage("Пользователь удален");
       await loadAdminData();
     } catch (error) {
-      setMessage(error.message || "Не удалось удалить пользователя");
+      const messageText = error.message || "Не удалось удалить пользователя";
+      if (messageText.includes("привязаны предметы") || messageText.includes("привязаны уроки")) {
+        const confirmed = window.confirm(`${messageText}\n\nУдалить пользователя вместе с его предметами, уроками, оценками и посещаемостью?`);
+        if (!confirmed) {
+          setMessage(messageText);
+          return;
+        }
+
+        try {
+          await apiRequest(`/users/${user.id}`, {
+            method: "DELETE",
+            body: JSON.stringify({ deleteLinkedSubjects: true })
+          });
+          setMessage("Пользователь и связанные учебные данные удалены");
+          await loadAdminData();
+        } catch (cascadeError) {
+          setMessage(cascadeError.message || "Не удалось удалить пользователя со связанными данными");
+        }
+        return;
+      }
+
+      setMessage(messageText);
     }
   }
 
@@ -1457,8 +1478,8 @@ function AdminPage({ role }) {
 
   async function updateSubject(event) {
     event.preventDefault();
-    if (!editingSubject || !editingSubject.name.trim() || !editingSubject.teacherId) {
-      setMessage("Укажите название предмета и выберите учителя");
+    if (!editingSubject || !editingSubject.name.trim()) {
+      setMessage("Укажите название предмета");
       return;
     }
 
@@ -1466,8 +1487,7 @@ function AdminPage({ role }) {
       await apiRequest(`/subjects/${editingSubject.subjectId}`, {
         method: "PUT",
         body: JSON.stringify({
-          name: editingSubject.name.trim(),
-          teacherId: Number(editingSubject.teacherId)
+          name: editingSubject.name.trim()
         })
       });
       setEditingSubject(null);
@@ -1479,7 +1499,7 @@ function AdminPage({ role }) {
   }
 
   async function deleteSubject(subjectId) {
-    if (!window.confirm("Удалить предмет? Это действие удалит все связанные уроки.")) {
+    if (!window.confirm("Удалить предмет? Если к нему есть уроки, система предложит удалить их отдельно.")) {
       return;
     }
 
@@ -1490,8 +1510,39 @@ function AdminPage({ role }) {
       setMessage("Предмет удален");
       await loadAdminData();
     } catch (error) {
-      setMessage(error.message || "Не удалось удалить предмет");
+      const messageText = error.message || "Не удалось удалить предмет";
+      if (messageText.includes("привязаны уроки")) {
+        const confirmed = window.confirm(`${messageText}\n\nУдалить предмет вместе с уроками, оценками и посещаемостью?`);
+        if (!confirmed) {
+          setMessage(messageText);
+          return;
+        }
+
+        try {
+          await apiRequest(`/subjects/${subjectId}`, {
+            method: "DELETE",
+            body: JSON.stringify({ deleteLessons: true })
+          });
+          setMessage("Предмет и связанные уроки удалены");
+          await loadAdminData();
+        } catch (cascadeError) {
+          setMessage(cascadeError.message || "Не удалось удалить предмет со связанными уроками");
+        }
+        return;
+      }
+
+      setMessage(messageText);
     }
+  }
+
+  function openSubjectEditor(subject) {
+    setEditingSubject(subject);
+    window.requestAnimationFrame(() => {
+      document.getElementById("subject-inline-editor")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    });
   }
 
   async function assignSubjectToClass(event) {
@@ -1669,13 +1720,12 @@ function AdminPage({ role }) {
     const search = subjectFilters.search.trim().toLowerCase();
     const assignments = item.classAssignments ?? [];
     const classNames = assignments.map((assignment) => assignment.className).join(" ").toLowerCase();
-    const teacherNames = [item.teacherName, ...assignments.map((assignment) => assignment.teacherName)].join(" ").toLowerCase();
+    const teacherNames = assignments.map((assignment) => assignment.teacherName).join(" ").toLowerCase();
     const matchesSearch = !search
       || item.name?.toLowerCase().includes(search)
       || classNames.includes(search)
       || teacherNames.includes(search);
     const matchesTeacher = !subjectFilters.teacherId
-      || Number(item.teacherId) === Number(subjectFilters.teacherId)
       || assignments.some((assignment) => Number(assignment.teacherId) === Number(subjectFilters.teacherId));
     const matchesClass = !subjectFilters.classId
       || assignments.some((assignment) => Number(assignment.classId) === Number(subjectFilters.classId));
@@ -1683,7 +1733,7 @@ function AdminPage({ role }) {
     return matchesSearch && matchesTeacher && matchesClass;
   }), subjectFilters.sort, {
     name: (item) => item.name || "",
-    teacher: (item) => item.teacherName || "",
+    teacher: (item) => (item.classAssignments ?? []).map((assignment) => assignment.teacherName).join("|"),
     classes: (item) => (item.classAssignments ?? []).map((assignment) => classSortValue(assignment.className)).join("|")
   });
   const classStudentCounts = students.reduce((acc, student) => {
@@ -1966,10 +2016,9 @@ function AdminPage({ role }) {
         <DataTable
           title={`Предметы (${filteredSubjects.length})`}
           className="nested-table"
-          columns={["Предмет", "Основной учитель", "Классы", "Действие"]}
+          columns={["Предмет", "Классы и преподаватели", "Действие"]}
           rows={filteredSubjects.map((item) => [
             item.name,
-            item.teacherName,
             (item.classAssignments?.length ? (
               <div className="row-actions" key={`assignments-${item.subjectId}`}>
                 {item.classAssignments.map((assignment) => (
@@ -1986,29 +2035,21 @@ function AdminPage({ role }) {
               </div>
             ) : "Нет назначенных классов"),
             <div key={item.subjectId} style={{ display: "flex", gap: "8px" }}>
-              <button className="table-action" type="button" onClick={() => setEditingSubject(item)}>Изменить</button>
+              <button className="table-action" type="button" onClick={() => openSubjectEditor(item)}>Изменить</button>
               <button className="table-action" type="button" onClick={() => deleteSubject(item.subjectId)}>Удалить</button>
             </div>
           ])}
         />
       </section>
       {editingSubject && adminTab === "subjects" && (
-        <section className="table-card inline-editor-card">
+        <section className="table-card inline-editor-card" id="subject-inline-editor">
           <div className="table-title">Редактирование предмета</div>
           <form className="inline-form attach-form" onSubmit={updateSubject}>
             <Field label="Название предмета" value={editingSubject.name} onChange={(value) => setEditingSubject({ ...editingSubject, name: value })} />
-            <label className="field">
-              <span>Основной учитель</span>
-              <select value={editingSubject.teacherId} onChange={(event) => setEditingSubject({ ...editingSubject, teacherId: event.target.value })}>
-                {teacherUsers.map((item) => (
-                  <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
-                ))}
-              </select>
-            </label>
             <button className="primary-button">Сохранить</button>
             <button className="ghost-button compact" type="button" onClick={() => setEditingSubject(null)}>Отмена</button>
           </form>
-          <p className="modal-hint inline-editor-hint">Изменение основного учителя больше не переназначает все классы и уроки каскадом. Учителей по конкретным классам меняйте через назначения ниже.</p>
+          <p className="modal-hint inline-editor-hint">Преподаватели назначаются только по конкретным классам в списке выше. Здесь меняется только название предмета.</p>
         </section>
       )}
       {classDeleteTarget && adminTab === "access" && (

@@ -31,6 +31,11 @@ namespace ClassBook.Application.DTOs
         public bool? IsActive { get; set; }
     }
 
+    public class DeleteUserDto
+    {
+        public bool DeleteLinkedSubjects { get; set; }
+    }
+
     public class ParentStudentListItemDto
     {
         public int StudentId { get; set; }

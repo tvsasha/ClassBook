@@ -291,20 +291,73 @@ namespace ClassBook.Application.Facades
         /// <summary>
          /// Удаляет пользователя.
         /// </summary>
-        public async Task<UserDeleteResultDto> DeleteUserAsync(int id)
+        public async Task<UserDeleteResultDto> DeleteUserAsync(int id, bool deleteLinkedSubjects = false)
         {
             var user = await _db.Users.FindAsync(id);
             if (user == null)
                 throw new KeyNotFoundException("Пользователь не найден");
 
-            if (await _db.Subjects.AnyAsync(s => s.TeacherId == id) ||
-                await _db.Lessons.AnyAsync(l => l.TeacherId == id))
+            var linkedSubjectIds = await _db.Subjects
+                .Where(subject => subject.TeacherId == id || subject.ClassAssignments!.Any(assignment => assignment.TeacherId == id))
+                .Select(subject => subject.SubjectId)
+                .Distinct()
+                .ToListAsync();
+            var linkedLessonIds = await _db.Lessons
+                .Where(lesson => lesson.TeacherId == id || linkedSubjectIds.Contains(lesson.SubjectId))
+                .Select(lesson => lesson.LessonId)
+                .Distinct()
+                .ToListAsync();
+
+            if ((linkedSubjectIds.Count > 0 || linkedLessonIds.Count > 0) && !deleteLinkedSubjects)
             {
-                throw new InvalidOperationException("Нельзя удалить учителя с привязанными предметами или уроками");
+                throw new InvalidOperationException("К пользователю привязаны предметы или уроки. Можно удалить пользователя вместе с этими предметами, уроками, оценками и посещаемостью.");
             }
 
             var oldValues = BuildUserAuditDto(user);
 
+            if (linkedLessonIds.Count > 0)
+            {
+                var grades = await _db.Grades.Where(grade => linkedLessonIds.Contains(grade.LessonId)).ToListAsync();
+                var attendances = await _db.Attendances.Where(attendance => linkedLessonIds.Contains(attendance.LessonId)).ToListAsync();
+                var lessons = await _db.Lessons.Where(lesson => linkedLessonIds.Contains(lesson.LessonId)).ToListAsync();
+                _db.Grades.RemoveRange(grades);
+                _db.Attendances.RemoveRange(attendances);
+                _db.Lessons.RemoveRange(lessons);
+            }
+
+            if (linkedSubjectIds.Count > 0)
+            {
+                var subjectAssignments = await _db.SubjectClassAssignments
+                    .Where(assignment => linkedSubjectIds.Contains(assignment.SubjectId) || assignment.TeacherId == id)
+                    .ToListAsync();
+                var subjects = await _db.Subjects
+                    .Where(subject => linkedSubjectIds.Contains(subject.SubjectId))
+                    .ToListAsync();
+                _db.SubjectClassAssignments.RemoveRange(subjectAssignments);
+                _db.Subjects.RemoveRange(subjects);
+            }
+
+            var ownAssignments = await _db.SubjectClassAssignments
+                .Where(assignment => assignment.TeacherId == id)
+                .ToListAsync();
+            var classTeachers = await _db.ClassTeachers
+                .Where(assignment => assignment.TeacherId == id)
+                .ToListAsync();
+            var parentLinks = await _db.StudentParents
+                .Where(link => link.ParentId == id)
+                .ToListAsync();
+            var linkedStudents = await _db.Students
+                .Where(student => student.UserId == id)
+                .ToListAsync();
+
+            foreach (var student in linkedStudents)
+            {
+                student.UserId = null;
+            }
+
+            _db.SubjectClassAssignments.RemoveRange(ownAssignments);
+            _db.ClassTeachers.RemoveRange(classTeachers);
+            _db.StudentParents.RemoveRange(parentLinks);
             _db.Users.Remove(user);
             await _db.SaveChangesAsync();
 

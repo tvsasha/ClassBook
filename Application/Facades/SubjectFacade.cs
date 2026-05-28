@@ -202,7 +202,7 @@ namespace ClassBook.Application.Facades
             };
         }
 
-        public async Task<SubjectAdminResponseDto> UpdateSubjectAsync(int subjectId, string name, int teacherId)
+        public async Task<SubjectAdminResponseDto> UpdateSubjectAsync(int subjectId, string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Название предмета обязательно");
@@ -211,12 +211,7 @@ namespace ClassBook.Application.Facades
             if (subject == null)
                 throw new KeyNotFoundException("Предмет не найден");
 
-            var teacher = await _db.Users.FirstOrDefaultAsync(u => u.Id == teacherId && u.RoleId == SystemRoleIds.Teacher);
-            if (teacher == null)
-                throw new InvalidOperationException("Учитель не найден или это не учитель");
-
             subject.Name = name.Trim();
-            subject.TeacherId = teacherId;
 
             await _db.SaveChangesAsync();
 
@@ -224,18 +219,38 @@ namespace ClassBook.Application.Facades
             {
                 SubjectId = subject.SubjectId,
                 Name = subject.Name,
-                TeacherName = teacher.FullName
+                TeacherName = subject.Teacher?.FullName ?? "Не назначен"
             };
         }
 
-        public async Task DeleteSubjectAsync(int subjectId)
+        public async Task DeleteSubjectAsync(int subjectId, bool deleteLessons = false)
         {
             var subject = await _db.Subjects.FindAsync(subjectId);
             if (subject == null)
                 throw new KeyNotFoundException("Предмет не найден");
 
-            if (await _db.Lessons.AnyAsync(l => l.SubjectId == subjectId))
-                throw new InvalidOperationException("Нельзя удалить предмет, к которому привязаны уроки");
+            var lessonIds = await _db.Lessons
+                .Where(lesson => lesson.SubjectId == subjectId)
+                .Select(lesson => lesson.LessonId)
+                .ToListAsync();
+
+            if (lessonIds.Count > 0 && !deleteLessons)
+                throw new InvalidOperationException("К предмету привязаны уроки. Можно удалить предмет вместе с уроками, оценками и посещаемостью.");
+
+            if (lessonIds.Count > 0)
+            {
+                var grades = await _db.Grades.Where(grade => lessonIds.Contains(grade.LessonId)).ToListAsync();
+                var attendances = await _db.Attendances.Where(attendance => lessonIds.Contains(attendance.LessonId)).ToListAsync();
+                var lessons = await _db.Lessons.Where(lesson => lessonIds.Contains(lesson.LessonId)).ToListAsync();
+                _db.Grades.RemoveRange(grades);
+                _db.Attendances.RemoveRange(attendances);
+                _db.Lessons.RemoveRange(lessons);
+            }
+
+            var assignments = await _db.SubjectClassAssignments
+                .Where(assignment => assignment.SubjectId == subjectId)
+                .ToListAsync();
+            _db.SubjectClassAssignments.RemoveRange(assignments);
 
             _db.Subjects.Remove(subject);
             await _db.SaveChangesAsync();

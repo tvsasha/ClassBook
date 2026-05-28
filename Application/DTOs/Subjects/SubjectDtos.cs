@@ -12,6 +12,11 @@ namespace ClassBook.Application.DTOs
         public int TeacherId { get; set; }
     }
 
+    public class DeleteSubjectDto
+    {
+        public bool DeleteLessons { get; set; }
+    }
+
     public class SubjectAdminListItemDto
     {
         public int SubjectId { get; set; }

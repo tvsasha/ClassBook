@@ -195,11 +195,11 @@ namespace ClassBook.Controllers
         /// <param name="id">Идентификатор пользователя.</param>
         /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(int id, [FromBody] DeleteUserDto? dto = null)
         {
             try
             {
-                var result = await _userFacade.DeleteUserAsync(id);
+                var result = await _userFacade.DeleteUserAsync(id, dto?.DeleteLinkedSubjects ?? false);
 
                 var currentUserId = GetCurrentUserId();
                 if (currentUserId > 0)

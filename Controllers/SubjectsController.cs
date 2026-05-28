@@ -78,7 +78,7 @@ namespace ClassBook.Controllers
         {
             try
             {
-                return Ok(await _subjectFacade.UpdateSubjectAsync(id, dto.Name, dto.TeacherId));
+                return Ok(await _subjectFacade.UpdateSubjectAsync(id, dto.Name));
             }
             catch (KeyNotFoundException ex)
             {
@@ -158,11 +158,11 @@ namespace ClassBook.Controllers
         /// <param name="id">Идентификатор предмета.</param>
         /// <returns>Пустой ответ при успешном удалении.</returns>
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteSubject(int id)
+        public async Task<IActionResult> DeleteSubject(int id, [FromBody] DeleteSubjectDto? dto = null)
         {
             try
             {
-                await _subjectFacade.DeleteSubjectAsync(id);
+                await _subjectFacade.DeleteSubjectAsync(id, dto?.DeleteLessons ?? false);
                 return NoContent();
             }
             catch (KeyNotFoundException ex)
