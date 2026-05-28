@@ -984,6 +984,7 @@ function AdminPage({ role }) {
     teacherId: ""
   });
   const [classForm, setClassForm] = useState({ name: "" });
+  const [editingClass, setEditingClass] = useState(null);
   const [classDeleteTarget, setClassDeleteTarget] = useState(null);
   const [classDeleteForm, setClassDeleteForm] = useState({
     studentAction: "keepWithoutClass",
@@ -1153,6 +1154,20 @@ function AdminPage({ role }) {
       await loadAdminData();
     } catch (error) {
       setMessage(error.message || "Не удалось создать временный пароль");
+    }
+  }
+
+  async function deleteUser(user) {
+    if (!window.confirm(`Удалить пользователя ${user.fullName || user.login}?`)) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/users/${user.id}`, { method: "DELETE" });
+      setMessage("Пользователь удален");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось удалить пользователя");
     }
   }
 
@@ -1341,6 +1356,26 @@ function AdminPage({ role }) {
       await loadAdminData();
     } catch (error) {
       setMessage(error.message || "Не удалось добавить класс");
+    }
+  }
+
+  async function updateAdminClass(event) {
+    event.preventDefault();
+    if (!editingClass || !editingClass.name.trim()) {
+      setMessage("Укажите название класса");
+      return;
+    }
+
+    try {
+      await apiRequest(`/classes/${editingClass.classId}`, {
+        method: "PUT",
+        body: JSON.stringify({ name: editingClass.name.trim() })
+      });
+      setEditingClass(null);
+      setMessage("Класс обновлен");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось обновить класс");
     }
   }
 
@@ -1958,21 +1993,23 @@ function AdminPage({ role }) {
         />
       </section>
       {editingSubject && adminTab === "subjects" && (
-        <Modal title="Редактирование предмета" onClose={() => setEditingSubject(null)}>
-          <form className="modal-form" onSubmit={updateSubject}>
+        <section className="table-card inline-editor-card">
+          <div className="table-title">Редактирование предмета</div>
+          <form className="inline-form attach-form" onSubmit={updateSubject}>
             <Field label="Название предмета" value={editingSubject.name} onChange={(value) => setEditingSubject({ ...editingSubject, name: value })} />
             <label className="field">
-              <span>Учитель</span>
+              <span>Основной учитель</span>
               <select value={editingSubject.teacherId} onChange={(event) => setEditingSubject({ ...editingSubject, teacherId: event.target.value })}>
                 {teacherUsers.map((item) => (
                   <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
                 ))}
               </select>
             </label>
-            <button className="primary-button">Сохранить предмет</button>
+            <button className="primary-button">Сохранить</button>
             <button className="ghost-button compact" type="button" onClick={() => setEditingSubject(null)}>Отмена</button>
           </form>
-        </Modal>
+          <p className="modal-hint inline-editor-hint">Изменение основного учителя больше не переназначает все классы и уроки каскадом. Учителей по конкретным классам меняйте через назначения ниже.</p>
+        </section>
       )}
       {classDeleteTarget && adminTab === "access" && (
         <Modal title={`Удаление класса ${classDeleteTarget.name}`} onClose={() => setClassDeleteTarget(null)}>
@@ -2011,6 +2048,15 @@ function AdminPage({ role }) {
           </form>
         </Modal>
       )}
+      {editingClass && adminTab === "access" && (
+        <Modal title={`Изменение класса ${editingClass.name}`} onClose={() => setEditingClass(null)}>
+          <form className="modal-form" onSubmit={updateAdminClass}>
+            <Field label="Название класса" value={editingClass.name} onChange={(value) => setEditingClass({ ...editingClass, name: value })} />
+            <button className="primary-button">Сохранить класс</button>
+            <button className="ghost-button compact" type="button" onClick={() => setEditingClass(null)}>Отмена</button>
+          </form>
+        </Modal>
+      )}
       <section className={`table-card admin-section ${adminTab === "access" ? "active" : ""}`}>
         <div className="table-title">Классы</div>
         <form className="inline-form attach-form" onSubmit={createAdminClass}>
@@ -2027,7 +2073,10 @@ function AdminPage({ role }) {
               item.name,
               classStudentCounts.get(Number(item.classId)) ?? 0,
               classTeacher?.teacherName ?? "Не назначен",
-              <button className="table-action" type="button" onClick={() => openClassDeleteDialog(item)}>Удалить</button>
+              <div className="row-actions">
+                <button className="table-action" type="button" onClick={() => setEditingClass(item)}>Изменить</button>
+                <button className="table-action" type="button" onClick={() => openClassDeleteDialog(item)}>Удалить</button>
+              </div>
             ];
           })}
         />
@@ -2150,6 +2199,7 @@ function AdminPage({ role }) {
           <div className="row-actions">
             <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
             <button className="table-action" type="button" onClick={() => resetUserPassword(item)}>Временный пароль</button>
+            <button className="table-action danger-action" type="button" onClick={() => deleteUser(item)}>Удалить</button>
           </div>
         ])}
       />

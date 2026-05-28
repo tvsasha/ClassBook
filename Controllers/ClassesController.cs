@@ -49,6 +49,27 @@ namespace ClassBook.Controllers
             }
         }
 
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateClass(int id, [FromBody] CreateClassDto dto)
+        {
+            try
+            {
+                return Ok(await _classFacade.UpdateClassAsync(id, dto.Name));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+        }
+
         /// <summary>
         /// Удаляет учебный класс, если к нему не привязаны ученики и уроки.
         /// </summary>

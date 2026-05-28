@@ -1713,6 +1713,21 @@ tbody tr:hover td {
   align-items: center;
 }
 
+.danger-action {
+  color: #991b1b;
+  background: rgba(153, 27, 27, 0.08);
+  border-color: rgba(153, 27, 27, 0.18);
+}
+
+.inline-editor-card {
+  border-color: rgba(15, 124, 102, 0.22);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.inline-editor-hint {
+  padding: 0 18px 18px;
+}
+
 .schedule-toolbar {
   display: flex;
   flex-wrap: wrap;

@@ -51,6 +51,29 @@ namespace ClassBook.Application.Facades
             };
         }
 
+        public async Task<ClassListItemDto> UpdateClassAsync(int classId, string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Название класса обязательно");
+
+            var classEntity = await _db.Classes.FindAsync(classId);
+            if (classEntity == null)
+                throw new KeyNotFoundException("Класс не найден");
+
+            var normalizedName = name.Trim();
+            if (await _db.Classes.AnyAsync(c => c.ClassId != classId && c.Name == normalizedName))
+                throw new InvalidOperationException("Класс с таким названием уже существует");
+
+            classEntity.Name = normalizedName;
+            await _db.SaveChangesAsync();
+
+            return new ClassListItemDto
+            {
+                ClassId = classEntity.ClassId,
+                Name = classEntity.Name
+            };
+        }
+
         public async Task DeleteClassAsync(int classId, string studentAction = "keepWithoutClass", int? targetClassId = null)
         {
             var classEntity = await _db.Classes.FindAsync(classId);
