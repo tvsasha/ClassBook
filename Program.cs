@@ -350,22 +350,31 @@ namespace ClassBook
 
         private static void EnsureBootstrapAdmin(AppDbContext db, IPasswordHasher hasher)
         {
-            const string login = "1";
-            const string password = "1";
+            const string legacyLogin = "1";
+            const string legacyPassword = "1";
             const string fullName = "Администратор";
 
             var adminRole = db.Roles.First(role => role.Name == "Администратор");
-            var admin = db.Users.FirstOrDefault(user => user.Login == login);
-            if (admin == null)
+            var legacyAdmin = db.Users.FirstOrDefault(user => user.Login == legacyLogin);
+            var bootstrapPassword = Environment.GetEnvironmentVariable("CLASSBOOK_BOOTSTRAP_ADMIN_PASSWORD");
+            var hasOtherActiveAdmin = db.Users.Any(user =>
+                user.Login != legacyLogin &&
+                user.RoleId == adminRole.Id &&
+                user.IsActive);
+
+            if (legacyAdmin == null)
             {
+                if (string.IsNullOrWhiteSpace(bootstrapPassword))
+                    return;
+
                 db.Users.Add(new User
                 {
-                    Login = login,
+                    Login = legacyLogin,
                     FullName = fullName,
-                    PasswordHash = hasher.Hash(password),
+                    PasswordHash = hasher.Hash(bootstrapPassword),
                     RoleId = adminRole.Id,
                     IsActive = true,
-                    MustChangePassword = false,
+                    MustChangePassword = true,
                     CreatedAt = DateTime.UtcNow
                 });
                 db.SaveChanges();
@@ -373,34 +382,20 @@ namespace ClassBook
             }
 
             var changed = false;
-            if (admin.RoleId != adminRole.Id)
+            if (hasher.Verify(legacyPassword, legacyAdmin.PasswordHash))
             {
-                admin.RoleId = adminRole.Id;
-                changed = true;
-            }
-
-            if (admin.FullName != fullName)
-            {
-                admin.FullName = fullName;
-                changed = true;
-            }
-
-            if (!admin.IsActive)
-            {
-                admin.IsActive = true;
-                changed = true;
-            }
-
-            if (admin.MustChangePassword)
-            {
-                admin.MustChangePassword = false;
-                changed = true;
-            }
-
-            if (!hasher.Verify(password, admin.PasswordHash))
-            {
-                admin.PasswordHash = hasher.Hash(password);
-                changed = true;
+                if (hasOtherActiveAdmin)
+                {
+                    legacyAdmin.IsActive = false;
+                    legacyAdmin.MustChangePassword = true;
+                    changed = true;
+                }
+                else if (!string.IsNullOrWhiteSpace(bootstrapPassword))
+                {
+                    legacyAdmin.PasswordHash = hasher.Hash(bootstrapPassword);
+                    legacyAdmin.MustChangePassword = true;
+                    changed = true;
+                }
             }
 
             if (changed)

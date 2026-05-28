@@ -1,4 +1,5 @@
 using ClassBook.Application.Facades;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ClassBook.Controllers
@@ -7,6 +8,7 @@ namespace ClassBook.Controllers
     /// Контроллер для получения списка ролей пользователей.
     /// </summary>
     [ApiController]
+    [Authorize(Policy = "AdminOnly")]
     [Route("api/roles")]
     public class RolesController : ControllerBase
     {
