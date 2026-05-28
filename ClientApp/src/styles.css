@@ -1878,6 +1878,15 @@ tbody tr:hover td {
   font-weight: 700;
 }
 
+.schedule-grid-table tbody tr:hover .schedule-day-col {
+  background: #e8f2ee;
+}
+
+.schedule-grid-table tbody tr:hover .schedule-time-col,
+.schedule-grid-table tbody tr:hover .schedule-number-col {
+  background: rgba(255, 255, 255, 0.98);
+}
+
 .day-cell {
   color: var(--accent-strong);
   font-weight: 700;

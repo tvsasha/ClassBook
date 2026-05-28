@@ -2454,13 +2454,20 @@ function TeacherPage({ role, user }) {
     setLoading(true);
     setMessage("");
     try {
+      const adminMode = role === "Администратор";
       const [classData, subjectData, lessonData] = await Promise.all([
-        apiRequest(`/teacher/classes?teacherId=${user.id}`),
-        apiRequest(`/teacher/subjects?teacherId=${user.id}`),
-        apiRequest(`/teacher/lessons?teacherId=${user.id}`)
+        apiRequest(adminMode ? "/classes" : `/teacher/classes?teacherId=${user.id}`),
+        apiRequest(adminMode ? "/subjects" : `/teacher/subjects?teacherId=${user.id}`),
+        apiRequest(adminMode ? "/lessons" : `/teacher/lessons?teacherId=${user.id}`)
       ]);
       setClasses(sortItems(classData ?? [], "name", { name: (item) => classSortValue(item.name) }));
-      setSubjects(subjectData ?? []);
+      setSubjects(adminMode
+        ? (subjectData ?? []).map((subject) => ({
+          ...subject,
+          classIds: (subject.classAssignments ?? []).map((assignment) => assignment.classId),
+          classes: (subject.classAssignments ?? []).map((assignment) => assignment.className).join(", ")
+        }))
+        : subjectData ?? []);
       setLessons(lessonData ?? []);
     } catch (error) {
       setMessage(error.message || "Не удалось загрузить кабинет учителя");
@@ -2473,7 +2480,7 @@ function TeacherPage({ role, user }) {
     if (allowed) {
       loadTeacherData();
     }
-  }, [allowed]);
+  }, [allowed, role, user.id]);
 
   useEffect(() => {
     if (!selectedClassId) {
