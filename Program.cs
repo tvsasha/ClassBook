@@ -13,6 +13,7 @@ using System.IO;
 using System.Security.Claims;
 using System.Reflection;
 using System.Text;
+using ClassBook.Domain.Constants;
 
 namespace ClassBook
 {
@@ -516,31 +517,76 @@ namespace ClassBook
 
         private static void NormalizeDemoUsers(AppDbContext db)
         {
-            var replacements = new Dictionary<int, string>
+            var teacherNamesById = new Dictionary<int, string>
             {
+                [2] = "Тарзиева Нина Адилхоновна",
+                [3] = "Кудабаева Дана Нурлановна",
+                [4] = "Милош Алевтина Валерьевна",
+                [5] = "Абдрахимова Асимгуль Асембековна",
+                [6] = "Мироненко Надежда Васильевна",
+                [7] = "Соколова Маргарита Юрьевна",
+                [8] = "Усачева Марина Николаевна",
+                [9] = "Агишева Ольга Ивановна",
+                [11] = "Даниленко Анна Александровна",
+                [12] = "Бушуева Наталья Михайловна",
+                [13] = "Пелеева Татьяна Геннадьевна",
                 [73] = "Смирнов Алексей Викторович",
+                [78] = "Иванченко Александра Анатольевна",
+                [80] = "Кузьмина Анастасия Владимировна",
+                [83] = "Иванникова Татьяна Сергеевна",
                 [88] = "Ковалев Артем Сергеевич",
-                [99] = "Учитель музыки",
-                [109] = "Учитель русского языка",
-                [115] = "Педагог физической культуры",
-                [118] = "Учитель химии"
+                [90] = "Давлетшина Румия Минигалимовна",
+                [95] = "Литвинюк Марина Александровна",
+                [99] = "Орлова Екатерина Павловна",
+                [109] = "Петрова Елена Сергеевна",
+                [115] = "Федоров Илья Андреевич",
+                [118] = "Морозова Ирина Викторовна"
             };
-
-            foreach (var user in db.Users)
+            var fallbackTeacherNames = new[]
             {
-                if (replacements.TryGetValue(user.Id, out var replacement))
+                "Савельева Мария Андреевна",
+                "Никитина Анна Сергеевна",
+                "Громова Виктория Павловна",
+                "Белова Елена Игоревна",
+                "Захарова Наталья Викторовна",
+                "Корнилова Оксана Дмитриевна",
+                "Алексеева Ирина Олеговна",
+                "Волкова Светлана Романовна",
+                "Романова Юлия Михайловна",
+                "Макарова Полина Евгеньевна"
+            };
+            var usedTeacherNames = new HashSet<string>(teacherNamesById.Values, StringComparer.OrdinalIgnoreCase);
+            var usedLogins = new HashSet<string>(
+                db.Users.Select(user => user.Login),
+                StringComparer.OrdinalIgnoreCase);
+            var fallbackIndex = 0;
+
+            foreach (var user in db.Users.OrderBy(user => user.Id))
+            {
+                if (user.RoleId == SystemRoleIds.Teacher)
                 {
-                    user.FullName = replacement;
+                    if (teacherNamesById.TryGetValue(user.Id, out var teacherName))
+                    {
+                        user.FullName = teacherName;
+                    }
+                    else if (ShouldNormalizeTeacherName(user.FullName, user.Login))
+                    {
+                        while (fallbackIndex < fallbackTeacherNames.Length &&
+                               usedTeacherNames.Contains(fallbackTeacherNames[fallbackIndex]))
+                        {
+                            fallbackIndex++;
+                        }
+
+                        user.FullName = fallbackIndex < fallbackTeacherNames.Length
+                            ? fallbackTeacherNames[fallbackIndex++]
+                            : $"Преподаватель Демо {user.Id}";
+                        usedTeacherNames.Add(user.FullName);
+                    }
+
+                    usedLogins.Remove(user.Login);
+                    user.Login = BuildUniqueTeacherLogin(user.FullName, usedLogins, user.Id);
                     user.IsActive = true;
                     continue;
-                }
-
-                if (user.Login.StartsWith("schedule.", StringComparison.OrdinalIgnoreCase) &&
-                    user.FullName.Contains(':') &&
-                    !user.FullName.Contains('?'))
-                {
-                    user.FullName = user.FullName.Split(':', 2)[0].Trim();
-                    user.IsActive = true;
                 }
 
                 if (!user.FullName.Contains('?'))
@@ -564,6 +610,64 @@ namespace ClassBook
                 };
                 user.IsActive = true;
             }
+        }
+
+        private static bool ShouldNormalizeTeacherName(string fullName, string login)
+        {
+            var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return fullName.Contains('?') ||
+                   fullName.Contains(':') ||
+                   fullName.Contains('.') ||
+                   fullName.StartsWith("Учитель", StringComparison.OrdinalIgnoreCase) ||
+                   fullName.StartsWith("Педагог", StringComparison.OrdinalIgnoreCase) ||
+                   login.StartsWith("schedule.", StringComparison.OrdinalIgnoreCase) ||
+                   parts.Length < 3;
+        }
+
+        private static string BuildUniqueTeacherLogin(string fullName, HashSet<string> usedLogins, int userId)
+        {
+            var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var baseLogin = parts.Length >= 2
+                ? $"{Transliterate(parts[0])}.{Transliterate(parts[1])}"
+                : $"teacher.{userId}";
+            baseLogin = baseLogin.ToLowerInvariant().Trim('.');
+            if (string.IsNullOrWhiteSpace(baseLogin))
+                baseLogin = $"teacher.{userId}";
+
+            var login = baseLogin;
+            var suffix = 2;
+            while (usedLogins.Contains(login))
+            {
+                login = $"{baseLogin}.{suffix++}";
+            }
+
+            usedLogins.Add(login);
+            return login;
+        }
+
+        private static string Transliterate(string value)
+        {
+            var map = new Dictionary<char, string>
+            {
+                ['а'] = "a", ['б'] = "b", ['в'] = "v", ['г'] = "g", ['д'] = "d", ['е'] = "e", ['ё'] = "e",
+                ['ж'] = "zh", ['з'] = "z", ['и'] = "i", ['й'] = "y", ['к'] = "k", ['л'] = "l", ['м'] = "m",
+                ['н'] = "n", ['о'] = "o", ['п'] = "p", ['р'] = "r", ['с'] = "s", ['т'] = "t", ['у'] = "u",
+                ['ф'] = "f", ['х'] = "h", ['ц'] = "ts", ['ч'] = "ch", ['ш'] = "sh", ['щ'] = "sch",
+                ['ы'] = "y", ['э'] = "e", ['ю'] = "yu", ['я'] = "ya"
+            };
+            var builder = new StringBuilder();
+            foreach (var character in value.ToLowerInvariant())
+            {
+                if (map.TryGetValue(character, out var replacement))
+                {
+                    builder.Append(replacement);
+                }
+                else if (character is >= 'a' and <= 'z' or >= '0' and <= '9')
+                {
+                    builder.Append(character);
+                }
+            }
+            return builder.ToString();
         }
 
         private static void NormalizeDemoSubjects(AppDbContext db)

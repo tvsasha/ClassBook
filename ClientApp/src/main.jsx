@@ -1157,6 +1157,19 @@ function AdminPage({ role }) {
     }
   }
 
+  async function activateUser(user) {
+    try {
+      await apiRequest(`/users/${user.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ isActive: true })
+      });
+      setMessage("Пользователь активирован");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось активировать пользователя");
+    }
+  }
+
   async function deleteUser(user) {
     if (!window.confirm(`Удалить пользователя ${user.fullName || user.login}?`)) {
       return;
@@ -1954,6 +1967,7 @@ function AdminPage({ role }) {
           </label>
           <button className="primary-button">Создать и назначить</button>
         </form>
+        <p className="modal-hint inline-editor-hint">Один предмет может быть назначен разным классам и учителям. Кнопка «Снять» ниже удаляет только конкретную связку класс + учитель, а «Удалить предмет целиком» удаляет сам предмет и отдельно спросит подтверждение, если есть уроки.</p>
         <form className="inline-form attach-form" onSubmit={assignSubjectToClass}>
           <label className="field">
             <span>Предмет</span>
@@ -2016,7 +2030,7 @@ function AdminPage({ role }) {
         <DataTable
           title={`Предметы (${filteredSubjects.length})`}
           className="nested-table"
-          columns={["Предмет", "Классы и преподаватели", "Действие"]}
+          columns={["Предмет", "Назначения", "Действие"]}
           rows={filteredSubjects.map((item) => [
             item.name,
             (item.classAssignments?.length ? (
@@ -2027,16 +2041,16 @@ function AdminPage({ role }) {
                     key={`${assignment.classId}-${assignment.teacherId}`}
                     type="button"
                     onClick={() => removeSubjectAssignment(item.subjectId, assignment.classId, assignment.teacherId)}
-                    title="Снять назначение"
+                    title="Снять только это назначение"
                   >
-                    {assignment.className} · {assignment.teacherName}
+                    Снять: {assignment.className} · {assignment.teacherName}
                   </button>
                 ))}
               </div>
             ) : "Нет назначенных классов"),
             <div key={item.subjectId} style={{ display: "flex", gap: "8px" }}>
               <button className="table-action" type="button" onClick={() => openSubjectEditor(item)}>Изменить</button>
-              <button className="table-action" type="button" onClick={() => deleteSubject(item.subjectId)}>Удалить</button>
+              <button className="table-action danger-action" type="button" onClick={() => deleteSubject(item.subjectId)}>Удалить предмет целиком</button>
             </div>
           ])}
         />
@@ -2239,6 +2253,7 @@ function AdminPage({ role }) {
           item.mustChangePassword ? "Нужно сменить" : "Постоянный",
           <div className="row-actions">
             <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
+            {!item.isActive && <button className="table-action" type="button" onClick={() => activateUser(item)}>Активировать</button>}
             <button className="table-action" type="button" onClick={() => resetUserPassword(item)}>Временный пароль</button>
             <button className="table-action danger-action" type="button" onClick={() => deleteUser(item)}>Удалить</button>
           </div>
@@ -4904,14 +4919,7 @@ function getScheduleSubjectLabel(subject) {
 }
 
 function getAdminSubjectLabel(subject) {
-  const teachers = [...new Set((subject.classAssignments ?? [])
-    .map((assignment) => assignment.teacherName)
-    .filter(Boolean))];
-  const teacher = teachers.length > 0 ? teachers.join(", ") : subject.teacherName;
-  const classes = subject.classAssignments?.length
-    ? [...new Set(subject.classAssignments.map((assignment) => assignment.className).filter(Boolean))].join(", ")
-    : "";
-  return [subject.name, teacher, classes].filter(Boolean).join(" - ");
+  return [subject.name, subject.teacherName].filter(Boolean).join(" - ");
 }
 
 function dayName(day) {
