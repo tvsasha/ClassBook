@@ -554,7 +554,19 @@ namespace ClassBook
                 "Алексеева Ирина Олеговна",
                 "Волкова Светлана Романовна",
                 "Романова Юлия Михайловна",
-                "Макарова Полина Евгеньевна"
+                "Макарова Полина Евгеньевна",
+                "Соловьева Алина Вячеславовна",
+                "Егорова Дарья Константиновна",
+                "Гаврилова Ольга Петровна",
+                "Тихонова Валерия Сергеевна",
+                "Михайлова Ксения Андреевна",
+                "Фролова Надежда Ильинична",
+                "Семенова Екатерина Денисовна",
+                "Павлова Марина Витальевна",
+                "Калинина Вера Николаевна",
+                "Новикова Татьяна Алексеевна",
+                "Васильева Людмила Юрьевна",
+                "Андреева Елена Борисовна"
             };
             var usedTeacherNames = new HashSet<string>(teacherNamesById.Values, StringComparer.OrdinalIgnoreCase);
             var usedLogins = new HashSet<string>(
@@ -580,7 +592,7 @@ namespace ClassBook
 
                         user.FullName = fallbackIndex < fallbackTeacherNames.Length
                             ? fallbackTeacherNames[fallbackIndex++]
-                            : $"Преподаватель Демо {user.Id}";
+                            : $"Педагог школы {user.Id}";
                         usedTeacherNames.Add(user.FullName);
                     }
 
@@ -621,6 +633,7 @@ namespace ClassBook
                    fullName.Contains('.') ||
                    fullName.StartsWith("Учитель", StringComparison.OrdinalIgnoreCase) ||
                    fullName.StartsWith("Педагог", StringComparison.OrdinalIgnoreCase) ||
+                   fullName.StartsWith("Преподаватель", StringComparison.OrdinalIgnoreCase) ||
                    login.StartsWith("schedule.", StringComparison.OrdinalIgnoreCase) ||
                    parts.Length < 3;
         }

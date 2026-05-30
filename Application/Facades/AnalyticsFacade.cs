@@ -20,6 +20,7 @@ namespace ClassBook.Application.Facades
             var endOfDay = startOfDay.AddDays(1).AddTicks(-1);
 
             var lessonsForDate = await _db.Lessons
+                .AsNoTracking()
                 .Where(l => l.Date >= startOfDay && l.Date <= endOfDay)
                 .Include(l => l.Teacher)
                 .Include(l => l.Subject)
@@ -28,14 +29,18 @@ namespace ClassBook.Application.Facades
                 .Include(l => l.Attendances)
                 .ToListAsync();
 
+            var classIds = lessonsForDate.Select(lesson => lesson.ClassId).Distinct().ToList();
+            var studentCounts = await _db.Students
+                .AsNoTracking()
+                .Where(student => student.ClassId.HasValue && classIds.Contains(student.ClassId.Value))
+                .GroupBy(student => student.ClassId!.Value)
+                .Select(group => new { ClassId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(item => item.ClassId, item => item.Count);
             var report = new List<DailyCompletionLessonDto>();
 
             foreach (var lesson in lessonsForDate)
             {
-                var studentsInClass = await _db.Students
-                    .Where(s => s.ClassId == lesson.ClassId)
-                    .CountAsync();
-
+                var studentsInClass = studentCounts.GetValueOrDefault(lesson.ClassId);
                 var gradesCount = lesson.Grades?.Count ?? 0;
                 var explicitAttendanceCount = lesson.Attendances?.Count ?? 0;
                 var absentCount = lesson.Attendances?.Count(a => a.Status == 0) ?? 0;
@@ -68,32 +73,41 @@ namespace ClassBook.Application.Facades
 
         public async Task<AttendanceStatisticsReportDto> GetAttendanceStatisticsAsync(DateTime startDate, DateTime endDate)
         {
-            var classes = await _db.Classes.ToListAsync();
-            var stats = new List<AttendanceStatisticsItemDto>();
-
-            foreach (var classItem in classes)
+            var classes = await _db.Classes.AsNoTracking().ToListAsync();
+            var studentCounts = await _db.Students
+                .AsNoTracking()
+                .Where(student => student.ClassId.HasValue)
+                .GroupBy(student => student.ClassId!.Value)
+                .Select(group => new { ClassId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(item => item.ClassId, item => item.Count);
+            var lessonCounts = await _db.Lessons
+                .AsNoTracking()
+                .Where(lesson => lesson.Date >= startDate && lesson.Date <= endDate)
+                .GroupBy(lesson => lesson.ClassId)
+                .Select(group => new { ClassId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(item => item.ClassId, item => item.Count);
+            var attendanceStats = await _db.Attendances
+                .AsNoTracking()
+                .Where(attendance => attendance.Lesson.Date >= startDate && attendance.Lesson.Date <= endDate)
+                .GroupBy(attendance => attendance.Student.ClassId)
+                .Select(group => new
+                {
+                    ClassId = group.Key,
+                    Absent = group.Count(attendance => attendance.Status == 0),
+                    Excused = group.Count(attendance => attendance.Status == 2)
+                })
+                .ToDictionaryAsync(item => item.ClassId ?? 0, item => item);
+            var stats = classes.Select(classItem =>
             {
-                var lessonsCount = await _db.Lessons
-                    .Where(l => l.ClassId == classItem.ClassId &&
-                               l.Date >= startDate && l.Date <= endDate)
-                    .CountAsync();
-
-                var attendanceRecords = await _db.Attendances
-                    .Where(a => a.Student.ClassId == classItem.ClassId &&
-                               a.Lesson.Date >= startDate && a.Lesson.Date <= endDate)
-                    .Include(a => a.Student)
-                    .Include(a => a.Lesson)
-                    .ToListAsync();
-
-                var totalStudents = await _db.Students
-                    .CountAsync(s => s.ClassId == classItem.ClassId);
-
-                var absentCount = attendanceRecords.Count(a => a.Status == 0);
-                var excusedCount = attendanceRecords.Count(a => a.Status == 2);
+                var totalStudents = studentCounts.GetValueOrDefault(classItem.ClassId);
+                var lessonsCount = lessonCounts.GetValueOrDefault(classItem.ClassId);
                 var totalRecords = totalStudents * lessonsCount;
+                var classAttendance = attendanceStats.GetValueOrDefault(classItem.ClassId);
+                var absentCount = classAttendance?.Absent ?? 0;
+                var excusedCount = classAttendance?.Excused ?? 0;
                 var presentCount = totalRecords > 0 ? totalRecords - absentCount : 0;
 
-                stats.Add(new AttendanceStatisticsItemDto
+                return new AttendanceStatisticsItemDto
                 {
                     ClassName = classItem.Name,
                     TotalStudents = totalStudents,
@@ -102,8 +116,8 @@ namespace ClassBook.Application.Facades
                     Excused = excusedCount,
                     PresentPercentage = totalRecords > 0 ? Math.Round((double)presentCount / totalRecords * 100, 2) : 0,
                     AbsentPercentage = totalRecords > 0 ? Math.Round((double)absentCount / totalRecords * 100, 2) : 0
-                });
-            }
+                };
+            }).ToList();
 
             return new AttendanceStatisticsReportDto
             {
@@ -120,8 +134,6 @@ namespace ClassBook.Application.Facades
             int? studentId = null,
             int? teacherId = null)
         {
-            var students = new List<ProblematicStudentDto>();
-
             var query = _db.Students.AsQueryable();
             if (classId.HasValue)
             {
@@ -129,6 +141,8 @@ namespace ClassBook.Application.Facades
             }
 
             var filteredStudents = await query
+                .AsNoTracking()
+                .AsSplitQuery()
                 .Include(s => s.Class)
                 .Include(s => s.Attendances!)
                 .ThenInclude(a => a.Lesson)
@@ -140,6 +154,19 @@ namespace ClassBook.Application.Facades
             {
                 filteredStudents = filteredStudents.Where(s => s.StudentId == studentId.Value).ToList();
             }
+
+            var classIds = filteredStudents
+                .Where(student => student.ClassId.HasValue)
+                .Select(student => student.ClassId!.Value)
+                .Distinct()
+                .ToList();
+            var lessonCountsByClass = await _db.Lessons
+                .AsNoTracking()
+                .Where(lesson => classIds.Contains(lesson.ClassId) && lesson.Date >= startDate && lesson.Date <= endDate)
+                .GroupBy(lesson => lesson.ClassId)
+                .Select(group => new { ClassId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(item => item.ClassId, item => item.Count);
+            var students = new List<ProblematicStudentDto>();
 
             foreach (var student in filteredStudents)
             {
@@ -157,8 +184,9 @@ namespace ClassBook.Application.Facades
 
                 var avgGrade = grades.Count > 0 ? Math.Round((double)grades.Sum(g => g.Value) / grades.Count, 2) : 0;
                 var lowGradeCount = grades.Count(g => g.Value < 3);
-                var totalAttendance = await _db.Lessons
-                    .CountAsync(l => l.ClassId == student.ClassId && l.Date >= startDate && l.Date <= endDate);
+                var totalAttendance = student.ClassId.HasValue
+                    ? lessonCountsByClass.GetValueOrDefault(student.ClassId.Value)
+                    : 0;
                 var absencePercentage = totalAttendance > 0
                     ? Math.Round((double)absences / totalAttendance * 100, 2)
                     : 0;
@@ -170,7 +198,7 @@ namespace ClassBook.Application.Facades
                         StudentId = student.StudentId,
                         FirstName = student.FirstName,
                         LastName = student.LastName,
-                        Class = student.Class.Name,
+                        Class = student.Class?.Name ?? "",
                         Absences = absences,
                         AbsencePercentage = absencePercentage,
                         AverageGrade = avgGrade,
@@ -249,42 +277,42 @@ namespace ClassBook.Application.Facades
         public async Task<ClassSummaryReportDto> GetClassSummaryAsync(DateTime startDate, DateTime endDate)
         {
             var classes = await _db.Classes
+                .AsNoTracking()
                 .Include(c => c.Students)
                 .ToListAsync();
+            var absenceCounts = await _db.Attendances
+                .AsNoTracking()
+                .Where(attendance => attendance.Lesson.Date >= startDate &&
+                                     attendance.Lesson.Date <= endDate &&
+                                     attendance.Status == 0)
+                .GroupBy(attendance => attendance.Student.ClassId)
+                .Select(group => new { ClassId = group.Key, Count = group.Count() })
+                .ToDictionaryAsync(item => item.ClassId ?? 0, item => item.Count);
+            var gradeStats = await _db.Grades
+                .AsNoTracking()
+                .Where(grade => grade.Lesson.Date >= startDate && grade.Lesson.Date <= endDate)
+                .GroupBy(grade => grade.Student.ClassId)
+                .Select(group => new
+                {
+                    ClassId = group.Key,
+                    Count = group.Count(),
+                    Sum = group.Sum(grade => grade.Value)
+                })
+                .ToDictionaryAsync(item => item.ClassId ?? 0, item => item);
 
-            var summary = new List<ClassSummaryItemDto>();
-
-            foreach (var classItem in classes)
+            var summary = classes.Select(classItem =>
             {
                 var students = classItem.Students ?? [];
-                var avgAbsences = 0.0;
-                var avgGrade = 0.0;
-
-                if (students.Count > 0)
-                {
-                    var allAbsences = await _db.Attendances
-                        .Where(a => a.Student.ClassId == classItem.ClassId &&
-                                   a.Lesson.Date >= startDate && a.Lesson.Date <= endDate &&
-                                   a.Status == 0)
-                        .CountAsync();
-
-                    var allGrades = await _db.Grades
-                        .Where(g => g.Student.ClassId == classItem.ClassId &&
-                                   g.Lesson.Date >= startDate && g.Lesson.Date <= endDate)
-                        .ToListAsync();
-
-                    avgAbsences = Math.Round((double)allAbsences / students.Count, 2);
-                    avgGrade = allGrades.Count > 0 ? Math.Round((double)allGrades.Sum(g => g.Value) / allGrades.Count, 2) : 0;
-                }
-
-                summary.Add(new ClassSummaryItemDto
+                var allAbsences = absenceCounts.GetValueOrDefault(classItem.ClassId);
+                var grades = gradeStats.GetValueOrDefault(classItem.ClassId);
+                return new ClassSummaryItemDto
                 {
                     ClassName = classItem.Name,
                     StudentCount = students.Count,
-                    AverageAbsences = avgAbsences,
-                    AverageGrade = avgGrade
-                });
-            }
+                    AverageAbsences = students.Count > 0 ? Math.Round((double)allAbsences / students.Count, 2) : 0,
+                    AverageGrade = grades is { Count: > 0 } ? Math.Round((double)grades.Sum / grades.Count, 2) : 0
+                };
+            }).ToList();
 
             return new ClassSummaryReportDto
             {
