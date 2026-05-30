@@ -158,7 +158,19 @@ namespace ClassBook.Application.Facades
                 })
                 .ToListAsync();
 
+            var lessonAssignments = await _db.Lessons
+                .AsNoTracking()
+                .Select(lesson => new
+                {
+                    lesson.SubjectId,
+                    lesson.ClassId,
+                    lesson.TeacherId
+                })
+                .Distinct()
+                .ToListAsync();
+
             var assignmentsBySubject = assignments
+                .Concat(lessonAssignments)
                 .GroupBy(assignment => assignment.SubjectId)
                 .ToDictionary(group => group.Key, group => group.ToList());
 

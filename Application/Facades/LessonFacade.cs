@@ -149,12 +149,25 @@ namespace ClassBook.Application.Facades
             if (!teacherExists)
                 throw new InvalidOperationException("Учитель не найден или это не учитель");
 
-            var assignmentExists = await _db.SubjectClassAssignments.AnyAsync(a =>
-                a.SubjectId == subjectId &&
-                a.ClassId == classId &&
-                a.TeacherId == teacherId);
-            if (!assignmentExists)
-                throw new InvalidOperationException("Учитель не назначен на этот предмет в выбранном классе");
+            await EnsureSubjectAssignmentAsync(subjectId, classId, teacherId);
+        }
+
+        private async Task EnsureSubjectAssignmentAsync(int subjectId, int classId, int teacherId)
+        {
+            var assignmentExists = await _db.SubjectClassAssignments.AnyAsync(assignment =>
+                assignment.SubjectId == subjectId &&
+                assignment.ClassId == classId &&
+                assignment.TeacherId == teacherId);
+            if (assignmentExists)
+                return;
+
+            _db.SubjectClassAssignments.Add(new SubjectClassAssignment
+            {
+                SubjectId = subjectId,
+                ClassId = classId,
+                TeacherId = teacherId,
+                CreatedAt = DateTime.UtcNow
+            });
         }
 
         private async Task<LessonResponse> GetRequiredLessonResponseAsync(int lessonId)

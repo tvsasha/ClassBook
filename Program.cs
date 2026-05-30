@@ -490,6 +490,7 @@ namespace ClassBook
 
             NormalizeDemoLessons(db);
             EnsureOvzLessons(db);
+            EnsureLessonSubjectAssignments(db);
             db.SaveChanges();
 
             SeedDemoAttendanceAndGrades(db);
@@ -809,6 +810,35 @@ namespace ClassBook
                     });
                     currentCount++;
                 }
+            }
+        }
+
+        private static void EnsureLessonSubjectAssignments(AppDbContext db)
+        {
+            var existingKeys = db.SubjectClassAssignments
+                .Select(assignment => new { assignment.SubjectId, assignment.ClassId, assignment.TeacherId })
+                .AsEnumerable()
+                .ToHashSet();
+
+            var lessonKeys = db.Lessons
+                .Select(lesson => new { lesson.SubjectId, lesson.ClassId, lesson.TeacherId })
+                .AsEnumerable()
+                .Distinct()
+                .ToList();
+
+            foreach (var key in lessonKeys)
+            {
+                if (existingKeys.Contains(key))
+                    continue;
+
+                db.SubjectClassAssignments.Add(new SubjectClassAssignment
+                {
+                    SubjectId = key.SubjectId,
+                    ClassId = key.ClassId,
+                    TeacherId = key.TeacherId,
+                    CreatedAt = DateTime.UtcNow
+                });
+                existingKeys.Add(key);
             }
         }
 
