@@ -653,6 +653,11 @@ namespace ClassBook
             var ovzSubjects = new[] { "Русский язык", "Математика", "Литературное чтение", "Окружающий мир", "Самоподготовка" };
             var start = new DateTime(2026, 5, 11);
             var dayOffsets = new[] { 0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18 };
+            EnsureDemoScheduleSlots(db);
+            var slots = db.Schedules
+                .AsEnumerable()
+                .GroupBy(slot => new { slot.DayOfWeek, slot.LessonNumber })
+                .ToDictionary(group => group.Key, group => group.OrderBy(slot => slot.ScheduleId).First());
 
             foreach (var classEntity in db.Classes.AsEnumerable().Where(classEntity => IsOvzClass(classEntity.Name)).ToList())
             {
@@ -663,8 +668,9 @@ namespace ClassBook
                 if (teacherId == 0)
                     teacherId = classEntity.Name == "1А" ? 9 : classEntity.Name == "1Б" ? 11 : 12;
 
-                foreach (var subjectName in ovzSubjects)
+                for (var subjectIndex = 0; subjectIndex < ovzSubjects.Length; subjectIndex++)
                 {
+                    var subjectName = ovzSubjects[subjectIndex];
                     var subject = db.Subjects.FirstOrDefault(item => item.Name == subjectName && item.TeacherId == teacherId);
                     if (subject == null)
                     {
@@ -690,20 +696,33 @@ namespace ClassBook
                     foreach (var offset in dayOffsets)
                     {
                         var date = start.AddDays(offset);
-                        if (db.Lessons.Any(lesson =>
-                                lesson.ClassId == classEntity.ClassId &&
-                                lesson.SubjectId == subject.SubjectId &&
-                                lesson.Date == date))
+                        var dayOfWeek = GetSchoolDayOfWeek(date);
+                        if (dayOfWeek < 0 || !slots.TryGetValue(new { DayOfWeek = dayOfWeek, LessonNumber = subjectIndex + 1 }, out var slot))
                         {
                             continue;
                         }
 
                         var sample = GetLessonSample(subjectName, date, offset);
+                        var existingLesson = db.Lessons.FirstOrDefault(lesson =>
+                            lesson.ClassId == classEntity.ClassId &&
+                            lesson.SubjectId == subject.SubjectId &&
+                            lesson.Date == date);
+
+                        if (existingLesson != null)
+                        {
+                            existingLesson.TeacherId = teacherId;
+                            existingLesson.ScheduleId = slot.ScheduleId;
+                            existingLesson.Topic = sample.Topic;
+                            existingLesson.Homework = null;
+                            continue;
+                        }
+
                         db.Lessons.Add(new Lesson
                         {
                             SubjectId = subject.SubjectId,
                             ClassId = classEntity.ClassId,
                             TeacherId = teacherId,
+                            ScheduleId = slot.ScheduleId,
                             Date = date,
                             Topic = sample.Topic,
                             Homework = null
@@ -711,6 +730,41 @@ namespace ClassBook
                     }
                 }
             }
+        }
+
+        private static void EnsureDemoScheduleSlots(AppDbContext db)
+        {
+            if (db.Schedules.Any())
+                return;
+
+            var defaultTimes = new (string Start, string End)[]
+            {
+                ("09:15", "09:55"),
+                ("10:10", "10:50"),
+                ("10:55", "11:35"),
+                ("11:45", "12:25"),
+                ("12:30", "13:10"),
+                ("13:30", "14:10"),
+                ("14:15", "14:55")
+            };
+
+            for (var day = 0; day < 5; day++)
+            {
+                for (var index = 0; index < defaultTimes.Length; index++)
+                {
+                    db.Schedules.Add(new Schedule
+                    {
+                        DayOfWeek = day,
+                        LessonNumber = index + 1,
+                        StartTime = TimeSpan.Parse(defaultTimes[index].Start),
+                        EndTime = TimeSpan.Parse(defaultTimes[index].End),
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            db.SaveChanges();
         }
 
         private static void SeedDemoAttendanceAndGrades(AppDbContext db)
@@ -951,6 +1005,12 @@ namespace ClassBook
             string.Equals(className, "1А", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(className, "1Б", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(className, "2О", StringComparison.OrdinalIgnoreCase);
+
+        private static int GetSchoolDayOfWeek(DateTime date)
+        {
+            var day = ((int)date.DayOfWeek + 6) % 7;
+            return day is >= 0 and <= 4 ? day : -1;
+        }
 
         private static bool ShouldCreateGrade(int studentId, int lessonId) =>
             StableHash(studentId, lessonId, 41) % 100 < 42;
