@@ -3383,6 +3383,7 @@ function SchedulePage({ role }) {
   const [copyWeekTarget, setCopyWeekTarget] = useState(() => shiftWeek(weekStart, 7));
   const [scheduleMenu, setScheduleMenu] = useState(null);
   const [lessonEditorOpen, setLessonEditorOpen] = useState(false);
+  const [isScheduleFullscreen, setIsScheduleFullscreen] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [className, setClassName] = useState("");
@@ -3970,6 +3971,22 @@ function SchedulePage({ role }) {
     };
   }, [editable, selectedCell, copiedLesson, copiedLessons, selectedLessonIds, week.lessons, metadata]);
 
+  useEffect(() => {
+    document.body.classList.toggle("schedule-fullscreen-lock", isScheduleFullscreen);
+    return () => document.body.classList.remove("schedule-fullscreen-lock");
+  }, [isScheduleFullscreen]);
+
+  useEffect(() => {
+    const handleFullscreenKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsScheduleFullscreen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleFullscreenKeyDown);
+    return () => window.removeEventListener("keydown", handleFullscreenKeyDown);
+  }, []);
+
   if (!allowed) {
     return <AccessWarning title="Расписание доступно менеджеру расписания, директору и администратору" />;
   }
@@ -4018,6 +4035,9 @@ function SchedulePage({ role }) {
           <input type="date" value={weekStart} onChange={(event) => setWeekStart(toIsoDate(getMonday(new Date(event.target.value))))} />
         </label>
         <button className="ghost-button compact" onClick={() => setWeekStart(shiftWeek(weekStart, 7))}>Следующая</button>
+        <button className="ghost-button compact schedule-fullscreen-toggle" type="button" onClick={() => setIsScheduleFullscreen((current) => !current)}>
+          {isScheduleFullscreen ? "Закрыть полный экран" : "На весь экран"}
+        </button>
         {editable && (
           <form className="week-copy-form" onSubmit={copyFullScheduleWeek}>
             <label className="schedule-week-picker">
@@ -4034,7 +4054,16 @@ function SchedulePage({ role }) {
           </form>
         )}
       </div>
-      <div className="schedule-editor">
+      <div className={`schedule-editor ${isScheduleFullscreen ? "schedule-editor-fullscreen" : ""}`}>
+        {isScheduleFullscreen && (
+          <div className="schedule-fullscreen-head">
+            <div>
+              <strong>Расписание</strong>
+              <span>{weekCaption}</span>
+            </div>
+            <button className="ghost-button compact" type="button" onClick={() => setIsScheduleFullscreen(false)}>Закрыть</button>
+          </div>
+        )}
         <div className="schedule-grid-wrap">
           <table className="schedule-grid-table">
             <thead>

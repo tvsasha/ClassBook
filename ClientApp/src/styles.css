@@ -1804,6 +1804,55 @@ tbody tr:hover td {
   max-width: 100%;
 }
 
+body.schedule-fullscreen-lock {
+  overflow: hidden;
+}
+
+.schedule-editor-fullscreen {
+  position: fixed;
+  inset: 12px;
+  z-index: 120;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  max-width: none;
+  padding: 12px;
+  border: 1px solid rgba(24, 32, 38, 0.12);
+  border-radius: 24px;
+  background: rgba(249, 251, 248, 0.98);
+  box-shadow: 0 24px 80px rgba(24, 32, 38, 0.26);
+}
+
+.schedule-fullscreen-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 0;
+}
+
+.schedule-fullscreen-head div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.schedule-fullscreen-head strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.schedule-fullscreen-head span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.schedule-editor-fullscreen .schedule-grid-wrap {
+  max-height: none;
+  height: 100%;
+  border-radius: 18px;
+}
+
 .schedule-grid-wrap {
   --schedule-day-width: 118px;
   --schedule-time-width: 104px;
@@ -2693,6 +2742,21 @@ tbody tr:hover td {
   .schedule-side-editor {
     padding: 16px;
     border-radius: 18px;
+  }
+
+  .schedule-editor-fullscreen {
+    inset: 6px;
+    padding: 8px;
+    border-radius: 18px;
+  }
+
+  .schedule-fullscreen-head {
+    align-items: stretch;
+  }
+
+  .schedule-fullscreen-head .compact {
+    width: auto;
+    min-width: 104px;
   }
 }
 
