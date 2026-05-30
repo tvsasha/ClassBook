@@ -132,6 +132,14 @@ namespace ClassBook
                 EnsureBootstrapAdmin(db, hasher);
             }
 
+            if (args.Length >= 1 && args[0].Equals("normalize-demo-data", StringComparison.OrdinalIgnoreCase))
+            {
+                using var scope = app.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                NormalizeDemoData(db);
+                return;
+            }
+
             if (args.Length >= 2 && args[0].Equals("import-roster", StringComparison.OrdinalIgnoreCase))
             {
                 using var scope = app.Services.CreateScope();
@@ -468,6 +476,488 @@ namespace ClassBook
             return !string.IsNullOrWhiteSpace(cookieToken)
                 && !string.IsNullOrWhiteSpace(headerToken)
                 && string.Equals(cookieToken, headerToken, StringComparison.Ordinal);
+        }
+
+        private static void NormalizeDemoData(AppDbContext db)
+        {
+            using var transaction = db.Database.BeginTransaction();
+
+            NormalizeDemoUsers(db);
+            NormalizeDemoSubjects(db);
+            ConsolidateDemoSubjects(db);
+            DeduplicateSubjectClassAssignments(db);
+            db.SaveChanges();
+
+            NormalizeDemoLessons(db);
+            EnsureOvzLessons(db);
+            db.SaveChanges();
+
+            SeedDemoAttendanceAndGrades(db);
+            db.SaveChanges();
+
+            transaction.Commit();
+
+            var questionUsers = db.Users.Count(user => user.FullName.Contains("?"));
+            var ordinaryGrades = db.Grades
+                .Include(grade => grade.Student)
+                .ThenInclude(student => student.Class)
+                .AsEnumerable()
+                .Count(grade => grade.Student.Class != null && !IsOvzClass(grade.Student.Class.Name));
+            var ovzGrades = db.Grades
+                .Include(grade => grade.Student)
+                .ThenInclude(student => student.Class)
+                .AsEnumerable()
+                .Count(grade => grade.Student.Class != null && IsOvzClass(grade.Student.Class.Name));
+            var attendance = db.Attendances.Count();
+
+            Console.WriteLine($"Нормализация демо-данных завершена. Пользователей с ????: {questionUsers}. Оценок: {ordinaryGrades}. Оценок ОВЗ: {ovzGrades}. Посещаемость: {attendance}.");
+        }
+
+        private static void NormalizeDemoUsers(AppDbContext db)
+        {
+            var replacements = new Dictionary<int, string>
+            {
+                [73] = "Смирнов Алексей Викторович",
+                [88] = "Учитель информатики",
+                [99] = "Учитель музыки",
+                [109] = "Учитель русского языка",
+                [115] = "Педагог физической культуры",
+                [118] = "Учитель химии"
+            };
+
+            foreach (var user in db.Users)
+            {
+                if (replacements.TryGetValue(user.Id, out var replacement))
+                {
+                    user.FullName = replacement;
+                    user.IsActive = true;
+                    continue;
+                }
+
+                if (user.Login.StartsWith("schedule.", StringComparison.OrdinalIgnoreCase) &&
+                    user.FullName.Contains(':') &&
+                    !user.FullName.Contains('?'))
+                {
+                    user.FullName = user.FullName.Split(':', 2)[0].Trim();
+                    user.IsActive = true;
+                }
+
+                if (!user.FullName.Contains('?'))
+                    continue;
+
+                var source = $"{user.FullName} {user.Login}".ToLowerInvariant();
+                user.FullName = source switch
+                {
+                    var text when text.Contains("мат") || text.Contains("алгеб") || text.Contains("геомет") => "Учитель математики",
+                    var text when text.Contains("рус") => "Учитель русского языка",
+                    var text when text.Contains("физ-ра") || text.Contains("физк") => "Педагог физической культуры",
+                    var text when text.Contains("физик") => "Смирнов Алексей Викторович",
+                    var text when text.Contains("информ") => "Учитель информатики",
+                    var text when text.Contains("биолог") => "Учитель биологии",
+                    var text when text.Contains("хим") => "Учитель химии",
+                    var text when text.Contains("об-") || text.Contains("общест") => "Учитель обществознания",
+                    var text when text.Contains("анг") => "Учитель английского языка",
+                    var text when text.Contains("лит") || text.Contains("чтен") => "Учитель литературы",
+                    var text when text.Contains("музык") => "Учитель музыки",
+                    _ => "Учитель начальных классов"
+                };
+                user.IsActive = true;
+            }
+        }
+
+        private static void NormalizeDemoSubjects(AppDbContext db)
+        {
+            var users = db.Users.ToDictionary(user => user.Id);
+            var classesBySubject = db.SubjectClassAssignments
+                .Include(assignment => assignment.Class)
+                .GroupBy(assignment => assignment.SubjectId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(assignment => assignment.Class.Name).Distinct().ToList());
+
+            foreach (var subject in db.Subjects)
+            {
+                subject.Name = NormalizeSubjectName(subject.Name);
+                var classNames = classesBySubject.TryGetValue(subject.SubjectId, out var names) ? names : new List<string>();
+                subject.TeacherId = PickTeacherIdForSubject(db, subject.Name, classNames, subject.TeacherId);
+                if (users.TryGetValue(subject.TeacherId, out var teacher))
+                    teacher.IsActive = true;
+            }
+
+            foreach (var assignment in db.SubjectClassAssignments.Include(assignment => assignment.Subject).Include(assignment => assignment.Class))
+            {
+                assignment.TeacherId = PickTeacherIdForSubject(
+                    db,
+                    assignment.Subject.Name,
+                    new[] { assignment.Class.Name },
+                    assignment.TeacherId);
+            }
+        }
+
+        private static void DeduplicateSubjectClassAssignments(AppDbContext db)
+        {
+            var duplicates = db.SubjectClassAssignments
+                .AsEnumerable()
+                .GroupBy(assignment => new { assignment.SubjectId, assignment.ClassId, assignment.TeacherId })
+                .SelectMany(group => group.OrderBy(assignment => assignment.SubjectClassAssignmentId).Skip(1))
+                .ToList();
+
+            if (duplicates.Count > 0)
+                db.SubjectClassAssignments.RemoveRange(duplicates);
+        }
+
+        private static void ConsolidateDemoSubjects(AppDbContext db)
+        {
+            var subjects = db.Subjects.ToList();
+            foreach (var duplicateGroup in subjects
+                         .GroupBy(subject => new { subject.Name, subject.TeacherId })
+                         .Where(group => group.Count() > 1))
+            {
+                var keeper = duplicateGroup.OrderBy(subject => subject.SubjectId).First();
+                foreach (var duplicate in duplicateGroup.Where(subject => subject.SubjectId != keeper.SubjectId))
+                {
+                    foreach (var lesson in db.Lessons.Where(lesson => lesson.SubjectId == duplicate.SubjectId))
+                        lesson.SubjectId = keeper.SubjectId;
+
+                    foreach (var assignment in db.SubjectClassAssignments.Where(assignment => assignment.SubjectId == duplicate.SubjectId))
+                        assignment.SubjectId = keeper.SubjectId;
+
+                    db.Subjects.Remove(duplicate);
+                }
+            }
+        }
+
+        private static void NormalizeDemoLessons(AppDbContext db)
+        {
+            var subjects = db.Subjects.ToDictionary(subject => subject.SubjectId);
+            var classes = db.Classes.ToDictionary(classEntity => classEntity.ClassId);
+
+            foreach (var lesson in db.Lessons)
+            {
+                if (!subjects.TryGetValue(lesson.SubjectId, out var subject))
+                    continue;
+
+                subject.Name = NormalizeSubjectName(subject.Name);
+                var className = classes.TryGetValue(lesson.ClassId, out var classEntity) ? classEntity.Name : string.Empty;
+                lesson.TeacherId = PickTeacherIdForSubject(db, subject.Name, new[] { className }, lesson.TeacherId);
+
+                var sample = GetLessonSample(subject.Name, lesson.Date, lesson.LessonId);
+                lesson.Topic = sample.Topic;
+                lesson.Homework = IsOvzClass(className) ? null : sample.Homework;
+            }
+        }
+
+        private static void EnsureOvzLessons(AppDbContext db)
+        {
+            var ovzSubjects = new[] { "Русский язык", "Математика", "Литературное чтение", "Окружающий мир" };
+            var start = new DateTime(2026, 5, 11);
+            var dayOffsets = new[] { 0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18 };
+
+            foreach (var classEntity in db.Classes.AsEnumerable().Where(classEntity => IsOvzClass(classEntity.Name)).ToList())
+            {
+                var teacherId = db.ClassTeachers
+                    .Where(link => link.ClassId == classEntity.ClassId)
+                    .Select(link => link.TeacherId)
+                    .FirstOrDefault();
+                if (teacherId == 0)
+                    teacherId = classEntity.Name == "1А" ? 9 : classEntity.Name == "1Б" ? 11 : 12;
+
+                foreach (var subjectName in ovzSubjects)
+                {
+                    var subject = db.Subjects.FirstOrDefault(item => item.Name == subjectName && item.TeacherId == teacherId);
+                    if (subject == null)
+                    {
+                        subject = new Subject { Name = subjectName, TeacherId = teacherId };
+                        db.Subjects.Add(subject);
+                        db.SaveChanges();
+                    }
+
+                    if (!db.SubjectClassAssignments.Any(link =>
+                            link.SubjectId == subject.SubjectId &&
+                            link.ClassId == classEntity.ClassId &&
+                            link.TeacherId == teacherId))
+                    {
+                        db.SubjectClassAssignments.Add(new SubjectClassAssignment
+                        {
+                            SubjectId = subject.SubjectId,
+                            ClassId = classEntity.ClassId,
+                            TeacherId = teacherId,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+
+                    foreach (var offset in dayOffsets)
+                    {
+                        var date = start.AddDays(offset);
+                        if (db.Lessons.Any(lesson =>
+                                lesson.ClassId == classEntity.ClassId &&
+                                lesson.SubjectId == subject.SubjectId &&
+                                lesson.Date == date))
+                        {
+                            continue;
+                        }
+
+                        var sample = GetLessonSample(subjectName, date, offset);
+                        db.Lessons.Add(new Lesson
+                        {
+                            SubjectId = subject.SubjectId,
+                            ClassId = classEntity.ClassId,
+                            TeacherId = teacherId,
+                            Date = date,
+                            Topic = sample.Topic,
+                            Homework = null
+                        });
+                    }
+                }
+            }
+        }
+
+        private static void SeedDemoAttendanceAndGrades(AppDbContext db)
+        {
+            var lessons = db.Lessons.Include(lesson => lesson.Class).Include(lesson => lesson.Subject).ToList();
+            var studentsByClass = db.Students
+                .Where(student => student.ClassId != null)
+                .GroupBy(student => student.ClassId!.Value)
+                .ToDictionary(group => group.Key, group => group.ToList());
+            var attendanceKeys = db.Attendances
+                .Select(attendance => new { attendance.StudentId, attendance.LessonId })
+                .AsEnumerable()
+                .ToHashSet();
+            var gradeKeys = db.Grades
+                .Select(grade => new { grade.StudentId, grade.LessonId })
+                .AsEnumerable()
+                .ToHashSet();
+            var ovzStudentIds = db.Students
+                .Include(student => student.Class)
+                .AsEnumerable()
+                .Where(student => student.Class != null && IsOvzClass(student.Class.Name))
+                .Select(student => student.StudentId)
+                .ToHashSet();
+            var ovzGrades = db.Grades.Where(grade => ovzStudentIds.Contains(grade.StudentId)).ToList();
+            if (ovzGrades.Count > 0)
+                db.Grades.RemoveRange(ovzGrades);
+
+            foreach (var lesson in lessons)
+            {
+                if (!studentsByClass.TryGetValue(lesson.ClassId, out var students))
+                    continue;
+
+                foreach (var student in students)
+                {
+                    var attendanceKey = new { student.StudentId, lesson.LessonId };
+                    if (!attendanceKeys.Contains(attendanceKey))
+                    {
+                        db.Attendances.Add(new Attendance
+                        {
+                            StudentId = student.StudentId,
+                            LessonId = lesson.LessonId,
+                            Status = GetAttendanceStatus(student.StudentId, lesson.LessonId)
+                        });
+                        attendanceKeys.Add(attendanceKey);
+                    }
+
+                    if (IsOvzClass(lesson.Class.Name))
+                        continue;
+
+                    var gradeKey = new { student.StudentId, lesson.LessonId };
+                    if (!gradeKeys.Contains(gradeKey) && ShouldCreateGrade(student.StudentId, lesson.LessonId))
+                    {
+                        db.Grades.Add(new Grade
+                        {
+                            StudentId = student.StudentId,
+                            LessonId = lesson.LessonId,
+                            Value = GetGradeValue(student.StudentId, lesson.LessonId)
+                        });
+                        gradeKeys.Add(gradeKey);
+                    }
+                }
+            }
+
+            db.SaveChanges();
+
+            var ordinaryStudents = db.Students
+                .Include(student => student.Class)
+                .AsEnumerable()
+                .Where(student => student.Class != null && !IsOvzClass(student.Class.Name))
+                .ToList();
+
+            foreach (var student in ordinaryStudents)
+            {
+                var currentCount = db.Grades.Count(grade => grade.StudentId == student.StudentId);
+                if (currentCount >= 6 || student.ClassId == null)
+                    continue;
+
+                var candidateLessons = lessons
+                    .Where(lesson => lesson.ClassId == student.ClassId.Value)
+                    .OrderBy(lesson => lesson.Date)
+                    .ThenBy(lesson => lesson.LessonId)
+                    .ToList();
+
+                foreach (var lesson in candidateLessons)
+                {
+                    if (currentCount >= 6)
+                        break;
+
+                    if (db.Grades.Any(grade => grade.StudentId == student.StudentId && grade.LessonId == lesson.LessonId))
+                        continue;
+
+                    db.Grades.Add(new Grade
+                    {
+                        StudentId = student.StudentId,
+                        LessonId = lesson.LessonId,
+                        Value = GetGradeValue(student.StudentId + currentCount, lesson.LessonId)
+                    });
+                    currentCount++;
+                }
+            }
+        }
+
+        private static string NormalizeSubjectName(string value)
+        {
+            var name = (value ?? string.Empty).Trim().ToLowerInvariant().Replace('ё', 'е');
+            name = name.Replace(".", string.Empty).Replace(",", string.Empty);
+
+            if (name.Contains("об-во") || name.Contains("общество") || name.Contains("обществ")) return "Обществознание";
+            if (name.Contains("рус")) return "Русский язык";
+            if (name.Contains("мат-ка") || name == "мат" || name.Contains("матем")) return "Математика";
+            if (name.Contains("алгеб")) return "Алгебра";
+            if (name.Contains("геом")) return "Геометрия";
+            if (name.Contains("анг")) return "Английский язык";
+            if (name.Contains("биолог")) return "Биология";
+            if (name.Contains("географ")) return "География";
+            if (name.Contains("истор")) return "История";
+            if (name.Contains("информ")) return "Информатика";
+            if (name.Contains("лит чт") || name.Contains("чтение")) return "Литературное чтение";
+            if (name.Contains("лит")) return "Литература";
+            if (name.Contains("физ-ра") || name.Contains("физк")) return "Физическая культура";
+            if (name.Contains("физик")) return "Физика";
+            if (name.Contains("хим")) return "Химия";
+            if (name.Contains("окр") || name.Contains("мир")) return "Окружающий мир";
+            if (name.Contains("изо") || name.Contains("рис")) return "ИЗО";
+            if (name.Contains("музык")) return "Музыка";
+            if (name.Contains("труд") || name.Contains("технолог")) return "Технология";
+            if (name.Contains("ров") || name.Contains("разговор") || name.Contains("россия")) return "Разговоры о важном";
+            if (name == "ип" || name.Contains("проект")) return "Индивидуальный проект";
+            if (name == "с/п" || name.Contains("соц")) return "Социальная практика";
+            if (name.Contains("впр")) return "Подготовка к ВПР";
+            if (name.Contains("огэ")) return "Подготовка к ОГЭ";
+            if (name.Contains("однк")) return "ОДНКНР";
+
+            return string.IsNullOrWhiteSpace(value) || value.Contains('?') ? "Предмет по расписанию" : value.Trim();
+        }
+
+        private static int PickTeacherIdForSubject(AppDbContext db, string subjectName, IEnumerable<string> classNames, int fallbackTeacherId)
+        {
+            var classList = classNames.ToList();
+            if (classList.Any(IsOvzClass))
+            {
+                var className = classList.First(IsOvzClass);
+                return className == "1А" ? 9 : className == "1Б" ? 11 : 12;
+            }
+
+            var normalized = subjectName.ToLowerInvariant();
+            var preferred = normalized switch
+            {
+                var text when text.Contains("англий") => 78,
+                var text when text.Contains("биолог") => 80,
+                var text when text.Contains("географ") => 83,
+                var text when text.Contains("истор") || text.Contains("общество") => 90,
+                var text when text.Contains("литерат") => 95,
+                var text when text.Contains("физика") => 73,
+                var text when text.Contains("хим") => 118,
+                var text when text.Contains("информ") => 88,
+                var text when text.Contains("музык") => 99,
+                var text when text.Contains("культура") => 115,
+                var text when text.Contains("русский") => 109,
+                var text when text.Contains("алгеб") || text.Contains("геометр") || text.Contains("математ") => 8,
+                _ => fallbackTeacherId
+            };
+
+            if (db.Users.Any(user => user.Id == preferred))
+                return preferred;
+
+            return db.Users.Any(user => user.Id == fallbackTeacherId) ? fallbackTeacherId : db.Users.Select(user => user.Id).First();
+        }
+
+        private static (string Topic, string Homework) GetLessonSample(string subjectName, DateTime date, int seed)
+        {
+            var samples = new Dictionary<string, (string Topic, string Homework)[]>
+            {
+                ["Математика"] = new[] { ("Решение задач на порядок действий", "Стр. 42, N 5-8"), ("Умножение и деление", "Стр. 47, N 3-6"), ("Текстовые задачи", "Повторить алгоритм решения") },
+                ["Алгебра"] = new[] { ("Линейные уравнения", "Параграф 12, N 84-88"), ("Функции и графики", "Построить графики в тетради"), ("Системы уравнений", "Параграф 14, N 101-104") },
+                ["Геометрия"] = new[] { ("Признаки равенства треугольников", "Параграф 8, задачи 54-56"), ("Параллельные прямые", "Выучить теорему, N 72"), ("Площадь многоугольника", "Решить задачи 91-93") },
+                ["Русский язык"] = new[] { ("Правописание безударных гласных", "Упр. 118, правило"), ("Сложное предложение", "Упр. 132"), ("Синтаксический разбор", "Разобрать 4 предложения") },
+                ["Литература"] = new[] { ("Анализ художественного текста", "Прочитать главу и ответить на вопросы"), ("Образ героя в произведении", "Подготовить цитатный план"), ("Средства выразительности", "Найти 5 примеров в тексте") },
+                ["Литературное чтение"] = new[] { ("Выразительное чтение рассказа", "Читать стр. 34-37"), ("Главная мысль текста", "Ответить на вопросы после текста"), ("План пересказа", "Подготовить пересказ") },
+                ["Окружающий мир"] = new[] { ("Природные зоны России", "Заполнить таблицу в тетради"), ("Органы чувств человека", "Стр. 28-30, вопросы"), ("Правила безопасности", "Составить памятку") },
+                ["Английский язык"] = new[] { ("Past Simple: правильные глаголы", "Workbook p. 24, ex. 2-4"), ("Topic: My school day", "Выучить слова"), ("Reading practice", "Прочитать текст и перевести") },
+                ["Китайский язык"] = new[] { ("Базовые фразы приветствия", "Выучить 8 фраз"), ("Иероглифы по теме семья", "Прописать иероглифы"), ("Диалог в школе", "Подготовить короткий диалог") },
+                ["Биология"] = new[] { ("Строение клетки", "Параграф 9, схема клетки"), ("Органы растений", "Параграф 11, вопросы 1-4"), ("Экосистемы", "Подготовить 3 примера") },
+                ["География"] = new[] { ("Климатические пояса", "Параграф 18, контурная карта"), ("Рельеф России", "Отметить формы рельефа"), ("Внутренние воды", "Параграф 21") },
+                ["История"] = new[] { ("Культура Древней Руси", "Параграф 15, даты"), ("Реформы Петра I", "Таблица реформ"), ("Россия в XIX веке", "Ответить на вопросы") },
+                ["Обществознание"] = new[] { ("Права и обязанности гражданина", "Параграф 10, вопросы"), ("Семья и общество", "Мини-сочинение"), ("Государство и закон", "Повторить термины") },
+                ["Физика"] = new[] { ("Сила и масса", "Параграф 19, задачи 3-5"), ("Давление твердых тел", "Параграф 21"), ("Работа и мощность", "Решить задачи") },
+                ["Химия"] = new[] { ("Химические элементы", "Выучить символы 1-20"), ("Кислоты и основания", "Параграф 17"), ("Уравнения реакций", "Расставить коэффициенты") },
+                ["Информатика"] = new[] { ("Алгоритмы и исполнители", "Составить блок-схему"), ("Табличные данные", "Практическая работа N 4"), ("Безопасность в интернете", "Подготовить памятку") },
+                ["Физическая культура"] = new[] { ("Развитие выносливости", "Комплекс ОРУ"), ("Легкая атлетика", "Техника бега"), ("Командные игры", "Правила игры") },
+                ["Музыка"] = new[] { ("Музыкальные жанры", "Выучить определения"), ("Народная песня", "Подготовить сообщение"), ("Ритм и мелодия", "Повторить термины") },
+                ["ИЗО"] = new[] { ("Композиция в пейзаже", "Закончить эскиз"), ("Цветовой круг", "Подобрать палитру"), ("Натюрморт", "Принести простой предмет") },
+                ["Технология"] = new[] { ("Проектирование изделия", "Подготовить эскиз"), ("Материалы и инструменты", "Повторить технику безопасности"), ("Практическая работа", "Завершить работу") },
+                ["Разговоры о важном"] = new[] { ("Ценности школьного сообщества", "Подумать над примерами"), ("Командная работа", "Подготовить один вопрос"), ("Моя малая родина", "Мини-рассказ") },
+                ["Индивидуальный проект"] = new[] { ("Выбор темы проекта", "Сформулировать цель"), ("План исследования", "Составить план"), ("Источники информации", "Найти 3 источника") },
+                ["Социальная практика"] = new[] { ("Планирование полезного дела", "Описать цель и шаги"), ("Командное взаимодействие", "Подготовить итоги работы"), ("Рефлексия проекта", "Заполнить дневник практики") },
+                ["ОРКСЭ"] = new[] { ("Культура общения", "Подготовить пример ситуации"), ("Семейные традиции", "Короткий рассказ"), ("Добро и ответственность", "Ответить на вопросы") },
+                ["Подготовка к ВПР"] = new[] { ("Разбор типовых заданий", "Выполнить вариант 2"), ("Работа с ошибками", "Повторить сложные темы"), ("Тренировочная работа", "Закончить задания") },
+                ["Подготовка к ОГЭ"] = new[] { ("Решение экзаменационных заданий", "Вариант 5"), ("Критерии оценивания", "Повторить памятку"), ("Практикум по части 2", "Дописать ответы") }
+            };
+
+            var set = samples.TryGetValue(subjectName, out var exact) ? exact : new[] { ("Работа по теме урока", "Повторить материал урока"), ("Закрепление изученного", "Выполнить задания в тетради"), ("Практическая работа", "Завершить начатое") };
+            var item = set[StableHash(StableTextHash(subjectName), date.Year, date.Month, date.Day, seed) % set.Length];
+            return item;
+        }
+
+        private static bool IsOvzClass(string className) =>
+            string.Equals(className, "1А", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(className, "1Б", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(className, "2О", StringComparison.OrdinalIgnoreCase);
+
+        private static bool ShouldCreateGrade(int studentId, int lessonId) =>
+            StableHash(studentId, lessonId, 41) % 100 < 42;
+
+        private static int GetGradeValue(int studentId, int lessonId)
+        {
+            var value = StableHash(studentId, lessonId, 79) % 100;
+            return value < 8 ? 3 : value < 56 ? 4 : 5;
+        }
+
+        private static byte GetAttendanceStatus(int studentId, int lessonId)
+        {
+            var value = StableHash(studentId, lessonId, 131) % 100;
+            if (value < 86) return 1;
+            if (value < 94) return 0;
+            return 2;
+        }
+
+        private static int StableTextHash(string value)
+        {
+            unchecked
+            {
+                var hash = 17;
+                foreach (var character in value)
+                    hash = hash * 31 + character;
+                return hash & int.MaxValue;
+            }
+        }
+
+        private static int StableHash(params int[] values)
+        {
+            unchecked
+            {
+                var hash = 17;
+                foreach (var value in values)
+                    hash = hash * 31 + value;
+                return hash & int.MaxValue;
+            }
         }
 
         private static void ApplyMigrationsWithRetry(AppDbContext db, ILogger logger)
