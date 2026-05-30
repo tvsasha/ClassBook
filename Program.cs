@@ -597,7 +597,9 @@ namespace ClassBook
             };
             var usedTeacherNames = new HashSet<string>(teacherNamesById.Values, StringComparer.OrdinalIgnoreCase);
             var usedLogins = new HashSet<string>(
-                db.Users.Select(user => user.Login),
+                db.Users
+                    .Where(user => user.RoleId != SystemRoleIds.Teacher)
+                    .Select(user => user.Login),
                 StringComparer.OrdinalIgnoreCase);
             var fallbackIndex = 0;
 
