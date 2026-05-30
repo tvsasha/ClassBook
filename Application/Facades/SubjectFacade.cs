@@ -81,18 +81,32 @@ namespace ClassBook.Application.Facades
             if (teacher == null)
                 throw new InvalidOperationException("Учитель не найден или это не учитель");
 
-            var subject = new Domain.Entities.Subject { Name = name.Trim(), TeacherId = teacherId };
-            _db.Subjects.Add(subject);
+            var normalizedName = name.Trim();
+            var subject = await _db.Subjects
+                .FirstOrDefaultAsync(item => item.Name == normalizedName && item.TeacherId == teacherId);
+            if (subject == null)
+            {
+                subject = new Domain.Entities.Subject { Name = normalizedName, TeacherId = teacherId };
+                _db.Subjects.Add(subject);
+            }
+
             if (classId.HasValue)
             {
                 await ValidateClassAsync(classId.Value);
-                _db.SubjectClassAssignments.Add(new Domain.Entities.SubjectClassAssignment
+                var hasAssignment = await _db.SubjectClassAssignments.AnyAsync(assignment =>
+                    assignment.SubjectId == subject.SubjectId &&
+                    assignment.ClassId == classId.Value &&
+                    assignment.TeacherId == teacherId);
+                if (!hasAssignment)
                 {
-                    Subject = subject,
-                    ClassId = classId.Value,
-                    TeacherId = teacherId,
-                    CreatedAt = DateTime.UtcNow
-                });
+                    _db.SubjectClassAssignments.Add(new Domain.Entities.SubjectClassAssignment
+                    {
+                        Subject = subject,
+                        ClassId = classId.Value,
+                        TeacherId = teacherId,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
             }
 
             await _db.SaveChangesAsync();

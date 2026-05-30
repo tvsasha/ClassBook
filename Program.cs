@@ -519,7 +519,7 @@ namespace ClassBook
             var replacements = new Dictionary<int, string>
             {
                 [73] = "Смирнов Алексей Викторович",
-                [88] = "Учитель информатики",
+                [88] = "Ковалев Артем Сергеевич",
                 [99] = "Учитель музыки",
                 [109] = "Учитель русского языка",
                 [115] = "Педагог физической культуры",
@@ -553,7 +553,7 @@ namespace ClassBook
                     var text when text.Contains("рус") => "Учитель русского языка",
                     var text when text.Contains("физ-ра") || text.Contains("физк") => "Педагог физической культуры",
                     var text when text.Contains("физик") => "Смирнов Алексей Викторович",
-                    var text when text.Contains("информ") => "Учитель информатики",
+                    var text when text.Contains("информ") => "Ковалев Артем Сергеевич",
                     var text when text.Contains("биолог") => "Учитель биологии",
                     var text when text.Contains("хим") => "Учитель химии",
                     var text when text.Contains("об-") || text.Contains("общест") => "Учитель обществознания",
