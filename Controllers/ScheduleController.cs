@@ -101,7 +101,7 @@ namespace ClassBook.Controllers
         /// </summary>
         /// <returns>Полный набор метаданных редактора расписания.</returns>
         [HttpGet("editor/metadata")]
-        [Authorize(Policy = "ScheduleManagerOnly")]
+        [Authorize(Policy = "ScheduleViewOnly")]
         public async Task<IActionResult> GetEditorMetadata()
         {
             return Ok(await _scheduleFacade.GetEditorMetadataAsync());
@@ -144,7 +144,7 @@ namespace ClassBook.Controllers
         /// <param name="weekStart">Дата начала недели.</param>
         /// <returns>Неделя расписания с уроками и справочными полями.</returns>
         [HttpGet("editor/week")]
-        [Authorize(Policy = "ScheduleManagerOnly")]
+        [Authorize(Policy = "ScheduleViewOnly")]
         public async Task<IActionResult> GetEditorWeek([FromQuery] string weekStart)
         {
             if (!DateTime.TryParse(weekStart, out var parsedWeekStart))

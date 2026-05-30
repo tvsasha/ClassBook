@@ -418,7 +418,9 @@ function getNavItemsForRole(role) {
       { route: "schedule", label: "Расписание" }
     ],
     "Директор": [
-      { route: "director", label: "Отчеты директора" }
+      { route: "director", label: "Отчеты директора" },
+      { route: "teacher", label: "Журналы" },
+      { route: "schedule", label: "Расписание" }
     ],
     "Учитель": [
       { route: "teacher", label: "Журнал учителя" },
@@ -660,7 +662,7 @@ async function loadRoleDashboard(role, user) {
         {
           title: "Классы за неделю",
           table: {
-            columns: ["Класс", "Учеников", "Средние пропуски", "Средняя"],
+            columns: ["Класс", "Учеников", "Пропусков на ученика", "Средняя"],
             rows: (classSummary?.classSummary ?? []).slice(0, 8).map((item) => [
               item.className,
               item.studentCount,
@@ -1156,6 +1158,19 @@ function AdminPage({ role }) {
       setMessage(error.message || "Не удалось создать временный пароль");
     }
   }
+
+  useEffect(() => {
+    if (!message) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setMessage(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [message]);
+
+  useEffect(() => {
+    setMessage("");
+  }, [adminTab]);
 
   async function activateUser(user) {
     try {
@@ -1919,58 +1934,11 @@ function AdminPage({ role }) {
           </div>
         </Modal>
       )}
-      <form className={`inline-form attach-form admin-section ${adminTab === "access" ? "active" : ""}`} onSubmit={attachStudentAccount}>
-        <label className="field">
-          <span>Карточка ученика без аккаунта</span>
-          <select value={studentAccountLink.studentId} onChange={(event) => setStudentAccountLink({ ...studentAccountLink, studentId: event.target.value })}>
-            <option value="">Выберите ученика</option>
-            {students.filter((item) => !item.hasAccount).map((item) => (
-              <option key={item.studentId} value={item.studentId}>{item.lastName} {item.firstName} · {item.className || "без класса"}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Свободная учетная запись ученика</span>
-          <select value={studentAccountLink.userId} onChange={(event) => setStudentAccountLink({ ...studentAccountLink, userId: event.target.value })}>
-            <option value="">Выберите пользователя</option>
-            {availableStudentUsers.map((item) => (
-              <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
-            ))}
-          </select>
-        </label>
-        <button className="primary-button">Привязать профиль</button>
-      </form>
       <section className={`table-card admin-section ${adminTab === "subjects" ? "active" : ""}`}>
         <div className="table-title">Предметы и учителя</div>
-        <form className="inline-form attach-form" onSubmit={createSubject}>
-          <label className="field">
-            <span>Название предмета</span>
-            <input type="text" value={subjectForm.name} onChange={(event) => setSubjectForm({ ...subjectForm, name: event.target.value })} />
-          </label>
-          <label className="field">
-            <span>Учитель</span>
-            <select value={subjectForm.teacherId} onChange={(event) => setSubjectForm({ ...subjectForm, teacherId: event.target.value })}>
-              <option value="">Выберите учителя</option>
-              {teacherUsers.map((item) => (
-                <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Класс</span>
-            <select value={subjectForm.classId} onChange={(event) => setSubjectForm({ ...subjectForm, classId: event.target.value })}>
-              <option value="">Выберите класс</option>
-              {sortedClasses.map((item) => (
-                <option key={item.classId} value={item.classId}>{item.name}</option>
-              ))}
-            </select>
-          </label>
-          <button className="primary-button">Создать и назначить</button>
-        </form>
-        <p className="modal-hint inline-editor-hint">Один предмет может быть назначен разным классам и учителям. Кнопка «Снять» ниже удаляет только конкретную связку класс + учитель, а «Удалить предмет целиком» удаляет сам предмет и отдельно спросит подтверждение, если есть уроки.</p>
         <form className="inline-form attach-form" onSubmit={assignSubjectToClass}>
           <label className="field">
-            <span>Предмет</span>
+            <span>Существующий предмет</span>
             <select value={subjectClassAssignmentForm.subjectId} onChange={(event) => setSubjectClassAssignmentForm({ ...subjectClassAssignmentForm, subjectId: event.target.value })}>
               <option value="">Выберите предмет</option>
               {subjects.map((item) => (
@@ -1979,7 +1947,7 @@ function AdminPage({ role }) {
             </select>
           </label>
           <label className="field">
-            <span>Учитель</span>
+            <span>Преподаватель для класса</span>
             <select value={subjectClassAssignmentForm.teacherId} onChange={(event) => setSubjectClassAssignmentForm({ ...subjectClassAssignmentForm, teacherId: event.target.value })}>
               <option value="">Выберите учителя</option>
               {teacherUsers.map((item) => (
@@ -1988,7 +1956,7 @@ function AdminPage({ role }) {
             </select>
           </label>
           <label className="field">
-            <span>Класс</span>
+            <span>Новый класс для предмета</span>
             <select value={subjectClassAssignmentForm.classId} onChange={(event) => setSubjectClassAssignmentForm({ ...subjectClassAssignmentForm, classId: event.target.value })}>
               <option value="">Выберите класс</option>
               {sortedClasses.map((item) => (
@@ -1996,7 +1964,33 @@ function AdminPage({ role }) {
               ))}
             </select>
           </label>
-          <button className="ghost-button">Добавить класс</button>
+          <button className="primary-button">Добавить класс</button>
+        </form>
+        <p className="modal-hint inline-editor-hint">Если предмет уже есть, используйте верхнюю форму: она добавит только новую связку предмет + класс + преподаватель. Кнопка «Снять» ниже удаляет только конкретную связку, а «Удалить предмет целиком» удаляет сам предмет и отдельно спросит подтверждение, если есть уроки.</p>
+        <form className="inline-form attach-form" onSubmit={createSubject}>
+          <label className="field">
+            <span>Новый предмет</span>
+            <input type="text" value={subjectForm.name} onChange={(event) => setSubjectForm({ ...subjectForm, name: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Первый преподаватель</span>
+            <select value={subjectForm.teacherId} onChange={(event) => setSubjectForm({ ...subjectForm, teacherId: event.target.value })}>
+              <option value="">Выберите учителя</option>
+              {teacherUsers.map((item) => (
+                <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Первый класс</span>
+            <select value={subjectForm.classId} onChange={(event) => setSubjectForm({ ...subjectForm, classId: event.target.value })}>
+              <option value="">Выберите класс</option>
+              {sortedClasses.map((item) => (
+                <option key={item.classId} value={item.classId}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+          <button className="ghost-button">Создать новый предмет</button>
         </form>
         <div className="filter-panel">
           <Field label="Поиск" value={subjectFilters.search} onChange={(value) => setSubjectFilters({ ...subjectFilters, search: value })} />
@@ -2112,6 +2106,30 @@ function AdminPage({ role }) {
           </form>
         </Modal>
       )}
+      <section className={`table-card admin-section ${adminTab === "access" ? "active" : ""}`}>
+        <div className="table-title">Привязка готового аккаунта ученика</div>
+        <form className="inline-form attach-form" onSubmit={attachStudentAccount}>
+          <label className="field">
+            <span>Карточка ученика без аккаунта</span>
+            <select value={studentAccountLink.studentId} onChange={(event) => setStudentAccountLink({ ...studentAccountLink, studentId: event.target.value })}>
+              <option value="">Выберите ученика</option>
+              {students.filter((item) => !item.hasAccount).map((item) => (
+                <option key={item.studentId} value={item.studentId}>{item.lastName} {item.firstName} · {item.className || "без класса"}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Свободная учетная запись ученика</span>
+            <select value={studentAccountLink.userId} onChange={(event) => setStudentAccountLink({ ...studentAccountLink, userId: event.target.value })}>
+              <option value="">Выберите пользователя</option>
+              {availableStudentUsers.map((item) => (
+                <option key={item.id} value={item.id}>{item.fullName} · {item.login}</option>
+              ))}
+            </select>
+          </label>
+          <button className="primary-button">Привязать профиль</button>
+        </form>
+      </section>
       <section className={`table-card admin-section ${adminTab === "access" ? "active" : ""}`}>
         <div className="table-title">Классы</div>
         <form className="inline-form attach-form" onSubmit={createAdminClass}>
@@ -2318,6 +2336,7 @@ function DirectorPage({ role }) {
   const [daily, setDaily] = useState(null);
   const [teachers, setTeachers] = useState(null);
   const [classTeachers, setClassTeachers] = useState(null);
+  const [problematic, setProblematic] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -2326,18 +2345,20 @@ function DirectorPage({ role }) {
     setMessage("");
     const query = `startDate=${period.start}&endDate=${period.end}`;
     try {
-      const [classSummary, attendanceStats, dailyReport, teacherSummary, classTeacherSummary] = await Promise.all([
+      const [classSummary, attendanceStats, dailyReport, teacherSummary, classTeacherSummary, problematicStudents] = await Promise.all([
         apiRequest(`/director/report/class-summary?${query}`),
         apiRequest(`/director/report/attendance?${query}`),
         apiRequest(`/director/report/daily?date=${period.end}`),
         apiRequest(`/director/report/teachers?${query}`),
-        apiRequest(`/director/report/class-teachers?${query}`)
+        apiRequest(`/director/report/class-teachers?${query}`),
+        apiRequest(`/director/report/problematic?${query}`)
       ]);
       setSummary(classSummary);
       setAttendance(attendanceStats);
       setDaily(dailyReport);
       setTeachers(teacherSummary);
       setClassTeachers(classTeacherSummary);
+      setProblematic(problematicStudents);
     } catch (error) {
       setMessage(error.message || "Не удалось загрузить отчеты директора");
     } finally {
@@ -2360,10 +2381,13 @@ function DirectorPage({ role }) {
   const dailyRows = daily?.report ?? [];
   const teacherRows = teachers?.teachers ?? [];
   const classTeacherRows = classTeachers?.classTeachers ?? [];
+  const problemRows = problematic?.problematicStudents ?? [];
   const averageAttendance = attendanceRows.length
     ? attendanceRows.reduce((sum, item) => sum + Number(item.presentPercentage ?? 0), 0) / attendanceRows.length
     : 0;
   const averageClassGrade = calculateAverage(classRows.map((item) => item.averageGrade).filter((value) => Number(value) > 0));
+  const lowGradeTotal = problemRows.reduce((sum, item) => sum + Number(item.lowGrades ?? 0), 0);
+  const absenceTotal = attendanceRows.reduce((sum, item) => sum + Number(item.absent ?? 0), 0);
 
   function applyMode(mode) {
     setPeriodMode(mode);
@@ -2398,12 +2422,18 @@ function DirectorPage({ role }) {
             setPeriod({ ...period, end: event.target.value });
           }} />
         </label>
+        <a className="ghost-button compact" href="#/teacher">Открыть журналы</a>
+        <a className="ghost-button compact" href="#/schedule">Открыть расписание</a>
       </div>
       <div className="metric-grid">
         <MetricCard label="Уроков в контрольный день" value={daily?.totalLessons ?? 0} />
         <MetricCard label="Средняя посещаемость" value={`${formatNumber(averageAttendance)}%`} />
         <MetricCard label="Средняя оценка" value={formatNumber(averageClassGrade)} />
-        <MetricCard label="Учителей в периоде" value={teacherRows.length} />
+        <MetricCard label="Учителей с уроками" value={teacherRows.length} />
+        <MetricCard label="Ученики в зоне внимания" value={problemRows.length} />
+        <MetricCard label="Низких оценок" value={lowGradeTotal} />
+        <MetricCard label="Пропусков за период" value={absenceTotal} />
+        <MetricCard label="Уроков без оценок" value={(daily?.report ?? []).filter((item) => Number(item.gradesPercentage ?? 0) === 0).length} />
       </div>
       <div className="director-chart-grid">
         <BarChartCard
@@ -2424,11 +2454,29 @@ function DirectorPage({ role }) {
             suffix: "%"
           }))}
         />
+        <BarChartCard
+          title="Низкие оценки по ученикам"
+          items={problemRows.filter((item) => Number(item.lowGrades) > 0).slice(0, 10).map((item) => ({
+            label: `${item.lastName} ${item.firstName} (${item.class})`,
+            value: Number(item.lowGrades ?? 0),
+            max: Math.max(5, ...problemRows.map((row) => Number(row.lowGrades ?? 0))),
+            suffix: ""
+          }))}
+        />
+        <BarChartCard
+          title="Пропуски по ученикам"
+          items={problemRows.filter((item) => Number(item.absences) > 0).slice(0, 10).map((item) => ({
+            label: `${item.lastName} ${item.firstName} (${item.class})`,
+            value: Number(item.absences ?? 0),
+            max: Math.max(5, ...problemRows.map((row) => Number(row.absences ?? 0))),
+            suffix: ""
+          }))}
+        />
       </div>
       <ReportSection title="По классам" subtitle={`${classRows.length} классов`} defaultOpen>
         <DataTable
           title="Сводка"
-          columns={["Класс", "Учеников", "Средние пропуски", "Средняя оценка"]}
+          columns={["Класс", "Учеников", "Пропусков на ученика", "Средняя оценка"]}
           rows={classRows.map((item) => [
             item.className,
             item.studentCount,
@@ -2439,7 +2487,7 @@ function DirectorPage({ role }) {
       </ReportSection>
       <ReportSection title="По учителям" subtitle={`${teacherRows.length} учителей`}>
         <BarChartCard
-          title="Заполнение оценок"
+          title="Уроки с оценками"
           items={teacherRows.slice(0, 12).map((item) => ({
             label: item.teacher,
             value: Number(item.gradesCompletionPercentage ?? 0),
@@ -2449,13 +2497,27 @@ function DirectorPage({ role }) {
         />
         <DataTable
           title="Учителя"
-          columns={["Учитель", "Уроков", "Оценок", "Проблем посещаемости", "Заполнение"]}
+          columns={["Учитель", "Уроков", "Оценок", "Проблем посещаемости", "Уроки с оценками"]}
           rows={teacherRows.map((item) => [
             item.teacher,
             item.lessonsCount,
             item.gradesEntered,
             item.attendanceProblems,
             `${formatNumber(item.gradesCompletionPercentage)}%`
+          ])}
+        />
+      </ReportSection>
+      <ReportSection title="Ученики в зоне внимания" subtitle={`${problemRows.length} учеников`}>
+        <DataTable
+          title="Риски по ученикам"
+          columns={["Ученик", "Класс", "Пропуски", "Низкие оценки", "Средняя", "Всего оценок"]}
+          rows={problemRows.map((item) => [
+            `${item.lastName} ${item.firstName}`,
+            item.class,
+            item.absences,
+            item.lowGrades,
+            formatNumber(item.averageGrade),
+            item.totalGrades
           ])}
         />
       </ReportSection>
@@ -2536,7 +2598,8 @@ function BarChartCard({ title, items }) {
 }
 
 function TeacherPage({ role, user }) {
-  const allowed = role === "Учитель" || role === "Администратор";
+  const allowed = role === "Учитель" || role === "Администратор" || role === "Директор";
+  const readOnly = role === "Директор";
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [lessons, setLessons] = useState([]);
@@ -2562,18 +2625,27 @@ function TeacherPage({ role, user }) {
     setLoading(true);
     setMessage("");
     try {
-      const adminMode = role === "Администратор";
-      const [classData, subjectData, lessonData] = await Promise.all([
-        apiRequest(adminMode ? "/classes" : `/teacher/classes?teacherId=${user.id}`),
-        apiRequest(adminMode ? "/subjects" : `/teacher/subjects?teacherId=${user.id}`),
-        apiRequest(adminMode ? "/lessons" : `/teacher/lessons?teacherId=${user.id}`)
-      ]);
+      const adminMode = role === "Администратор" || role === "Директор";
+      const [classData, subjectData, lessonData] = role === "Директор"
+        ? await Promise.all([
+          apiRequest("/schedule/editor/metadata"),
+          apiRequest("/lessons")
+        ]).then(([metadataData, lessonRows]) => [metadataData?.classes ?? [], metadataData?.subjects ?? [], lessonRows])
+        : await Promise.all([
+          apiRequest(adminMode ? "/classes" : `/teacher/classes?teacherId=${user.id}`),
+          apiRequest(adminMode ? "/subjects" : `/teacher/subjects?teacherId=${user.id}`),
+          apiRequest(adminMode ? "/lessons" : `/teacher/lessons?teacherId=${user.id}`)
+        ]);
       setClasses(sortItems(classData ?? [], "name", { name: (item) => classSortValue(item.name) }));
       setSubjects(adminMode
         ? (subjectData ?? []).map((subject) => ({
           ...subject,
-          classIds: (subject.classAssignments ?? []).map((assignment) => assignment.classId),
-          classes: (subject.classAssignments ?? []).map((assignment) => assignment.className).join(", ")
+          classIds: subject.classAssignments
+            ? subject.classAssignments.map((assignment) => assignment.classId)
+            : subject.classIds ?? [],
+          classes: subject.classAssignments
+            ? subject.classAssignments.map((assignment) => assignment.className).join(", ")
+            : subject.classes ?? ""
         }))
         : subjectData ?? []);
       setLessons(lessonData ?? []);
@@ -2819,7 +2891,7 @@ function TeacherPage({ role, user }) {
         <MetricCard label="Не явились" value={absentCount} />
         <MetricCard label="Опоздали" value={lateCount} />
       </div>
-      <form className="inline-form lesson-form" onSubmit={createLesson}>
+      {!readOnly && <form className="inline-form lesson-form" onSubmit={createLesson}>
         <label className="field">
           <span>Предмет</span>
           <select value={lessonForm.subjectId} onChange={(event) => setLessonForm({ ...lessonForm, subjectId: event.target.value })}>
@@ -2842,7 +2914,7 @@ function TeacherPage({ role, user }) {
         <Field label="Дата" type="date" value={lessonForm.date} onChange={(value) => setLessonForm({ ...lessonForm, date: value })} />
         <Field label="Домашнее задание" value={lessonForm.homework} onChange={(value) => setLessonForm({ ...lessonForm, homework: value })} />
         <button className="primary-button">Создать урок</button>
-      </form>
+      </form>}
       <div className="split-grid">
         <section className="table-card">
           <div className="table-title">Выбор класса и урока</div>
@@ -2950,14 +3022,14 @@ function TeacherPage({ role, user }) {
                                 <button
                                   className={`grade-pill grade-${grade.value}`}
                                   key={grade.gradeId}
-                                  title="Удалить оценку"
+                                  title={readOnly ? "Оценка" : "Удалить оценку"}
                                   type="button"
-                                  onClick={() => deleteGrade(grade.gradeId, lesson.lessonId)}
+                                  onClick={() => !readOnly && deleteGrade(grade.gradeId, lesson.lessonId)}
                                 >
                                   {grade.value}
                                 </button>
                               ))}
-                              <select defaultValue="" onChange={(event) => {
+                              {!readOnly && <select defaultValue="" onChange={(event) => {
                                 const gradeValue = event.target.value;
                                 event.target.value = "";
                                 saveGradeForLesson(lesson.lessonId, student.studentId, gradeValue);
@@ -2966,9 +3038,9 @@ function TeacherPage({ role, user }) {
                                 {[2, 3, 4, 5].map((value) => (
                                   <option key={value} value={value}>{value}</option>
                                 ))}
-                              </select>
+                              </select>}
                             </div>
-                            <select className="attendance-select" value={String(attendanceStatus)} onChange={(event) => saveAttendanceForLesson(lesson.lessonId, student.studentId, event.target.value)}>
+                            <select className="attendance-select" value={String(attendanceStatus)} disabled={readOnly} onChange={(event) => saveAttendanceForLesson(lesson.lessonId, student.studentId, event.target.value)}>
                               <option value="1">Присутствует</option>
                               <option value="2">Опоздал</option>
                               <option value="0">Не явился</option>
@@ -3383,7 +3455,7 @@ function AttendanceReviewPanel({ attendance, isOpen, filter, sort, onToggle, onF
 }
 
 function SchedulePage({ role }) {
-  const allowed = role === "Менеджер расписания" || role === "Администратор";
+  const allowed = role === "Менеджер расписания" || role === "Администратор" || role === "Директор";
   const editable = role === "Менеджер расписания" || role === "Администратор";
   const [weekStart, setWeekStart] = useState(() => toIsoDate(getMonday(new Date())));
   const [week, setWeek] = useState({ lessons: [] });

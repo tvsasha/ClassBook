@@ -22,7 +22,7 @@ namespace ClassBook.Controllers
         /// </summary>
         /// <returns>Список уроков системы.</returns>
         [HttpGet]
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Roles = "Администратор,Директор")]
         public async Task<IActionResult> GetAll()
         {
             return Ok(await _facade.GetAllLessonsAsync());

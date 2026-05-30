@@ -53,6 +53,7 @@ namespace ClassBook
             {
                 options.AddPolicy("AdminOnly", policy => policy.RequireRole("Администратор"));
                 options.AddPolicy("ScheduleManagerOnly", policy => policy.RequireRole("Менеджер расписания", "Администратор"));
+                options.AddPolicy("ScheduleViewOnly", policy => policy.RequireRole("Менеджер расписания", "Администратор", "Директор"));
                 options.AddPolicy("DirectorOnly", policy => policy.RequireRole("Директор", "Администратор"));
                 options.AddPolicy("TeacherOrAdmin", policy => policy.RequireRole("Учитель", "Администратор"));
                 options.AddPolicy("StudentOrParent", policy => policy.RequireRole("Ученик", "Родитель"));
@@ -896,6 +897,12 @@ namespace ClassBook
             if (ovzGrades.Count > 0)
                 db.Grades.RemoveRange(ovzGrades);
 
+            foreach (var grade in db.Grades.Include(grade => grade.Student).ThenInclude(student => student.Class))
+            {
+                if (grade.Student.Class != null && !IsOvzClass(grade.Student.Class.Name))
+                    grade.Value = GetGradeValue(grade.StudentId, grade.LessonId);
+            }
+
             foreach (var lesson in lessons)
             {
                 if (!studentsByClass.TryGetValue(lesson.ClassId, out var students))
@@ -1117,12 +1124,12 @@ namespace ClassBook
         }
 
         private static bool ShouldCreateGrade(int studentId, int lessonId) =>
-            StableHash(studentId, lessonId, 41) % 100 < 42;
+            StableHash(studentId, lessonId, 41) % 100 < 54;
 
         private static int GetGradeValue(int studentId, int lessonId)
         {
             var value = StableHash(studentId, lessonId, 79) % 100;
-            return value < 8 ? 3 : value < 56 ? 4 : 5;
+            return value < 14 ? 2 : value < 32 ? 3 : value < 72 ? 4 : 5;
         }
 
         private static byte GetAttendanceStatus(int studentId, int lessonId)

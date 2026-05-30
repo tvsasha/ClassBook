@@ -9,7 +9,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/teacher/attendance")]
-    [Authorize(Roles = "Учитель,Администратор")]
+    [Authorize(Roles = "Учитель,Администратор,Директор")]
     public class AttendanceController : ApiControllerBase
     {
         private readonly AttendanceFacade _facade;
@@ -27,6 +27,9 @@ namespace ClassBook.Controllers
         {
             try
             {
+                if (User.IsInRole("Директор"))
+                    return ForbiddenError("Директору доступен только просмотр журнала");
+
                 await _facade.MarkAttendanceAsync(dto.LessonId, dto.StudentId, dto.Status);
                 return Ok("Посещаемость отмечена");
             }

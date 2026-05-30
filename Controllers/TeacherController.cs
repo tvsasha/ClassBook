@@ -8,7 +8,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/teacher")]
-    [Authorize(Roles = "Учитель,Администратор")]
+    [Authorize(Roles = "Учитель,Администратор,Директор")]
     public class TeacherController : ApiControllerBase
     {
         private readonly SubjectFacade _subjectFacade;
@@ -98,6 +98,9 @@ namespace ClassBook.Controllers
         {
             try
             {
+                if (User.IsInRole("Директор"))
+                    return ForbiddenError("Директору доступен только просмотр журнала");
+
                 var currentUserId = GetCurrentUserId();
                 var requestedTeacherId = dto.TeacherId == 0 ? currentUserId : dto.TeacherId;
                 if (requestedTeacherId != currentUserId && !User.IsInRole("Администратор"))
@@ -131,6 +134,9 @@ namespace ClassBook.Controllers
         {
             try
             {
+                if (User.IsInRole("Директор"))
+                    return ForbiddenError("Директору доступен только просмотр журнала");
+
                 var existingLesson = await _lessonFacade.GetLessonByIdAsync(lessonId);
                 if (existingLesson == null)
                     return NotFoundError("Урок не найден");
@@ -166,6 +172,9 @@ namespace ClassBook.Controllers
         {
             try
             {
+                if (User.IsInRole("Директор"))
+                    return ForbiddenError("Директору доступен только просмотр журнала");
+
                 var lesson = await _lessonFacade.GetLessonByIdAsync(lessonId);
                 if (lesson == null)
                     return NotFoundError("Урок не найден");
@@ -193,6 +202,9 @@ namespace ClassBook.Controllers
         {
             try
             {
+                if (User.IsInRole("Директор"))
+                    return ForbiddenError("Директору доступен только просмотр журнала");
+
                 var grade = await _gradeFacade.AddGradeAsync(dto.LessonId, dto.StudentId, dto.Value);
                 return CreatedAtAction(nameof(AddGrade), new { id = grade.GradeId }, grade);
             }
@@ -220,6 +232,9 @@ namespace ClassBook.Controllers
         {
             try
             {
+                if (User.IsInRole("Директор"))
+                    return ForbiddenError("Директору доступен только просмотр журнала");
+
                 await _attendanceFacade.MarkAttendanceAsync(dto.LessonId, dto.StudentId, dto.Status);
                 return Ok("Посещаемость успешно отмечена");
             }

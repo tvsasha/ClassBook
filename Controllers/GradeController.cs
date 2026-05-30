@@ -9,7 +9,7 @@ namespace ClassBook.Controllers
 {
     [ApiController]
     [Route("api/teacher/grades")]
-    [Authorize(Roles = "Учитель,Администратор")]
+    [Authorize(Roles = "Учитель,Администратор,Директор")]
     public class GradeController : ApiControllerBase
     {
         private readonly GradeFacade _facade;
@@ -36,6 +36,9 @@ namespace ClassBook.Controllers
         {
             try
             {
+                if (User.IsInRole("Директор"))
+                    return ForbiddenError("Директору доступен только просмотр журнала");
+
                 var userId = GetUserId();
                 var grade = await _facade.AddGradeAsync(dto.LessonId, dto.StudentId, dto.Value, userId > 0 ? userId : null);
                 return CreatedAtAction(nameof(AddGrade), new { id = grade.GradeId }, grade);
@@ -112,6 +115,9 @@ namespace ClassBook.Controllers
         {
             try
             {
+                if (User.IsInRole("Директор"))
+                    return ForbiddenError("Директору доступен только просмотр журнала");
+
                 var userId = GetUserId();
                 await _facade.DeleteGradeAsync(gradeId, userId > 0 ? userId : null);
                 return NoContent();
