@@ -107,6 +107,10 @@ namespace ClassBook.Application.DTOs
         public int GradesEntered { get; set; }
         public int AttendanceProblems { get; set; }
         public double GradesCompletionPercentage { get; set; }
+        public int TopicsFilled { get; set; }
+        public int HomeworkFilled { get; set; }
+        public double TopicsCompletionPercentage { get; set; }
+        public double HomeworkCompletionPercentage { get; set; }
     }
 
     public sealed class TeacherSummaryReportDto

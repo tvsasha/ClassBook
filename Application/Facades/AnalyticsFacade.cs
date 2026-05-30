@@ -340,6 +340,8 @@ namespace ClassBook.Application.Facades
                     .Where(lesson => lesson.TeacherId == teacher.Id)
                     .ToList();
                 var lessonsWithGrades = teacherLessons.Count(lesson => (lesson.Grades?.Count ?? 0) > 0);
+                var topicsFilled = teacherLessons.Count(lesson => !IsEmptyJournalText(lesson.Topic));
+                var homeworkFilled = teacherLessons.Count(lesson => !IsEmptyJournalText(lesson.Homework));
 
                 return new TeacherSummaryItemDto
                 {
@@ -350,6 +352,14 @@ namespace ClassBook.Application.Facades
                     AttendanceProblems = teacherLessons.Sum(lesson => lesson.Attendances?.Count(attendance => attendance.Status != 1) ?? 0),
                     GradesCompletionPercentage = teacherLessons.Count > 0
                         ? Math.Round((double)lessonsWithGrades / teacherLessons.Count * 100, 2)
+                        : 0,
+                    TopicsFilled = topicsFilled,
+                    HomeworkFilled = homeworkFilled,
+                    TopicsCompletionPercentage = teacherLessons.Count > 0
+                        ? Math.Round((double)topicsFilled / teacherLessons.Count * 100, 2)
+                        : 0,
+                    HomeworkCompletionPercentage = teacherLessons.Count > 0
+                        ? Math.Round((double)homeworkFilled / teacherLessons.Count * 100, 2)
                         : 0
                 };
             })
@@ -411,6 +421,15 @@ namespace ClassBook.Application.Facades
                 EndDate = endDate.Date,
                 ClassTeachers = items
             };
+        }
+
+        private static bool IsEmptyJournalText(string? value)
+        {
+            var text = (value ?? string.Empty).Trim().ToLowerInvariant();
+            return string.IsNullOrWhiteSpace(text) ||
+                   text.Contains("???") ||
+                   text.Contains("будет указана") ||
+                   text.Contains("не указана");
         }
     }
 }
