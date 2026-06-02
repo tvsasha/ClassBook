@@ -3190,6 +3190,35 @@ function StudentPage({ role, view = "full" }) {
     : "Ученик";
   const studentClassName = info?.class?.name || info?.className || "класс не указан";
 
+  if (adminMode) {
+    return (
+      <section className="page-stack">
+        <PageHeader
+          title="Данные ученика"
+          subtitle={info ? `${studentName} · ${studentClassName}` : "Выберите ученика"}
+          text="Административный просмотр расписания, оценок, домашних заданий и посещаемости выбранного ученика."
+        />
+        <StatusLine loading={loading} message={message} />
+        <label className="field wide-field">
+          <span>Ученик</span>
+          <select value={selectedStudentId} onChange={(event) => setSelectedStudentId(event.target.value)}>
+            {students.length === 0 ? (
+              <option value="">Ученики не найдены</option>
+            ) : sortItems(students, "name", {
+              name: (item) => `${item.lastName} ${item.firstName}`,
+              className: (item) => classSortValue(item.className)
+            }).map((student) => (
+              <option key={student.studentId} value={student.studentId}>
+                {student.lastName} {student.firstName} · {student.className || "без класса"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} view={view} />
+      </section>
+    );
+  }
+
   return (
     <LearningPage
       title={view === "schedule" ? "Мое расписание" : "Кабинет ученика"}
@@ -4241,35 +4270,6 @@ function SchedulePage({ role }) {
     subject,
     label: getScheduleSubjectLabel(subject)
   }));
-
-  if (adminMode) {
-    return (
-      <section className="page-stack">
-        <PageHeader
-          title="Данные ученика"
-          subtitle={info ? `${studentName} · ${studentClassName}` : "Выберите ученика"}
-          text="Административный просмотр расписания, оценок, домашних заданий и посещаемости выбранного ученика."
-        />
-        <StatusLine loading={loading} message={message} />
-        <label className="field wide-field">
-          <span>Ученик</span>
-          <select value={selectedStudentId} onChange={(event) => setSelectedStudentId(event.target.value)}>
-            {students.length === 0 ? (
-              <option value="">Ученики не найдены</option>
-            ) : sortItems(students, "name", {
-              name: (item) => `${item.lastName} ${item.firstName}`,
-              className: (item) => classSortValue(item.className)
-            }).map((student) => (
-              <option key={student.studentId} value={student.studentId}>
-                {student.lastName} {student.firstName} · {student.className || "без класса"}
-              </option>
-            ))}
-          </select>
-        </label>
-        <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} view={view} />
-      </section>
-    );
-  }
 
   return (
     <section className="page-stack">
