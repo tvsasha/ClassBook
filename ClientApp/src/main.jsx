@@ -413,8 +413,8 @@ function getNavItemsForRole(role) {
       { route: "admin", label: "Администрирование" },
       { route: "director", label: "Отчеты директора" },
       { route: "teacher", label: "Журнал учителя" },
-      { route: "student", label: "Дневник ученика" },
-      { route: "parent", label: "Кабинет родителя" },
+      { route: "student", label: "Данные ученика" },
+      { route: "parent", label: "Данные родителя" },
       { route: "schedule", label: "Расписание" }
     ],
     "Директор": [
@@ -2412,24 +2412,15 @@ function DirectorPage({ role }) {
           <button className={periodMode === "week" ? "active" : ""} type="button" onClick={() => applyMode("week")}>Неделя</button>
           <button className={periodMode === "month" ? "active" : ""} type="button" onClick={() => applyMode("month")}>Месяц</button>
         </div>
-        <label className="field">
-          <span>Начало</span>
-          <input id="director-period-start" name="directorPeriodStart" type="date" value={period.start} onChange={(event) => {
+        <Field label="Начало" type="date" value={period.start} onChange={(value) => {
             setPeriodMode("custom");
-            setPeriod({ ...period, start: event.target.value });
+            setPeriod({ ...period, start: value });
           }} />
-        </label>
-        <label className="field">
-          <span>Конец</span>
-          <input id="director-period-end" name="directorPeriodEnd" type="date" value={period.end} onChange={(event) => {
+        <Field label="Конец" type="date" value={period.end} onChange={(value) => {
             setPeriodMode("custom");
-            setPeriod({ ...period, end: event.target.value });
+            setPeriod({ ...period, end: value });
           }} />
-        </label>
-        <label className="field">
-          <span>День контроля</span>
-          <input id="director-daily-date" name="directorDailyDate" type="date" value={dailyDate} onChange={(event) => setDailyDate(event.target.value)} />
-        </label>
+        <Field label="День контроля" type="date" value={dailyDate} onChange={setDailyDate} />
         <a className="ghost-button compact" href="#/teacher">Открыть журналы</a>
         <a className="ghost-button compact" href="#/schedule">Открыть расписание</a>
       </div>
@@ -3109,6 +3100,9 @@ function TeacherPage({ role, user }) {
 
 function StudentPage({ role, view = "full" }) {
   const allowed = role === "Ученик" || role === "Администратор";
+  const adminMode = role === "Администратор";
+  const [students, setStudents] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
   const [info, setInfo] = useState(null);
   const [schedule, setSchedule] = useState([]);
   const [grades, setGrades] = useState([]);
@@ -3119,6 +3113,21 @@ function StudentPage({ role, view = "full" }) {
 
   useEffect(() => {
     if (!allowed) {
+      return;
+    }
+
+    if (adminMode) {
+      setLoading(true);
+      apiRequest("/admin/students")
+        .then((data) => {
+          const list = data ?? [];
+          setStudents(list);
+          if (!selectedStudentId && list.length > 0) {
+            setSelectedStudentId(String(list[0].studentId));
+          }
+        })
+        .catch((error) => setMessage(error.message || "Не удалось загрузить список учеников"))
+        .finally(() => setLoading(false));
       return;
     }
 
@@ -3139,7 +3148,38 @@ function StudentPage({ role, view = "full" }) {
       })
       .catch((error) => setMessage(error.message || "Не удалось загрузить кабинет ученика"))
       .finally(() => setLoading(false));
-  }, [allowed]);
+  }, [allowed, adminMode]);
+
+  useEffect(() => {
+    if (!allowed || !adminMode || !selectedStudentId) {
+      return;
+    }
+
+    const selectedStudent = students.find((item) => String(item.studentId) === String(selectedStudentId));
+    setLoading(true);
+    Promise.all([
+      apiRequest(`/parent/student/${selectedStudentId}/schedule`),
+      apiRequest(`/parent/student/${selectedStudentId}/grades`),
+      apiRequest(`/parent/student/${selectedStudentId}/homework`),
+      apiRequest(`/parent/student/${selectedStudentId}/attendance`)
+    ])
+      .then(([scheduleData, gradeData, homeworkData, attendanceData]) => {
+        setInfo(selectedStudent
+          ? {
+            studentId: selectedStudent.studentId,
+            firstName: selectedStudent.firstName,
+            lastName: selectedStudent.lastName,
+            className: selectedStudent.className
+          }
+          : null);
+        setSchedule(scheduleData ?? []);
+        setGrades(gradeData ?? []);
+        setHomework(homeworkData ?? []);
+        setAttendance(attendanceData ?? []);
+      })
+      .catch((error) => setMessage(error.message || "Не удалось загрузить данные ученика"))
+      .finally(() => setLoading(false));
+  }, [allowed, adminMode, selectedStudentId, students]);
 
   if (!allowed) {
     return <AccessWarning title="Кабинет ученика доступен ученику и администратору" />;
@@ -3168,6 +3208,9 @@ function StudentPage({ role, view = "full" }) {
 
 function ParentPage({ role }) {
   const allowed = role === "Родитель" || role === "Администратор";
+  const adminMode = role === "Администратор";
+  const [parents, setParents] = useState([]);
+  const [selectedParentId, setSelectedParentId] = useState("");
   const [students, setStudents] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [schedule, setSchedule] = useState([]);
@@ -3183,6 +3226,20 @@ function ParentPage({ role }) {
     }
 
     setLoading(true);
+    if (adminMode) {
+      apiRequest("/users")
+        .then((data) => {
+          const parentUsers = (data ?? []).filter((item) => item.roleName === "Родитель");
+          setParents(parentUsers);
+          if (!selectedParentId && parentUsers.length > 0) {
+            setSelectedParentId(String(parentUsers[0].id));
+          }
+        })
+        .catch((error) => setMessage(error.message || "Не удалось загрузить список родителей"))
+        .finally(() => setLoading(false));
+      return;
+    }
+
     apiRequest("/parent/students")
       .then((data) => {
         const list = data ?? [];
@@ -3193,7 +3250,23 @@ function ParentPage({ role }) {
       })
       .catch((error) => setMessage(error.message || "Не удалось загрузить список детей"))
       .finally(() => setLoading(false));
-  }, [allowed]);
+  }, [allowed, adminMode]);
+
+  useEffect(() => {
+    if (!allowed || !adminMode || !selectedParentId) {
+      return;
+    }
+
+    setLoading(true);
+    apiRequest(`/users/${selectedParentId}/students`)
+      .then((data) => {
+        const list = data ?? [];
+        setStudents(list);
+        setSelectedStudentId(list.length > 0 ? String(list[0].studentId) : "");
+      })
+      .catch((error) => setMessage(error.message || "Не удалось загрузить учеников родителя"))
+      .finally(() => setLoading(false));
+  }, [allowed, adminMode, selectedParentId]);
 
   useEffect(() => {
     if (!selectedStudentId) {
@@ -3226,11 +3299,27 @@ function ParentPage({ role }) {
   return (
     <section className="page-stack">
       <PageHeader
-        title="Кабинет родителя"
+        title={adminMode ? "Данные родителя" : "Кабинет родителя"}
         subtitle={selectedStudent ? `${selectedStudent.firstName} ${selectedStudent.lastName}` : "Выберите ученика"}
-        text="Доступ к успеваемости, посещаемости, расписанию и домашним заданиям привязанных учеников."
+        text={adminMode
+          ? "Административный просмотр данных детей, привязанных к выбранному родителю."
+          : "Доступ к успеваемости, посещаемости, расписанию и домашним заданиям привязанных учеников."}
       />
       <StatusLine loading={loading} message={message} />
+      {adminMode && (
+        <label className="field wide-field">
+          <span>Родитель</span>
+          <select value={selectedParentId} onChange={(event) => setSelectedParentId(event.target.value)}>
+            {parents.length === 0 ? (
+              <option value="">Родители не найдены</option>
+            ) : sortItems(parents, "fullName", { fullName: (item) => item.fullName || "" }).map((parent) => (
+              <option key={parent.id} value={parent.id}>
+                {parent.fullName} · {parent.login}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="field wide-field">
         <span>Ученик</span>
         <select value={selectedStudentId} onChange={(event) => setSelectedStudentId(event.target.value)}>
@@ -4153,6 +4242,35 @@ function SchedulePage({ role }) {
     label: getScheduleSubjectLabel(subject)
   }));
 
+  if (adminMode) {
+    return (
+      <section className="page-stack">
+        <PageHeader
+          title="Данные ученика"
+          subtitle={info ? `${studentName} · ${studentClassName}` : "Выберите ученика"}
+          text="Административный просмотр расписания, оценок, домашних заданий и посещаемости выбранного ученика."
+        />
+        <StatusLine loading={loading} message={message} />
+        <label className="field wide-field">
+          <span>Ученик</span>
+          <select value={selectedStudentId} onChange={(event) => setSelectedStudentId(event.target.value)}>
+            {students.length === 0 ? (
+              <option value="">Ученики не найдены</option>
+            ) : sortItems(students, "name", {
+              name: (item) => `${item.lastName} ${item.firstName}`,
+              className: (item) => classSortValue(item.className)
+            }).map((student) => (
+              <option key={student.studentId} value={student.studentId}>
+                {student.lastName} {student.firstName} · {student.className || "без класса"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} view={view} />
+      </section>
+    );
+  }
+
   return (
     <section className="page-stack">
       <PageHeader
@@ -4171,20 +4289,18 @@ function SchedulePage({ role }) {
       </div>
       <div className="schedule-toolbar">
         <button className="ghost-button compact" onClick={() => setWeekStart(shiftWeek(weekStart, -7))}>Предыдущая</button>
-        <label className="schedule-week-picker">
-          <span>Неделя</span>
-          <input type="date" value={weekStart} onChange={(event) => setWeekStart(toIsoDate(getMonday(new Date(event.target.value))))} />
-        </label>
+        <div className="schedule-week-picker">
+          <Field label="Неделя" type="date" value={weekStart} onChange={(value) => setWeekStart(toIsoDate(getMonday(new Date(value))))} />
+        </div>
         <button className="ghost-button compact" onClick={() => setWeekStart(shiftWeek(weekStart, 7))}>Следующая</button>
         <button className="ghost-button compact schedule-fullscreen-toggle" type="button" onClick={() => setIsScheduleFullscreen((current) => !current)}>
           {isScheduleFullscreen ? "Закрыть полный экран" : "На весь экран"}
         </button>
         {editable && (
           <form className="week-copy-form" onSubmit={copyFullScheduleWeek}>
-            <label className="schedule-week-picker">
-              <span>Копия на</span>
-              <input type="date" value={copyWeekTarget} onChange={(event) => setCopyWeekTarget(toIsoDate(getMonday(new Date(event.target.value))))} />
-            </label>
+            <div className="schedule-week-picker">
+              <Field label="Дата недели" type="date" value={copyWeekTarget} onChange={(value) => setCopyWeekTarget(toIsoDate(getMonday(new Date(value))))} />
+            </div>
             <button className="ghost-button compact">Скопировать неделю</button>
           </form>
         )}
@@ -4784,6 +4900,35 @@ function RoleTile({ title, text }) {
 function Field({ label, value, onChange, type = "text", autoComplete }) {
   const inputId = useId();
   const inputName = `field-${inputId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const [localValue, setLocalValue] = useState(value ?? "");
+  const shouldDebounce = type === "date";
+
+  useEffect(() => {
+    setLocalValue(value ?? "");
+  }, [value]);
+
+  useEffect(() => {
+    if (!shouldDebounce || localValue === (value ?? "")) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => onChange(localValue), 3000);
+    return () => window.clearTimeout(timer);
+  }, [localValue, onChange, shouldDebounce, value]);
+
+  function handleChange(nextValue) {
+    setLocalValue(nextValue);
+    if (!shouldDebounce) {
+      onChange(nextValue);
+    }
+  }
+
+  function flushDateValue() {
+    if (shouldDebounce && localValue !== (value ?? "")) {
+      onChange(localValue);
+    }
+  }
+
   return (
     <div className="field">
       <label htmlFor={inputId}>{label}</label>
@@ -4791,9 +4936,10 @@ function Field({ label, value, onChange, type = "text", autoComplete }) {
         id={inputId}
         name={inputName}
         type={type}
-        value={value}
+        value={localValue}
         autoComplete={autoComplete}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => handleChange(event.target.value)}
+        onBlur={flushDateValue}
       />
     </div>
   );
