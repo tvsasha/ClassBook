@@ -4135,7 +4135,11 @@ function SchedulePage({ role }) {
         })
       });
       setWeekStart(normalizedTarget);
-      setMessage(`Неделя скопирована без изменений. Уроков: ${result?.copiedCount ?? 0}`);
+      const copiedCount = result?.copiedCount ?? 0;
+      const skippedCount = result?.skippedCount ?? 0;
+      setMessage(skippedCount > 0
+        ? `Добавлено уроков: ${copiedCount}. Уже было на месте: ${skippedCount}`
+        : `Неделя скопирована без изменений. Уроков: ${copiedCount}`);
     } catch (error) {
       setMessage(error.message || "Не удалось скопировать неделю расписания");
     } finally {
@@ -4306,7 +4310,7 @@ function SchedulePage({ role }) {
         )}
         {editable && (
           <form className="class-create-form" onSubmit={createClass}>
-            <input value={className} placeholder="Новый класс" onChange={(event) => setClassName(event.target.value)} />
+            <input id="schedule-new-class" name="scheduleNewClass" value={className} placeholder="Новый класс" onChange={(event) => setClassName(event.target.value)} />
             <button className="primary-button compact">Добавить класс</button>
           </form>
         )}
@@ -4416,7 +4420,7 @@ function SchedulePage({ role }) {
               <div className="lesson-editor-grid">
                 <label className="field">
                   <span>Преподаватель</span>
-                  <input list={teacherOptionsId} value={lessonForm.teacherName} onChange={(event) => {
+                  <input id="schedule-lesson-teacher" name="scheduleLessonTeacher" list={teacherOptionsId} value={lessonForm.teacherName} onChange={(event) => {
                     const teacherName = event.target.value;
                     const teacher = teachers.find((item) => item.fullName === teacherName);
                     const teacherId = teacher?.id ? String(teacher.id) : "";
@@ -4445,7 +4449,7 @@ function SchedulePage({ role }) {
                 </label>
                 <label className="field">
                   <span>Предмет</span>
-                  <input list={subjectOptionsId} value={lessonForm.subjectInput} disabled={!lessonForm.teacherId} onChange={(event) => {
+                  <input id="schedule-lesson-subject" name="scheduleLessonSubject" list={subjectOptionsId} value={lessonForm.subjectInput} disabled={!lessonForm.teacherId} onChange={(event) => {
                     const subjectInput = event.target.value;
                     const matchedOption = filteredSubjectOptions.find((item) => item.label === subjectInput);
                     const sameNameSubjects = filteredSubjects.filter((item) => item.name === subjectInput);
@@ -4464,7 +4468,7 @@ function SchedulePage({ role }) {
               </div>
               <label className="field">
                 <span>Домашнее задание / примечание</span>
-                <textarea value={lessonForm.homework} onChange={(event) => setLessonForm({ ...lessonForm, homework: event.target.value })} />
+                <textarea id="schedule-lesson-homework" name="scheduleLessonHomework" value={lessonForm.homework} onChange={(event) => setLessonForm({ ...lessonForm, homework: event.target.value })} />
               </label>
               <div className="lesson-editor-actions">
                 <button className="primary-button compact" disabled={!selectedCell}>Сохранить урок</button>

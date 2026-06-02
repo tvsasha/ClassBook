@@ -86,6 +86,7 @@ namespace ClassBook.Application.DTOs
     public class ScheduleEditorWeekCopyResultDto
     {
         public int CopiedCount { get; set; }
+        public int SkippedCount { get; set; }
         public DateTime SourceWeekStart { get; set; }
         public DateTime TargetWeekStart { get; set; }
         public List<ScheduleEditorLessonDto> Lessons { get; set; } = [];

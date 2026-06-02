@@ -317,13 +317,35 @@ namespace ClassBook.Application.Facades
             if (sourceLessons.Count == 0)
                 throw new InvalidOperationException("В исходной неделе нет уроков для копирования");
 
-            var targetHasLessons = await _db.Lessons
-                .AnyAsync(l => l.Date >= targetWeekStart && l.Date < targetWeekEnd && l.ScheduleId != null);
+            var targetLessons = await _db.Lessons
+                .AsNoTracking()
+                .Where(l => l.Date >= targetWeekStart && l.Date < targetWeekEnd && l.ScheduleId != null)
+                .Select(l => new
+                {
+                    l.ClassId,
+                    l.ScheduleId,
+                    l.Date
+                })
+                .ToListAsync();
 
-            if (targetHasLessons)
-                throw new InvalidOperationException("В целевой неделе уже есть уроки из расписания. Выберите неделю без сетки расписания, чтобы не потерять данные.");
+            var occupiedTargetSlots = targetLessons
+                .Select(lesson => $"{lesson.ClassId}_{lesson.ScheduleId}_{lesson.Date.Date:yyyy-MM-dd}")
+                .ToHashSet();
+            var skippedCount = 0;
 
-            var lessonsToCreate = sourceLessons.Select(lesson => new Lesson
+            var lessonsToCreate = sourceLessons.Where(lesson =>
+            {
+                var targetDate = targetWeekStart.AddDays((lesson.Date.Date - sourceWeekStart).Days);
+                var targetKey = $"{lesson.ClassId}_{lesson.ScheduleId}_{targetDate:yyyy-MM-dd}";
+                if (occupiedTargetSlots.Contains(targetKey))
+                {
+                    skippedCount++;
+                    return false;
+                }
+
+                occupiedTargetSlots.Add(targetKey);
+                return true;
+            }).Select(lesson => new Lesson
             {
                 SubjectId = lesson.SubjectId,
                 ClassId = lesson.ClassId,
@@ -368,6 +390,7 @@ namespace ClassBook.Application.Facades
             return new ScheduleEditorWeekCopyResultDto
             {
                 CopiedCount = copiedLessons.Count,
+                SkippedCount = skippedCount,
                 SourceWeekStart = sourceWeekStart,
                 TargetWeekStart = targetWeekStart,
                 Lessons = copiedLessons
