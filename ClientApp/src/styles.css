@@ -623,10 +623,33 @@ summary:focus-visible {
 .theme-toggle-moon {
   position: relative;
   z-index: 1;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  line-height: 1;
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: auto;
+}
+
+.theme-toggle-sun {
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-shadow:
+    0 -7px 0 -5px currentColor,
+    0 7px 0 -5px currentColor,
+    7px 0 0 -5px currentColor,
+    -7px 0 0 -5px currentColor,
+    5px 5px 0 -5px currentColor,
+    -5px -5px 0 -5px currentColor,
+    5px -5px 0 -5px currentColor,
+    -5px 5px 0 -5px currentColor;
+}
+
+.theme-toggle-moon {
+  width: 15px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  transform: rotate(35deg);
 }
 
 .theme-toggle-thumb {
