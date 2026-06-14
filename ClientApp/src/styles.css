@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --ink: #182026;
   --muted: #68747f;
   --panel: rgba(255, 255, 255, 0.88);
@@ -11,6 +12,22 @@
   --surface-strong: rgba(255, 255, 255, 0.92);
   --shadow: 0 24px 70px rgba(24, 32, 38, 0.14);
   --soft-shadow: 0 12px 36px rgba(24, 32, 38, 0.09);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #edf4f1;
+  --muted: #a9b7b1;
+  --panel: rgba(19, 25, 24, 0.94);
+  --line: rgba(224, 239, 234, 0.13);
+  --accent: #69c9ad;
+  --accent-strong: #91dec8;
+  --danger: #ff8e86;
+  --warning: #f0bd68;
+  --surface: rgba(27, 35, 33, 0.9);
+  --surface-strong: rgba(35, 45, 42, 0.98);
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  --soft-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
 }
 
 * {
@@ -26,6 +43,14 @@ body {
     radial-gradient(circle at 12% 18%, rgba(15, 124, 102, 0.22), transparent 28rem),
     radial-gradient(circle at 88% 8%, rgba(244, 177, 80, 0.22), transparent 24rem),
     linear-gradient(135deg, #edf3ed 0%, #f7f1e8 52%, #e6eef3 100%);
+  transition: color 0.28s ease, background 0.32s ease;
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(55, 139, 116, 0.18), transparent 28rem),
+    radial-gradient(circle at 88% 8%, rgba(190, 142, 65, 0.1), transparent 24rem),
+    linear-gradient(135deg, #101513 0%, #171b18 52%, #111817 100%);
 }
 
 button,
@@ -46,6 +71,20 @@ summary {
     box-shadow 0.18s ease,
     color 0.18s ease,
     transform 0.18s ease;
+}
+
+.brand-card,
+.auth-card,
+.dashboard-card,
+.side-panel,
+.content-panel,
+.topbar,
+.page-header,
+.module-card,
+.metric-card,
+.table-card,
+.inline-form {
+  transition: color 0.28s ease, background 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
 }
 
 button:focus-visible,
@@ -541,6 +580,84 @@ summary:focus-visible {
   background: rgba(15, 124, 102, 0.07);
 }
 
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 6px 11px 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--surface-strong);
+  box-shadow: var(--soft-shadow);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: rgba(15, 124, 102, 0.34);
+  transform: translateY(-1px);
+}
+
+.theme-toggle-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 24px);
+  align-items: center;
+  width: 54px;
+  height: 30px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(15, 124, 102, 0.08);
+}
+
+.theme-toggle-sun,
+.theme-toggle-moon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.theme-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(24, 32, 38, 0.2);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), background 0.28s ease;
+}
+
+:root[data-theme="dark"] .theme-toggle-thumb {
+  transform: translateX(26px);
+  background: #dceae5;
+}
+
+.theme-toggle-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.floating-theme-toggle {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 90;
+}
+
 .topbar-user b {
   width: 34px;
   height: 34px;
@@ -668,6 +785,61 @@ summary:focus-visible {
 
 .dashboard-actions {
   align-items: stretch;
+}
+
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .role-tile,
+:root[data-theme="dark"] .legacy-link,
+:root[data-theme="dark"] .app-nav a,
+:root[data-theme="dark"] .insight-item,
+:root[data-theme="dark"] .nested-table,
+:root[data-theme="dark"] .info-card,
+:root[data-theme="dark"] .report-section,
+:root[data-theme="dark"] .admin-tabs,
+:root[data-theme="dark"] .director-filter-panel,
+:root[data-theme="dark"] .director-tabs,
+:root[data-theme="dark"] .period-buttons button,
+:root[data-theme="dark"] .learning-day-column,
+:root[data-theme="dark"] .learning-day-heading,
+:root[data-theme="dark"] .learning-lesson-card,
+:root[data-theme="dark"] .today-lesson-row,
+:root[data-theme="dark"] .attendance-week-row,
+:root[data-theme="dark"] .modal-card,
+:root[data-theme="dark"] .inline-editor-card,
+:root[data-theme="dark"] .filter-panel,
+:root[data-theme="dark"] .schedule-editor,
+:root[data-theme="dark"] .schedule-time-col,
+:root[data-theme="dark"] .schedule-number-col,
+:root[data-theme="dark"] .schedule-cell.empty,
+:root[data-theme="dark"] .field input,
+:root[data-theme="dark"] .field select,
+:root[data-theme="dark"] .field textarea,
+:root[data-theme="dark"] .admin-tab-select {
+  background: rgba(28, 37, 34, 0.92);
+}
+
+:root[data-theme="dark"] .learning-lesson-card.attendance-absent,
+:root[data-theme="dark"] .today-lesson-row.attendance-absent {
+  background: rgba(92, 35, 34, 0.46);
+}
+
+:root[data-theme="dark"] .learning-lesson-card.attendance-late,
+:root[data-theme="dark"] .today-lesson-row.attendance-late {
+  background: rgba(91, 72, 31, 0.46);
+}
+
+:root[data-theme="dark"] .page-header {
+  background:
+    linear-gradient(135deg, rgba(31, 41, 38, 0.96), rgba(21, 29, 27, 0.92)),
+    radial-gradient(circle at 90% 12%, rgba(105, 201, 173, 0.12), transparent 22rem);
+}
+
+:root[data-theme="dark"] th {
+  background: rgba(24, 32, 30, 0.98);
+}
+
+:root[data-theme="dark"] tbody tr:hover td {
+  background: rgba(105, 201, 173, 0.07);
 }
 
 .dashboard-actions .module-card {
@@ -2220,6 +2392,63 @@ body.schedule-fullscreen-lock {
   line-height: 1.5;
 }
 
+.cookie-banner {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  width: min(720px, calc(100vw - 40px));
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  color: var(--ink);
+  background: var(--surface-strong);
+  box-shadow: 0 24px 70px rgba(24, 32, 38, 0.22);
+  backdrop-filter: blur(18px);
+  animation: cookie-banner-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cookie-banner-copy strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1.05rem;
+}
+
+.cookie-banner-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.cookie-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cookie-banner-actions .primary-button,
+.cookie-banner-actions .ghost-button {
+  width: auto;
+  min-width: 112px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+@keyframes cookie-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 920px) {
   .app-shell {
     padding: 18px;
@@ -2311,6 +2540,12 @@ body.schedule-fullscreen-lock {
       linear-gradient(160deg, #f2f6ef 0%, #faf2e6 100%);
   }
 
+  :root[data-theme="dark"] body {
+    background:
+      radial-gradient(circle at 20% 8%, rgba(55, 139, 116, 0.15), transparent 18rem),
+      linear-gradient(160deg, #101513 0%, #171b18 100%);
+  }
+
   .app-shell {
     padding: 8px;
   }
@@ -2387,6 +2622,24 @@ body.schedule-fullscreen-lock {
 
   .topbar-user span {
     display: none;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .topbar .theme-toggle {
+    min-height: 40px;
+    padding: 5px;
+  }
+
+  .topbar .theme-toggle-label {
+    display: none;
+  }
+
+  .floating-theme-toggle {
+    top: 10px;
+    right: 10px;
   }
 
   .route-admin .topbar {
@@ -2571,6 +2824,15 @@ body.schedule-fullscreen-lock {
     border: 1px solid rgba(24, 32, 38, 0.08);
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.72);
+  }
+
+  :root[data-theme="dark"] .table-card:not(.learning-week-card):not(.attendance-week-card) .table-wrap table:not(.gradebook-table):not(.schedule-grid-table) tr {
+    background: rgba(28, 37, 34, 0.92);
+  }
+
+  .dashboard-table tbody tr {
+    height: auto;
+    min-height: 0;
   }
 
   .table-card:not(.learning-week-card):not(.attendance-week-card) .table-wrap table:not(.gradebook-table):not(.schedule-grid-table) td {
@@ -2805,6 +3067,27 @@ body.schedule-fullscreen-lock {
   .schedule-fullscreen-head .compact {
     width: auto;
     min-width: 104px;
+  }
+
+  .cookie-banner {
+    right: 8px;
+    bottom: 8px;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    width: calc(100vw - 16px);
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .cookie-banner-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cookie-banner-actions .primary-button,
+  .cookie-banner-actions .ghost-button {
+    width: 100%;
+    min-width: 0;
   }
 }
 

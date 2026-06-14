@@ -48,11 +48,30 @@ async function copyTextToClipboard(text) {
   }
 }
 
+const themeStorageKey = "classbook-theme";
+const cookieConsentStorageKey = "classbook-cookie-consent";
+
+function getInitialTheme() {
+  const storedTheme = window.localStorage.getItem(themeStorageKey);
+  if (storedTheme === "light" || storedTheme === "dark") {
+    return storedTheme;
+  }
+
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 function App() {
   const [user, setUser] = useState(readStoredUser);
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState(getInitialTheme);
   const route = useAppRoute();
   const mode = new URLSearchParams(window.location.search).get("mode");
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem(themeStorageKey, theme);
+  }, [theme]);
 
   useEffect(() => {
     let ignore = false;
@@ -115,19 +134,18 @@ function App() {
     };
   }, [user?.id]);
 
+  let content;
   if (loading) {
-    return <main className="loading">Проверяем сессию...</main>;
-  }
-
-  if (user?.mustChangePassword || mode === "change-password") {
-    return <ChangePasswordPage user={user} onChanged={setUser} />;
-  }
-
-  if (user) {
-    return (
+    content = <main className="loading">Проверяем сессию...</main>;
+  } else if (user?.mustChangePassword || mode === "change-password") {
+    content = <ChangePasswordPage user={user} onChanged={setUser} />;
+  } else if (user) {
+    content = (
       <AuthenticatedShell
         route={route}
         user={user}
+        theme={theme}
+        onThemeToggle={() => setTheme((current) => current === "dark" ? "light" : "dark")}
         onLogout={async () => {
           await logout();
           setUser(null);
@@ -135,9 +153,23 @@ function App() {
         }}
       />
     );
+  } else {
+    content = <LoginPage onLogin={setUser} />;
   }
 
-  return <LoginPage onLogin={setUser} />;
+  return (
+    <>
+      {!user && (
+        <ThemeToggle
+          theme={theme}
+          className="floating-theme-toggle"
+          onToggle={() => setTheme((current) => current === "dark" ? "light" : "dark")}
+        />
+      )}
+      {content}
+      <CookieBanner />
+    </>
+  );
 }
 
 function useAppRoute() {
@@ -360,7 +392,60 @@ function ChangePasswordPage({ user, onChanged }) {
   );
 }
 
-function AuthenticatedShell({ route, user, onLogout }) {
+function ThemeToggle({ theme, onToggle, className = "" }) {
+  const dark = theme === "dark";
+  return (
+    <button
+      className={`theme-toggle ${className}`.trim()}
+      type="button"
+      onClick={onToggle}
+      aria-label={dark ? "Включить светлую тему" : "Включить темную тему"}
+      title={dark ? "Светлая тема" : "Темная тема"}
+    >
+      <span className="theme-toggle-track" aria-hidden="true">
+        <span className="theme-toggle-sun">☀</span>
+        <span className="theme-toggle-moon">☾</span>
+        <span className="theme-toggle-thumb" />
+      </span>
+      <span className="theme-toggle-label">{dark ? "Светлая" : "Темная"}</span>
+    </button>
+  );
+}
+
+function CookieBanner() {
+  const [visible, setVisible] = useState(() => !window.localStorage.getItem(cookieConsentStorageKey));
+
+  function saveChoice(choice) {
+    window.localStorage.setItem(cookieConsentStorageKey, choice);
+    setVisible(false);
+  }
+
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <aside className="cookie-banner" role="dialog" aria-label="Использование cookie" aria-live="polite">
+      <div className="cookie-banner-copy">
+        <strong>Cookie в ClassBook</strong>
+        <p>
+          Система использует обязательные cookie для безопасного входа и сохранения сессии.
+          Аналитические и рекламные cookie не используются.
+        </p>
+      </div>
+      <div className="cookie-banner-actions">
+        <button className="ghost-button compact" type="button" onClick={() => saveChoice("necessary")}>
+          Не согласен
+        </button>
+        <button className="primary-button compact" type="button" onClick={() => saveChoice("accepted")}>
+          Согласен
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function AuthenticatedShell({ route, user, theme, onThemeToggle, onLogout }) {
   const role = getRole(user);
   const navItems = getNavItemsForRole(role);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -395,9 +480,12 @@ function AuthenticatedShell({ route, user, onLogout }) {
             <span>Главная / {currentNavItem?.label || "Обзор"}</span>
             <strong>{currentNavItem?.label || "Главная"}</strong>
           </div>
-          <div className="topbar-user">
-            <span>{user.fullName || user.login}</span>
-            <b>{(user.fullName || user.login || "C").slice(0, 1).toUpperCase()}</b>
+          <div className="topbar-actions">
+            <ThemeToggle theme={theme} onToggle={onThemeToggle} />
+            <div className="topbar-user">
+              <span>{user.fullName || user.login}</span>
+              <b>{(user.fullName || user.login || "C").slice(0, 1).toUpperCase()}</b>
+            </div>
           </div>
         </header>
         <RouteContent route={route} role={role} user={user} />
