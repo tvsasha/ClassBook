@@ -589,9 +589,8 @@ summary:focus-visible {
 .theme-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
   min-height: 46px;
-  padding: 6px 11px 6px 7px;
+  padding: 7px;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--ink);
@@ -653,11 +652,6 @@ summary:focus-visible {
 :root[data-theme="dark"] .theme-toggle-thumb {
   transform: translateX(26px);
   background: #dceae5;
-}
-
-.theme-toggle-label {
-  font-size: 0.84rem;
-  font-weight: 700;
 }
 
 .floating-theme-toggle {
@@ -2732,10 +2726,6 @@ body.schedule-fullscreen-lock {
   .topbar .theme-toggle {
     min-height: 40px;
     padding: 5px;
-  }
-
-  .topbar .theme-toggle-label {
-    display: none;
   }
 
   .floating-theme-toggle {

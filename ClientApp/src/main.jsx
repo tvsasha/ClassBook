@@ -431,7 +431,6 @@ function ThemeToggle({ theme, onToggle, className = "" }) {
         </svg>
         <span className="theme-toggle-thumb" />
       </span>
-      <span className="theme-toggle-label">{dark ? "Светлая" : "Темная"}</span>
     </button>
   );
 }
