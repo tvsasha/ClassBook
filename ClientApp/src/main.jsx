@@ -3957,8 +3957,8 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
       return;
     }
 
-    if (!groupedGrades.some((group) => group.subject === selectedGradeSubject)) {
-      setSelectedGradeSubject(groupedGrades[0].subject);
+    if (selectedGradeSubject && !groupedGrades.some((group) => group.subject === selectedGradeSubject)) {
+      setSelectedGradeSubject("");
     }
   }, [showGradeSubjectFilter, groupedGrades, selectedGradeSubject]);
 
@@ -4022,7 +4022,7 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
 }
 
 function GradeSubjectPicker({ groups, selectedSubject, onSubjectChange }) {
-  const selectedGroup = groups.find((group) => group.subject === selectedSubject) ?? groups[0] ?? null;
+  const selectedGroup = groups.find((group) => group.subject === selectedSubject) ?? null;
 
   return (
     <section className="table-card grade-subject-picker-card">
@@ -4034,7 +4034,8 @@ function GradeSubjectPicker({ groups, selectedSubject, onSubjectChange }) {
           <div className="grade-subject-controls">
             <label className="field">
               <span>Предмет</span>
-              <select value={selectedGroup?.subject ?? ""} onChange={(event) => onSubjectChange(event.target.value)}>
+              <select value={selectedSubject} onChange={(event) => onSubjectChange(event.target.value)}>
+                <option value="">Выберите предмет</option>
                 {groups.map((group) => (
                   <option key={group.subject} value={group.subject}>
                     {group.subject} · {group.items.length} оценок
@@ -4044,31 +4045,35 @@ function GradeSubjectPicker({ groups, selectedSubject, onSubjectChange }) {
             </label>
             <div className="grade-subject-summary">
               <span>Средний балл</span>
-              <strong>{formatNumber(calculateAverage((selectedGroup?.items ?? []).map((grade) => grade.value)))}</strong>
+              <strong>{selectedGroup ? formatNumber(calculateAverage(selectedGroup.items.map((grade) => grade.value))) : "—"}</strong>
             </div>
           </div>
-          <div className="table-wrap grade-subject-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Дата</th>
-                  <th>Тема</th>
-                  <th>Учитель</th>
-                  <th>Оценка</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(selectedGroup?.items ?? []).map((grade) => (
-                  <tr key={grade.gradeId}>
-                    <td data-label="Дата">{formatDate(grade.date)}</td>
-                    <td data-label="Тема">{formatLessonTopic(grade.topic)}</td>
-                    <td data-label="Учитель">{grade.teacher || "—"}</td>
-                    <td data-label="Оценка"><GradeBadge value={grade.value} /></td>
+          {selectedGroup ? (
+            <div className="table-wrap grade-subject-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Дата</th>
+                    <th>Тема</th>
+                    <th>Учитель</th>
+                    <th>Оценка</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {selectedGroup.items.map((grade) => (
+                    <tr key={grade.gradeId}>
+                      <td data-label="Дата">{formatDate(grade.date)}</td>
+                      <td data-label="Тема">{formatLessonTopic(grade.topic)}</td>
+                      <td data-label="Учитель">{grade.teacher || "—"}</td>
+                      <td data-label="Оценка"><GradeBadge value={grade.value} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="empty-text padded">Выберите предмет, чтобы посмотреть все оценки</p>
+          )}
         </>
       )}
     </section>
