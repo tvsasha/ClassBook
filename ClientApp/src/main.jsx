@@ -3578,10 +3578,11 @@ function FinalGradesPage({ role }) {
     setLoading(true);
     setMessage("");
     try {
-      const requests = [apiRequest("/academic-periods")];
-      if (canViewClasses) requests.push(apiRequest("/final-grades/classes"));
-      if (isParent) requests.push(apiRequest("/parent/students"));
-      const [yearData, classData = [], studentData = []] = await Promise.all(requests);
+      const [yearData, classData, studentData] = await Promise.all([
+        apiRequest("/academic-periods"),
+        canViewClasses ? apiRequest("/final-grades/classes") : Promise.resolve([]),
+        isParent ? apiRequest("/parent/students") : Promise.resolve([])
+      ]);
       const nextYears = yearData ?? [];
       setYears(nextYears);
       const allPeriods = nextYears.flatMap((year) => year.periods ?? []);
@@ -3595,8 +3596,11 @@ function FinalGradesPage({ role }) {
         if (!classId && classData?.length) setClassId(String(classData[0].classId));
       }
       if (isParent) {
-        setStudents(studentData ?? []);
-        if (!studentId && studentData?.length) setStudentId(String(studentData[0].studentId));
+        const nextStudents = studentData ?? [];
+        setStudents(nextStudents);
+        if (nextStudents.length && !nextStudents.some((item) => String(item.studentId) === String(studentId))) {
+          setStudentId(String(nextStudents[0].studentId));
+        }
       }
       if (isAdmin && !periodForm.academicYearId && nextYears.length) {
         const activeYear = nextYears.find((year) => year.isActive) ?? nextYears[0];
@@ -3730,7 +3734,7 @@ function FinalGradesPage({ role }) {
           <form className="table-card period-admin-form" onSubmit={savePeriod}>
             <div className="table-title">{periodForm.academicPeriodId ? "Изменение периода" : "Новый период"}</div>
             <label className="field"><span>Учебный год</span><select value={periodForm.academicYearId} onChange={(event) => setPeriodForm({ ...periodForm, academicYearId: event.target.value })}>{years.map((year) => <option key={year.academicYearId} value={year.academicYearId}>{year.name}</option>)}</select></label>
-            <label className="field"><span>Тип</span><select value={periodForm.type} onChange={(event) => setPeriodForm({ ...periodForm, type: event.target.value })}><option value="quarter">Четверть</option><option value="semester">Полугодие</option></select></label>
+            <label className="field"><span>Тип</span><select value={periodForm.type} onChange={(event) => setPeriodForm({ ...periodForm, type: event.target.value })}><option value="quarter">Четверть</option><option value="semester">Полугодие</option><option value="year">Год</option></select></label>
             <Field label="Название" value={periodForm.name} onChange={(value) => setPeriodForm({ ...periodForm, name: value })} />
             <Field label="Номер" type="number" value={periodForm.sequence} onChange={(value) => setPeriodForm({ ...periodForm, sequence: value })} />
             <Field label="Начало" type="date" value={periodForm.startDate} onChange={(value) => setPeriodForm({ ...periodForm, startDate: value })} />

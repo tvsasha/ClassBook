@@ -20,6 +20,7 @@ namespace ClassBook.Application.Facades
         public async Task<List<AcademicYearDto>> GetYearsAsync()
         {
             await EnsureDefaultYearAsync();
+            await EnsureYearPeriodsAsync();
             return await _db.AcademicYears
                 .OrderByDescending(year => year.StartDate)
                 .Select(year => new AcademicYearDto
@@ -328,17 +329,64 @@ namespace ClassBook.Application.Facades
                 new() { Name = "3 четверть", Type = "quarter", Sequence = 3, StartDate = new DateTime(2026, 1, 12), EndDate = new DateTime(2026, 3, 22), IsClosed = true },
                 new() { Name = "4 четверть", Type = "quarter", Sequence = 4, StartDate = new DateTime(2026, 3, 30), EndDate = new DateTime(2026, 5, 31) },
                 new() { Name = "1 полугодие", Type = "semester", Sequence = 1, StartDate = new DateTime(2025, 9, 1), EndDate = new DateTime(2025, 12, 30), IsClosed = true },
-                new() { Name = "2 полугодие", Type = "semester", Sequence = 2, StartDate = new DateTime(2026, 1, 12), EndDate = new DateTime(2026, 5, 31) }
+                new() { Name = "2 полугодие", Type = "semester", Sequence = 2, StartDate = new DateTime(2026, 1, 12), EndDate = new DateTime(2026, 5, 31) },
+                new() { Name = "Год", Type = "year", Sequence = 1, StartDate = new DateTime(2025, 9, 1), EndDate = new DateTime(2026, 5, 31) }
             ];
             _db.AcademicYears.Add(year);
             await _db.SaveChangesAsync();
-            await SeedInitialFinalGradesAsync(year.Periods);
+            await SeedMissingFinalGradesAsync(year.Periods.Select(period => period.AcademicPeriodId));
         }
 
-        private async Task SeedInitialFinalGradesAsync(IEnumerable<AcademicPeriod> periods)
+        private async Task EnsureYearPeriodsAsync()
         {
+            var years = await _db.AcademicYears.Include(year => year.Periods).ToListAsync();
+            var createdPeriods = new List<AcademicPeriod>();
+
+            foreach (var year in years)
+            {
+                if (year.Periods.Any(period => period.Type == "year"))
+                    continue;
+
+                var lastStudyDay = new DateTime(year.EndDate.Year, 5, 31);
+                if (lastStudyDay < year.StartDate || lastStudyDay > year.EndDate)
+                    lastStudyDay = year.EndDate;
+
+                var period = new AcademicPeriod
+                {
+                    AcademicYearId = year.AcademicYearId,
+                    Name = "Год",
+                    Type = "year",
+                    Sequence = 1,
+                    StartDate = year.StartDate,
+                    EndDate = lastStudyDay,
+                    IsClosed = false
+                };
+                year.Periods.Add(period);
+                createdPeriods.Add(period);
+            }
+
+            if (createdPeriods.Count == 0)
+                return;
+
+            await _db.SaveChangesAsync();
+            await SeedMissingFinalGradesAsync(createdPeriods.Select(period => period.AcademicPeriodId));
+        }
+
+        private async Task SeedMissingFinalGradesAsync(IEnumerable<int> periodIds)
+        {
+            var periods = await _db.AcademicPeriods
+                .Where(period => periodIds.Contains(period.AcademicPeriodId))
+                .ToListAsync();
+
             foreach (var period in periods)
             {
+                var existingKeys = (await _db.FinalGrades
+                    .Where(grade => grade.AcademicPeriodId == period.AcademicPeriodId)
+                    .Select(grade => new { grade.StudentId, grade.SubjectId })
+                    .ToListAsync())
+                    .Select(item => $"{item.StudentId}:{item.SubjectId}")
+                    .ToHashSet();
+
                 var averages = await _db.Grades
                     .Where(grade => grade.Lesson.Date >= period.StartDate && grade.Lesson.Date <= period.EndDate)
                     .GroupBy(grade => new { grade.StudentId, grade.Lesson.SubjectId, grade.Lesson.Subject.TeacherId, ClassName = grade.Student.Class != null ? grade.Student.Class.Name : "" })
@@ -352,7 +400,7 @@ namespace ClassBook.Application.Facades
                     })
                     .ToListAsync();
 
-                foreach (var item in averages.Where(item => !IsOvzClass(item.ClassName)))
+                foreach (var item in averages.Where(item => !IsOvzClass(item.ClassName) && !existingKeys.Contains($"{item.StudentId}:{item.SubjectId}")))
                 {
                     _db.FinalGrades.Add(new FinalGrade
                     {
@@ -378,7 +426,8 @@ namespace ClassBook.Application.Facades
         {
             "quarter" => "quarter",
             "semester" => "semester",
-            _ => throw new ArgumentException("Тип периода должен быть четвертью или полугодием")
+            "year" => "year",
+            _ => throw new ArgumentException("Тип периода должен быть четвертью, полугодием или годом")
         };
 
         private static AcademicPeriodDto MapPeriod(AcademicPeriod period) => new()
