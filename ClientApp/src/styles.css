@@ -607,9 +607,8 @@ summary:focus-visible {
 
 .theme-toggle-track {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, 24px);
-  align-items: center;
+  display: block;
+  flex: 0 0 54px;
   width: 54px;
   height: 30px;
   padding: 3px;
@@ -621,35 +620,21 @@ summary:focus-visible {
 
 .theme-toggle-sun,
 .theme-toggle-moon {
-  position: relative;
-  z-index: 1;
+  position: absolute;
+  top: 7px;
+  z-index: 2;
   display: block;
   width: 14px;
   height: 14px;
-  margin: auto;
+  pointer-events: none;
 }
 
 .theme-toggle-sun {
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  box-shadow:
-    0 -7px 0 -5px currentColor,
-    0 7px 0 -5px currentColor,
-    7px 0 0 -5px currentColor,
-    -7px 0 0 -5px currentColor,
-    5px 5px 0 -5px currentColor,
-    -5px -5px 0 -5px currentColor,
-    5px -5px 0 -5px currentColor,
-    -5px 5px 0 -5px currentColor;
+  left: 7px;
 }
 
 .theme-toggle-moon {
-  width: 15px;
-  height: 15px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  transform: rotate(35deg);
+  right: 7px;
 }
 
 .theme-toggle-thumb {
@@ -661,6 +646,7 @@ summary:focus-visible {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 3px 10px rgba(24, 32, 38, 0.2);
+  z-index: 1;
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), background 0.28s ease;
 }
 
