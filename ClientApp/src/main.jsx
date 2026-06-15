@@ -2453,11 +2453,11 @@ function AdminPage({ role }) {
           item.isActive ? "Активен" : "Отключен",
           item.mustChangePassword ? "Нужно сменить" : "Постоянный",
           <div className="row-actions">
-            <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
-            {!item.isActive && <button className="table-action" type="button" onClick={() => activateUser(item)}>Активировать</button>}
-            <button className="table-action" type="button" onClick={() => resetUserPassword(item)}>Временный пароль</button>
-            <button className="table-action" type="button" onClick={() => issueQrLogin(item)}>{item.hasQrLogin ? "Перевыпустить QR" : "Создать QR"}</button>
-            {item.hasQrLogin && <button className="table-action danger-action" type="button" onClick={() => revokeQrLogin(item)}>Отключить QR</button>}
+            <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редакт.</button>
+            {!item.isActive && <button className="table-action" type="button" onClick={() => activateUser(item)}>Включить</button>}
+            <button className="table-action" type="button" onClick={() => resetUserPassword(item)}>Пароль</button>
+            <button className="table-action" type="button" onClick={() => issueQrLogin(item)}>{item.hasQrLogin ? "Новый QR" : "QR"}</button>
+            {item.hasQrLogin && <button className="table-action danger-action" type="button" onClick={() => revokeQrLogin(item)}>Без QR</button>}
             <button className="table-action danger-action" type="button" onClick={() => deleteUser(item)}>Удалить</button>
           </div>
         ])}
@@ -2813,7 +2813,7 @@ function TeacherPage({ role, user }) {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedLessonId, setSelectedLessonId] = useState("");
-  const [journalDateFrom, setJournalDateFrom] = useState(() => toIsoDate(new Date()));
+  const [journalDateFrom, setJournalDateFrom] = useState("");
   const [journalDateTo, setJournalDateTo] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3048,6 +3048,18 @@ function TeacherPage({ role, user }) {
 
     const normalizedStatus = status === "present" ? 1 : Number(status);
 
+    setAttendanceByLesson((current) => {
+      const existing = current[lessonId] ?? [];
+      const withoutStudent = existing.filter((item) => Number(item.studentId) !== Number(studentId));
+      return {
+        ...current,
+        [lessonId]: normalizedStatus === 1
+          ? withoutStudent
+          : [...withoutStudent, { lessonId: Number(lessonId), studentId: Number(studentId), status: normalizedStatus }]
+      };
+    });
+    setMessage("");
+
     try {
       await apiRequest("/teacher/attendance", {
         method: "POST",
@@ -3057,19 +3069,9 @@ function TeacherPage({ role, user }) {
           status: normalizedStatus
         })
       });
-      setAttendanceByLesson((current) => {
-        const existing = current[lessonId] ?? [];
-        const withoutStudent = existing.filter((item) => Number(item.studentId) !== Number(studentId));
-        return {
-          ...current,
-          [lessonId]: normalizedStatus === 1
-            ? withoutStudent
-            : [...withoutStudent, { lessonId: Number(lessonId), studentId: Number(studentId), status: normalizedStatus }]
-        };
-      });
-      setMessage("");
       await refreshLessonMarks(lessonId);
     } catch (error) {
+      await refreshLessonMarks(lessonId).catch(() => {});
       setMessage(error.message || "Не удалось сохранить посещаемость");
     }
   }
@@ -3100,7 +3102,7 @@ function TeacherPage({ role, user }) {
     .filter((lesson) => !selectedLessonId || String(lesson.lessonId) === String(selectedLessonId))
     .filter((lesson) => !journalDateFrom || new Date(lesson.date) >= new Date(journalDateFrom))
     .filter((lesson) => !journalDateTo || new Date(lesson.date) <= new Date(journalDateTo))
-    .sort((a, b) => new Date(a.date) - new Date(b.date)) : [];
+    .sort(sortLessonsFromToday) : [];
   const allVisibleGrades = journalLessons.flatMap((lesson) => gradesByLesson[lesson.lessonId] ?? []);
   const allVisibleAttendance = journalLessons.flatMap((lesson) => attendanceByLesson[lesson.lessonId] ?? []);
   const classAverage = calculateAverage(allVisibleGrades.map((item) => item.value));
@@ -3191,6 +3193,8 @@ function TeacherPage({ role, user }) {
                 <option value="">Все уроки предмета</option>
                 {classLessons
                   .filter((lesson) => !selectedSubjectId || String(lesson.subjectId ?? "") === String(selectedSubjectId))
+                  .slice()
+                  .sort(sortLessonsFromToday)
                   .map((lesson) => (
                   <option key={lesson.lessonId} value={lesson.lessonId}>
                     {lesson.subjectName} · {formatLessonTopic(lesson.topic)} · {formatDate(lesson.date)}
@@ -3201,10 +3205,10 @@ function TeacherPage({ role, user }) {
             <Field label="От" type="date" value={journalDateFrom} onChange={setJournalDateFrom} />
             <Field label="До" type="date" value={journalDateTo} onChange={setJournalDateTo} />
             <button className="ghost-button compact" type="button" onClick={() => {
-              setJournalDateFrom(toIsoDate(new Date()));
+              setJournalDateFrom("");
               setJournalDateTo("");
               setSelectedLessonId("");
-            }}>Сегодня и далее</button>
+            }}>Сбросить фильтры</button>
           </div>
         </section>
         <DataTable
@@ -3855,7 +3859,6 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState("problem");
   const [attendanceSort, setAttendanceSort] = useState("date-desc");
-  const [gradeSubject, setGradeSubject] = useState("all");
   const averageGrade = grades.length
     ? grades.reduce((sum, item) => sum + Number(item.value ?? 0), 0) / grades.length
     : 0;
@@ -3869,18 +3872,11 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
 
   const showOnlySchedule = view === "schedule";
   const todaySchedule = getTodaySchedule(schedule);
-  const gradeSubjects = [...new Set(grades.map((grade) => grade.subject || grade.subjectName).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, "ru"));
   const visibleGrades = grades
-    .filter((grade) => gradeSubject === "all" || (grade.subject || grade.subjectName) === gradeSubject)
     .slice()
     .sort((a, b) => new Date(b.date) - new Date(a.date) || Number(b.gradeId ?? 0) - Number(a.gradeId ?? 0));
-
-  useEffect(() => {
-    if (gradeSubject !== "all" && !gradeSubjects.includes(gradeSubject)) {
-      setGradeSubject("all");
-    }
-  }, [gradeSubject, gradeSubjects]);
+  const latestGrades = visibleGrades.slice(0, showGradeSubjectFilter ? 5 : 16);
+  const groupedGrades = groupGradesBySubject(visibleGrades);
 
   return (
     <>
@@ -3900,21 +3896,10 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
       ) : (
         <>
           <TodaySchedulePanel schedule={todaySchedule} attendance={attendance} />
-          {showGradeSubjectFilter && gradeSubjects.length > 1 && (
-            <section className="table-card grade-subject-filter">
-              <label className="field">
-                <span>Оценки по предмету</span>
-                <select value={gradeSubject} onChange={(event) => setGradeSubject(event.target.value)}>
-                  <option value="all">Все предметы</option>
-                  {gradeSubjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
-                </select>
-              </label>
-            </section>
-          )}
           <DataTable
-            title={gradeSubject === "all" ? "Все оценки" : `Оценки: ${gradeSubject}`}
+            title={showGradeSubjectFilter ? "Последние 5 оценок" : "Последние оценки"}
             columns={["Дата", "Предмет", "Тема", "Учитель", "Оценка"]}
-            rows={visibleGrades.map((grade) => [
+            rows={latestGrades.map((grade) => [
               formatDate(grade.date),
               grade.subject || grade.subjectName || "—",
               formatLessonTopic(grade.topic),
@@ -3922,6 +3907,9 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
               <GradeBadge value={grade.value} />
             ])}
           />
+          {showGradeSubjectFilter && (
+            <GradeSubjectSections groups={groupedGrades} />
+          )}
           <CardGrid
             title="Домашние задания"
             items={homework.slice(0, 8).map((item) => ({
@@ -3942,6 +3930,49 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
         </>
       )}
     </>
+  );
+}
+
+function GradeSubjectSections({ groups }) {
+  return (
+    <section className="grade-subject-sections">
+      {groups.length === 0 ? (
+        <section className="table-card"><p className="empty-text padded">Оценок пока нет</p></section>
+      ) : groups.map((group) => (
+        <details className="report-section grade-subject-section" key={group.subject}>
+          <summary>
+            <span>
+              <strong>{group.subject}</strong>
+              <small>{group.items.length} оценок · средний балл {formatNumber(calculateAverage(group.items.map((grade) => grade.value)))}</small>
+            </span>
+          </summary>
+          <div className="report-section-body">
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Дата</th>
+                    <th>Тема</th>
+                    <th>Учитель</th>
+                    <th>Оценка</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.items.map((grade) => (
+                    <tr key={grade.gradeId}>
+                      <td data-label="Дата">{formatDate(grade.date)}</td>
+                      <td data-label="Тема">{formatLessonTopic(grade.topic)}</td>
+                      <td data-label="Учитель">{grade.teacher || "—"}</td>
+                      <td data-label="Оценка"><GradeBadge value={grade.value} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+      ))}
+    </section>
   );
 }
 
@@ -5533,6 +5564,33 @@ function calculateMedian(values) {
   return numericValues.length % 2
     ? numericValues[middle]
     : (numericValues[middle - 1] + numericValues[middle]) / 2;
+}
+
+function groupGradesBySubject(grades) {
+  const groups = new Map();
+  grades.forEach((grade) => {
+    const subject = grade.subject || grade.subjectName || "Предмет";
+    groups.set(subject, [...(groups.get(subject) ?? []), grade]);
+  });
+
+  return [...groups.entries()]
+    .map(([subject, items]) => ({ subject, items }))
+    .sort((left, right) => left.subject.localeCompare(right.subject, "ru"));
+}
+
+function sortLessonsFromToday(left, right) {
+  const today = getTodayStart();
+  const leftDate = parseLocalDate(left.date);
+  const rightDate = parseLocalDate(right.date);
+  const leftFuture = leftDate >= today;
+  const rightFuture = rightDate >= today;
+
+  if (leftFuture !== rightFuture) {
+    return leftFuture ? -1 : 1;
+  }
+
+  const direction = leftFuture ? 1 : -1;
+  return (leftDate - rightDate) * direction;
 }
 
 function sortItems(items, sortKey, selectors) {
