@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { copyFileSync, readdirSync } from "node:fs";
+import { copyFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 function legacyAssetAliases(outDir) {
@@ -8,6 +8,9 @@ function legacyAssetAliases(outDir) {
     name: "legacy-asset-aliases",
     closeBundle() {
       const assetsDir = resolve(outDir, "assets");
+      if (!existsSync(assetsDir)) {
+        return;
+      }
       const files = readdirSync(assetsDir);
       const jsFile = files.find((name) => /^app-[\w-]+\.js$/.test(name));
       const cssFile = files.find((name) => /^app-[\w-]+\.css$/.test(name));
