@@ -1928,6 +1928,75 @@ tbody tr:hover td {
   width: 100%;
 }
 
+.final-grade-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) max-content;
+  gap: 14px;
+  align-items: end;
+  padding: 18px;
+}
+
+.final-grade-controls .field,
+.period-admin-form .field {
+  margin: 0;
+}
+
+.final-grade-select {
+  min-width: 72px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 7px 10px;
+  color: var(--ink);
+  background: var(--surface-strong);
+  font: inherit;
+  font-weight: 800;
+}
+
+.period-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.period-admin-form {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.period-admin-form .table-title {
+  margin: -18px -18px 2px;
+}
+
+.period-list-card {
+  grid-column: 1 / -1;
+}
+
+.period-list {
+  display: grid;
+  gap: 0;
+}
+
+.period-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line);
+}
+
+.period-list article > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.period-list article span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 @media (max-width: 600px) {
   .qr-access-actions {
     display: grid;
@@ -1935,6 +2004,24 @@ tbody tr:hover td {
 
   .qr-access-actions button {
     width: 100%;
+  }
+
+  .final-grade-controls,
+  .period-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .final-grade-controls .compact {
+    width: 100%;
+  }
+
+  .period-list-card {
+    grid-column: auto;
+  }
+
+  .period-list article {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

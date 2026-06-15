@@ -12,6 +12,7 @@ public class Student
     public User? User { get; set; }
     public ICollection<Grade>? Grades { get; set; }
     public ICollection<Attendance>? Attendances { get; set; }
+    public ICollection<FinalGrade>? FinalGrades { get; set; }
     /// <summary>
     /// Навигация: родители этого ученика
     /// </summary>

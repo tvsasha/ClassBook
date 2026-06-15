@@ -20,6 +20,9 @@ namespace ClassBook.Infrastructure.Data
         public DbSet<ClassTeacher> ClassTeachers => Set<ClassTeacher>();
         public DbSet<SubjectClassAssignment> SubjectClassAssignments => Set<SubjectClassAssignment>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<AcademicYear> AcademicYears => Set<AcademicYear>();
+        public DbSet<AcademicPeriod> AcademicPeriods => Set<AcademicPeriod>();
+        public DbSet<FinalGrade> FinalGrades => Set<FinalGrade>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -279,6 +282,48 @@ namespace ClassBook.Infrastructure.Data
                 entity.HasIndex(al => new { al.EntityType, al.EntityId });
                 entity.HasIndex(al => al.UserId);
                 entity.HasIndex(al => al.Timestamp);
+            });
+
+            modelBuilder.Entity<AcademicYear>(entity =>
+            {
+                entity.HasKey(item => item.AcademicYearId);
+                entity.Property(item => item.Name).IsRequired().HasMaxLength(30);
+                entity.HasIndex(item => item.Name).IsUnique();
+            });
+
+            modelBuilder.Entity<AcademicPeriod>(entity =>
+            {
+                entity.HasKey(item => item.AcademicPeriodId);
+                entity.Property(item => item.Name).IsRequired().HasMaxLength(50);
+                entity.Property(item => item.Type).IsRequired().HasMaxLength(20);
+                entity.HasOne(item => item.AcademicYear)
+                    .WithMany(year => year.Periods)
+                    .HasForeignKey(item => item.AcademicYearId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(item => new { item.AcademicYearId, item.Type, item.Sequence }).IsUnique();
+            });
+
+            modelBuilder.Entity<FinalGrade>(entity =>
+            {
+                entity.HasKey(item => item.FinalGradeId);
+                entity.Property(item => item.Value).IsRequired();
+                entity.HasOne(item => item.AcademicPeriod)
+                    .WithMany(period => period.FinalGrades)
+                    .HasForeignKey(item => item.AcademicPeriodId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(item => item.Student)
+                    .WithMany(student => student.FinalGrades)
+                    .HasForeignKey(item => item.StudentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(item => item.Subject)
+                    .WithMany(subject => subject.FinalGrades)
+                    .HasForeignKey(item => item.SubjectId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(item => item.SetByUser)
+                    .WithMany(user => user.FinalGradesSet)
+                    .HasForeignKey(item => item.SetByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(item => new { item.AcademicPeriodId, item.StudentId, item.SubjectId }).IsUnique();
             });
         }
     }

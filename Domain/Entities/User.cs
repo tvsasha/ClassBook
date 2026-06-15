@@ -27,5 +27,6 @@
         /// Навигация: логи аудита этого пользователя
         /// </summary>
         public ICollection<AuditLog>? AuditLogs { get; set; }
+        public ICollection<FinalGrade>? FinalGradesSet { get; set; }
     }
 }

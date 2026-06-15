@@ -95,6 +95,7 @@ namespace ClassBook
             builder.Services.AddScoped<AnalyticsFacade>();
             builder.Services.AddScoped<RoleFacade>();
             builder.Services.AddScoped<ClassTeacherFacade>();
+            builder.Services.AddScoped<FinalGradeFacade>();
 
             builder.Services.AddCors(options =>
             {

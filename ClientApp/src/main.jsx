@@ -522,6 +522,7 @@ function getNavItemsForRole(role) {
   const byRole = {
     "Администратор": [
       { route: "admin", label: "Администрирование" },
+      { route: "final-grades", label: "Итоговые оценки" },
       { route: "director", label: "Отчеты директора" },
       { route: "teacher", label: "Журнал учителя" },
       { route: "student", label: "Данные ученика" },
@@ -530,20 +531,24 @@ function getNavItemsForRole(role) {
     ],
     "Директор": [
       { route: "director", label: "Отчеты директора" },
+      { route: "final-grades", label: "Итоговые оценки" },
       { route: "teacher", label: "Журналы" },
       { route: "schedule", label: "Расписание" }
     ],
     "Учитель": [
       { route: "teacher", label: "Журнал учителя" },
+      { route: "final-grades", label: "Итоговые оценки" },
       { route: "class-teacher", label: "Классное руководство" },
       { route: "schedule", label: "Мое расписание" }
     ],
     "Ученик": [
       { route: "student", label: "Мой дневник" },
+      { route: "final-grades", label: "Итоговые оценки" },
       { route: "schedule", label: "Мое расписание" }
     ],
     "Родитель": [
-      { route: "parent", label: "Дневник ребенка" }
+      { route: "parent", label: "Дневник ребенка" },
+      { route: "final-grades", label: "Итоговые оценки" }
     ],
     "Менеджер расписания": [
       { route: "schedule", label: "Редактор расписания" }
@@ -575,6 +580,8 @@ function RouteContent({ route, role, user }) {
       return <StudentPage role={role} />;
     case "parent":
       return <ParentPage role={role} />;
+    case "final-grades":
+      return <FinalGradesPage role={role} />;
     case "schedule":
       if (role === "Учитель") {
         return <SchedulePage role={role} user={user} />;
@@ -3540,6 +3547,204 @@ function ParentPage({ role }) {
         </select>
       </label>
       <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} />
+    </section>
+  );
+}
+
+function FinalGradesPage({ role }) {
+  const isAdmin = role === "Администратор";
+  const isStudent = role === "Ученик";
+  const isParent = role === "Родитель";
+  const canViewClasses = role === "Администратор" || role === "Директор" || role === "Учитель";
+  const [years, setYears] = useState([]);
+  const [periodId, setPeriodId] = useState("");
+  const [classes, setClasses] = useState([]);
+  const [classId, setClassId] = useState("");
+  const [students, setStudents] = useState([]);
+  const [studentId, setStudentId] = useState("");
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [yearForm, setYearForm] = useState({ name: "", startDate: "", endDate: "", isActive: true });
+  const [periodForm, setPeriodForm] = useState({ academicPeriodId: "", academicYearId: "", name: "", type: "quarter", sequence: 1, startDate: "", endDate: "", isClosed: false });
+
+  const periods = years.flatMap((year) => (year.periods ?? []).map((period) => ({ ...period, yearName: year.name }))
+    .sort((left, right) => `${right.yearName}-${right.type}-${right.sequence}`.localeCompare(`${left.yearName}-${left.type}-${left.sequence}`, "ru"));
+  const selectedPeriod = periods.find((item) => String(item.academicPeriodId) === String(periodId));
+  const selectedClass = classes.find((item) => String(item.classId) === String(classId));
+  const canDownload = role !== "Учитель" || selectedClass?.isClassTeacher;
+
+  async function loadReferenceData() {
+    setLoading(true);
+    setMessage("");
+    try {
+      const requests = [apiRequest("/academic-periods")];
+      if (canViewClasses) requests.push(apiRequest("/final-grades/classes"));
+      if (isParent) requests.push(apiRequest("/parent/students"));
+      const [yearData, classData = [], studentData = []] = await Promise.all(requests);
+      const nextYears = yearData ?? [];
+      setYears(nextYears);
+      const allPeriods = nextYears.flatMap((year) => year.periods ?? []);
+      if (!periodId && allPeriods.length > 0) {
+        const activeYear = nextYears.find((year) => year.isActive) ?? nextYears[0];
+        const preferred = (activeYear?.periods ?? []).find((period) => !period.isClosed) ?? activeYear?.periods?.[0] ?? allPeriods[0];
+        setPeriodId(String(preferred.academicPeriodId));
+      }
+      if (canViewClasses) {
+        setClasses(classData ?? []);
+        if (!classId && classData?.length) setClassId(String(classData[0].classId));
+      }
+      if (isParent) {
+        setStudents(studentData ?? []);
+        if (!studentId && studentData?.length) setStudentId(String(studentData[0].studentId));
+      }
+      if (isAdmin && !periodForm.academicYearId && nextYears.length) {
+        const activeYear = nextYears.find((year) => year.isActive) ?? nextYears[0];
+        setPeriodForm((current) => ({ ...current, academicYearId: String(activeYear.academicYearId) }));
+      }
+    } catch (error) {
+      setMessage(error.message || "Не удалось загрузить учебные периоды");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadReferenceData();
+  }, [role]);
+
+  useEffect(() => {
+    if (!periodId) return;
+    let path = "";
+    if (isStudent) path = `/final-grades/me?periodId=${periodId}`;
+    if (isParent && studentId) path = `/final-grades/student/${studentId}?periodId=${periodId}`;
+    if (canViewClasses && classId) path = `/final-grades/class/${classId}?periodId=${periodId}`;
+    if (!path) return;
+
+    setLoading(true);
+    setMessage("");
+    apiRequest(path)
+      .then((data) => setReports(Array.isArray(data) ? data : [data]))
+      .catch((error) => { setReports([]); setMessage(error.message || "Не удалось загрузить итоговые оценки"); })
+      .finally(() => setLoading(false));
+  }, [periodId, classId, studentId, role]);
+
+  async function saveFinalGrade(report, grade, value) {
+    try {
+      await apiRequest("/final-grades", {
+        method: "PUT",
+        body: JSON.stringify({ academicPeriodId: Number(periodId), studentId: report.studentId, subjectId: grade.subjectId, value: Number(value) })
+      });
+      setReports((current) => current.map((item) => item.studentId !== report.studentId ? item : {
+        ...item,
+        grades: item.grades.map((entry) => entry.subjectId === grade.subjectId ? { ...entry, value: Number(value) } : entry)
+      }));
+      setMessage("Итоговая оценка сохранена");
+    } catch (error) {
+      setMessage(error.message || "Не удалось сохранить итоговую оценку");
+    }
+  }
+
+  async function saveYear(event) {
+    event.preventDefault();
+    try {
+      await apiRequest("/academic-periods/years", { method: "POST", body: JSON.stringify(yearForm) });
+      setYearForm({ name: "", startDate: "", endDate: "", isActive: true });
+      setMessage("Учебный год сохранен");
+      await loadReferenceData();
+    } catch (error) { setMessage(error.message || "Не удалось сохранить учебный год"); }
+  }
+
+  async function savePeriod(event) {
+    event.preventDefault();
+    try {
+      await apiRequest("/academic-periods", {
+        method: "POST",
+        body: JSON.stringify({
+          ...periodForm,
+          academicPeriodId: periodForm.academicPeriodId ? Number(periodForm.academicPeriodId) : null,
+          academicYearId: Number(periodForm.academicYearId),
+          sequence: Number(periodForm.sequence)
+        })
+      });
+      setPeriodForm((current) => ({ ...current, academicPeriodId: "", name: "", sequence: 1, startDate: "", endDate: "", isClosed: false }));
+      setMessage("Учебный период сохранен");
+      await loadReferenceData();
+    } catch (error) { setMessage(error.message || "Не удалось сохранить учебный период"); }
+  }
+
+  function editPeriod(period) {
+    setPeriodForm({
+      academicPeriodId: String(period.academicPeriodId), academicYearId: String(period.academicYearId), name: period.name,
+      type: period.type, sequence: period.sequence, startDate: period.startDate.slice(0, 10), endDate: period.endDate.slice(0, 10), isClosed: period.isClosed
+    });
+  }
+
+  async function deletePeriod(period) {
+    if (!window.confirm(`Удалить период «${period.name}» и его итоговые оценки?`)) return;
+    try {
+      await apiRequest(`/academic-periods/${period.academicPeriodId}`, { method: "DELETE" });
+      setMessage("Учебный период удален");
+      if (String(period.academicPeriodId) === String(periodId)) setPeriodId("");
+      await loadReferenceData();
+    } catch (error) { setMessage(error.message || "Не удалось удалить период"); }
+  }
+
+  function downloadReport() {
+    let path = "";
+    if (isStudent) path = `/final-grades/me/export?periodId=${periodId}`;
+    if (isParent && studentId) path = `/final-grades/student/${studentId}/export?periodId=${periodId}`;
+    if (canViewClasses && classId) path = `/final-grades/class/${classId}/export?periodId=${periodId}`;
+    if (path) window.location.assign(`${apiBase}${path}`);
+  }
+
+  return (
+    <section className="page-stack final-grades-page">
+      <PageHeader title="Итоговые оценки" subtitle={selectedPeriod ? `${selectedPeriod.yearName} · ${selectedPeriod.name}` : "Четверти и полугодия"} text="Текущие и архивные табели по четвертям и полугодиям." />
+      <StatusLine loading={loading} message={message} />
+      <section className="table-card final-grade-controls">
+        <label className="field"><span>Учебный период</span><select value={periodId} onChange={(event) => setPeriodId(event.target.value)}>{periods.map((period) => <option key={period.academicPeriodId} value={period.academicPeriodId}>{period.yearName} · {period.name}{period.isClosed ? " · архив" : ""}</option>)}</select></label>
+        {canViewClasses && <label className="field"><span>Класс</span><select value={classId} onChange={(event) => setClassId(event.target.value)}>{classes.map((item) => <option key={item.classId} value={item.classId}>{item.className}</option>)}</select></label>}
+        {isParent && <label className="field"><span>Ребенок</span><select value={studentId} onChange={(event) => setStudentId(event.target.value)}>{students.map((item) => <option key={item.studentId} value={item.studentId}>{item.lastName} {item.firstName} · {item.class?.name || item.className || "без класса"}</option>)}</select></label>}
+        <button className="ghost-button compact" type="button" disabled={!periodId || reports.length === 0 || !canDownload} title={!canDownload ? "Полный табель класса доступен его классному руководителю" : "Скачать табель"} onClick={downloadReport}>Скачать табель CSV</button>
+      </section>
+
+      {reports.map((report) => (
+        <DataTable key={report.studentId} title={`${report.studentName} · ${report.className}`} columns={["Предмет", "Учитель", "Оценок", "Средняя", "Итоговая"]} rows={(report.grades ?? []).map((grade) => [
+          grade.subjectName, grade.teacherName, grade.currentGradesCount, grade.currentAverage ? formatNumber(grade.currentAverage) : "—",
+          grade.canEdit && !selectedPeriod?.isClosed ? <select className="final-grade-select" value={grade.value ?? ""} onChange={(event) => saveFinalGrade(report, grade, event.target.value)}><option value="">—</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select> : <strong>{grade.value ?? "—"}</strong>
+        ])} />
+      ))}
+      {!loading && reports.length === 0 && <section className="table-card"><p className="empty-text padded">Для выбранного периода данные пока не найдены.</p></section>}
+
+      {isAdmin && (
+        <section className="period-admin-grid">
+          <form className="table-card period-admin-form" onSubmit={saveYear}>
+            <div className="table-title">Учебный год</div>
+            <Field label="Название" value={yearForm.name} onChange={(value) => setYearForm({ ...yearForm, name: value })} />
+            <Field label="Начало" type="date" value={yearForm.startDate} onChange={(value) => setYearForm({ ...yearForm, startDate: value })} />
+            <Field label="Окончание" type="date" value={yearForm.endDate} onChange={(value) => setYearForm({ ...yearForm, endDate: value })} />
+            <label className="toggle-field"><input type="checkbox" checked={yearForm.isActive} onChange={(event) => setYearForm({ ...yearForm, isActive: event.target.checked })} />Активный год</label>
+            <button className="primary-button">Сохранить год</button>
+          </form>
+          <form className="table-card period-admin-form" onSubmit={savePeriod}>
+            <div className="table-title">{periodForm.academicPeriodId ? "Изменение периода" : "Новый период"}</div>
+            <label className="field"><span>Учебный год</span><select value={periodForm.academicYearId} onChange={(event) => setPeriodForm({ ...periodForm, academicYearId: event.target.value })}>{years.map((year) => <option key={year.academicYearId} value={year.academicYearId}>{year.name}</option>)}</select></label>
+            <label className="field"><span>Тип</span><select value={periodForm.type} onChange={(event) => setPeriodForm({ ...periodForm, type: event.target.value })}><option value="quarter">Четверть</option><option value="semester">Полугодие</option></select></label>
+            <Field label="Название" value={periodForm.name} onChange={(value) => setPeriodForm({ ...periodForm, name: value })} />
+            <Field label="Номер" type="number" value={periodForm.sequence} onChange={(value) => setPeriodForm({ ...periodForm, sequence: value })} />
+            <Field label="Начало" type="date" value={periodForm.startDate} onChange={(value) => setPeriodForm({ ...periodForm, startDate: value })} />
+            <Field label="Окончание" type="date" value={periodForm.endDate} onChange={(value) => setPeriodForm({ ...periodForm, endDate: value })} />
+            <label className="toggle-field"><input type="checkbox" checked={periodForm.isClosed} onChange={(event) => setPeriodForm({ ...periodForm, isClosed: event.target.checked })} />Закрыт и перенесен в архив</label>
+            <button className="primary-button">Сохранить период</button>
+            {periodForm.academicPeriodId && <button className="ghost-button" type="button" onClick={() => setPeriodForm({ ...periodForm, academicPeriodId: "", name: "" })}>Отмена</button>}
+          </form>
+          <section className="table-card period-list-card">
+            <div className="table-title">Настроенные периоды</div>
+            <div className="period-list">{periods.map((period) => <article key={period.academicPeriodId}><div><strong>{period.yearName} · {period.name}</strong><span>{formatDate(period.startDate)} — {formatDate(period.endDate)} · {period.isClosed ? "архив" : "открыт"}</span></div><div className="row-actions"><button className="table-action" type="button" onClick={() => editPeriod(period)}>Изменить</button><button className="table-action danger-action" type="button" onClick={() => deletePeriod(period)}>Удалить</button></div></article>)}</div>
+          </section>
+        </section>
+      )}
     </section>
   );
 }
