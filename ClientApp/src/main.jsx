@@ -3568,7 +3568,7 @@ function FinalGradesPage({ role }) {
   const [yearForm, setYearForm] = useState({ name: "", startDate: "", endDate: "", isActive: true });
   const [periodForm, setPeriodForm] = useState({ academicPeriodId: "", academicYearId: "", name: "", type: "quarter", sequence: 1, startDate: "", endDate: "", isClosed: false });
 
-  const periods = years.flatMap((year) => (year.periods ?? []).map((period) => ({ ...period, yearName: year.name }))
+  const periods = years.flatMap((year) => (year.periods ?? []).map((period) => ({ ...period, yearName: year.name })))
     .sort((left, right) => `${right.yearName}-${right.type}-${right.sequence}`.localeCompare(`${left.yearName}-${left.type}-${left.sequence}`, "ru"));
   const selectedPeriod = periods.find((item) => String(item.academicPeriodId) === String(periodId));
   const selectedClass = classes.find((item) => String(item.classId) === String(classId));
