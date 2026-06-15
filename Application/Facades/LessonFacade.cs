@@ -48,6 +48,7 @@ namespace ClassBook.Application.Facades
                 SubjectId = subjectId,
                 ClassId = classId,
                 TeacherId = teacherId,
+                ScheduleId = await FindFreeScheduleSlotAsync(classId, teacherId, date),
                 Topic = topic.Trim(),
                 Date = date,
                 Homework = string.IsNullOrWhiteSpace(homework) ? null : homework.Trim()
@@ -73,10 +74,18 @@ namespace ClassBook.Application.Facades
             await ValidateLessonReferencesAsync(subjectId, classId, teacherId, topic);
 
             var oldValues = BuildLessonAuditDto(lesson);
+            var shouldReassignSchedule = lesson.ScheduleId == null
+                || lesson.ClassId != classId
+                || lesson.TeacherId != teacherId
+                || lesson.Date.Date != date.Date;
 
             lesson.SubjectId = subjectId;
             lesson.ClassId = classId;
             lesson.TeacherId = teacherId;
+            if (shouldReassignSchedule)
+            {
+                lesson.ScheduleId = await FindFreeScheduleSlotAsync(classId, teacherId, date, id);
+            }
             lesson.Topic = topic.Trim();
             lesson.Date = date;
             lesson.Homework = string.IsNullOrWhiteSpace(homework) ? null : homework.Trim();
@@ -169,6 +178,79 @@ namespace ClassBook.Application.Facades
                 TeacherId = teacherId,
                 CreatedAt = DateTime.UtcNow
             });
+        }
+
+        private async Task<int?> FindFreeScheduleSlotAsync(int classId, int teacherId, DateTime date, int? ignoredLessonId = null)
+        {
+            var lessonDate = date.Date;
+            var dayOfWeek = (int)lessonDate.DayOfWeek - 1;
+            if (dayOfWeek < 0 || dayOfWeek > 4)
+                return null;
+
+            var slots = await _db.Schedules
+                .Where(schedule => schedule.DayOfWeek == dayOfWeek)
+                .OrderBy(schedule => schedule.LessonNumber)
+                .Select(schedule => new
+                {
+                    schedule.ScheduleId,
+                    schedule.LessonNumber
+                })
+                .ToListAsync();
+
+            if (slots.Count == 0)
+                return null;
+
+            var nextDate = lessonDate.AddDays(1);
+            var dayLessonsQuery = _db.Lessons
+                .Where(lesson => lesson.Date >= lessonDate && lesson.Date < nextDate && lesson.ScheduleId.HasValue);
+
+            if (ignoredLessonId.HasValue)
+            {
+                dayLessonsQuery = dayLessonsQuery.Where(lesson => lesson.LessonId != ignoredLessonId.Value);
+            }
+
+            var occupiedLessons = await dayLessonsQuery
+                .Join(
+                    _db.Schedules,
+                    lesson => lesson.ScheduleId!.Value,
+                    schedule => schedule.ScheduleId,
+                    (lesson, schedule) => new
+                    {
+                        lesson.ClassId,
+                        lesson.TeacherId,
+                        schedule.LessonNumber
+                    })
+                .ToListAsync();
+
+            var classNumbers = occupiedLessons
+                .Where(lesson => lesson.ClassId == classId)
+                .Select(lesson => lesson.LessonNumber)
+                .ToHashSet();
+            var teacherNumbers = occupiedLessons
+                .Where(lesson => lesson.TeacherId == teacherId)
+                .Select(lesson => lesson.LessonNumber)
+                .ToHashSet();
+
+            var maxClassLesson = classNumbers.Count == 0 ? 0 : classNumbers.Max();
+            var preferredNumbers = maxClassLesson > 1
+                ? Enumerable.Range(1, maxClassLesson).Where(number => !classNumbers.Contains(number))
+                : Enumerable.Empty<int>();
+            var orderedNumbers = preferredNumbers
+                .Concat(slots.Select(slot => slot.LessonNumber))
+                .Distinct()
+                .ToList();
+
+            foreach (var lessonNumber in orderedNumbers)
+            {
+                if (classNumbers.Contains(lessonNumber) || teacherNumbers.Contains(lessonNumber))
+                    continue;
+
+                var slot = slots.FirstOrDefault(item => item.LessonNumber == lessonNumber);
+                if (slot != null)
+                    return slot.ScheduleId;
+            }
+
+            return null;
         }
 
         private async Task<LessonResponse> GetRequiredLessonResponseAsync(int lessonId)

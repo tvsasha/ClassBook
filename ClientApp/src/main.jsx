@@ -3152,7 +3152,7 @@ function TeacherPage({ role, user }) {
     .filter((lesson) => !selectedLessonId || String(lesson.lessonId) === String(selectedLessonId))
     .filter((lesson) => !journalDateFrom || new Date(lesson.date) >= new Date(journalDateFrom))
     .filter((lesson) => !journalDateTo || new Date(lesson.date) <= new Date(journalDateTo))
-    .sort(sortLessonsForJournal) : [];
+    .sort(sortLessonsChronological) : [];
   const allVisibleGrades = journalLessons.flatMap((lesson) => gradesByLesson[lesson.lessonId] ?? []);
   const allVisibleAttendance = journalLessons.flatMap((lesson) => attendanceByLesson[lesson.lessonId] ?? []);
   const classAverage = calculateAverage(allVisibleGrades.map((item) => item.value));
@@ -3244,7 +3244,7 @@ function TeacherPage({ role, user }) {
                 {classLessons
                   .filter((lesson) => !selectedSubjectId || String(lesson.subjectId ?? "") === String(selectedSubjectId))
                   .slice()
-                  .sort(sortLessonsForJournal)
+                  .sort(sortLessonsChronological)
                   .map((lesson) => (
                   <option key={lesson.lessonId} value={lesson.lessonId}>
                     {lesson.subjectName} · {formatLessonTopic(lesson.topic)} · {formatDate(lesson.date)}
@@ -5659,6 +5659,15 @@ function sortLessonsForJournal(left, right) {
 
   const direction = leftCurrentOrPast ? -1 : 1;
   return (leftDate - rightDate) * direction;
+}
+
+function sortLessonsChronological(left, right) {
+  const dateDiff = parseLocalDate(left.date) - parseLocalDate(right.date);
+  if (dateDiff !== 0) {
+    return dateDiff;
+  }
+
+  return Number(left.lessonNumber ?? left.lessonId ?? 0) - Number(right.lessonNumber ?? right.lessonId ?? 0);
 }
 
 function sortItems(items, sortKey, selectors) {

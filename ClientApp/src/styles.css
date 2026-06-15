@@ -1840,35 +1840,76 @@ tbody tr:hover td {
 }
 
 .admin-page td {
-  padding: 10px 9px;
+  padding: 8px 7px;
 }
 
 .admin-page th {
-  padding: 11px 9px;
+  padding: 9px 7px;
+}
+
+.admin-users-table .table-wrap {
+  overflow-x: hidden;
+}
+
+.admin-users-table table {
+  table-layout: fixed;
+  min-width: 0;
+}
+
+.admin-users-table th,
+.admin-users-table td {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.admin-users-table th:nth-child(1),
+.admin-users-table td:nth-child(1) {
+  width: 28%;
+}
+
+.admin-users-table th:nth-child(2),
+.admin-users-table td:nth-child(2) {
+  width: 17%;
+}
+
+.admin-users-table th:nth-child(3),
+.admin-users-table td:nth-child(3) {
+  width: 11%;
+}
+
+.admin-users-table th:nth-child(4),
+.admin-users-table td:nth-child(4) {
+  width: 10%;
+}
+
+.admin-users-table th:nth-child(5),
+.admin-users-table td:nth-child(5) {
+  width: 12%;
 }
 
 .admin-users-table th:nth-child(6),
 .admin-users-table td:nth-child(6) {
-  width: 1%;
-  min-width: 132px;
+  width: 22%;
+  min-width: 0;
 }
 
 .actions-menu {
   position: relative;
-  width: max-content;
+  width: 100%;
 }
 
 .actions-menu summary {
   display: inline-grid;
   place-items: center;
-  min-height: 32px;
-  padding: 6px 12px;
+  min-height: 30px;
+  width: 100%;
+  padding: 5px 8px;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--accent-strong);
   background: rgba(255, 255, 255, 0.82);
   cursor: pointer;
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   font-weight: 800;
   list-style: none;
 }
