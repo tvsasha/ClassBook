@@ -597,6 +597,13 @@ summary:focus-visible {
   background: var(--surface-strong);
   box-shadow: var(--soft-shadow);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.theme-toggle:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .theme-toggle:hover {
