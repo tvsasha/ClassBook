@@ -2114,6 +2114,43 @@ tbody tr:hover td {
   border-radius: 0 0 22px 22px;
 }
 
+.grade-subject-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+  padding: 16px 18px;
+}
+
+.grade-subject-controls .field {
+  margin: 0;
+}
+
+.grade-subject-summary {
+  display: grid;
+  gap: 3px;
+  min-width: 130px;
+  padding: 10px 14px;
+  border: 1px solid rgba(15, 124, 102, 0.16);
+  border-radius: 14px;
+  background: rgba(15, 124, 102, 0.06);
+}
+
+.grade-subject-summary span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.grade-subject-summary strong {
+  color: var(--accent-strong);
+  font-size: 1.25rem;
+}
+
+.grade-subject-table-wrap {
+  max-height: 58vh;
+  border-top: 1px solid rgba(24, 32, 38, 0.08);
+}
+
 .final-grade-select {
   min-width: 72px;
   min-height: 40px;
@@ -2180,6 +2217,7 @@ tbody tr:hover td {
   }
 
   .final-grade-controls,
+  .grade-subject-controls,
   .period-admin-grid {
     grid-template-columns: 1fr;
   }

@@ -3927,6 +3927,7 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState("problem");
   const [attendanceSort, setAttendanceSort] = useState("date-desc");
+  const [selectedGradeSubject, setSelectedGradeSubject] = useState("");
   const averageGrade = grades.length
     ? grades.reduce((sum, item) => sum + Number(item.value ?? 0), 0) / grades.length
     : 0;
@@ -3945,6 +3946,21 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
     .sort((a, b) => new Date(b.date) - new Date(a.date) || Number(b.gradeId ?? 0) - Number(a.gradeId ?? 0));
   const latestGrades = visibleGrades.slice(0, showGradeSubjectFilter ? 5 : 16);
   const groupedGrades = groupGradesBySubject(visibleGrades);
+
+  useEffect(() => {
+    if (!showGradeSubjectFilter) {
+      return;
+    }
+
+    if (groupedGrades.length === 0) {
+      setSelectedGradeSubject("");
+      return;
+    }
+
+    if (!groupedGrades.some((group) => group.subject === selectedGradeSubject)) {
+      setSelectedGradeSubject(groupedGrades[0].subject);
+    }
+  }, [showGradeSubjectFilter, groupedGrades, selectedGradeSubject]);
 
   return (
     <>
@@ -3976,7 +3992,11 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
             ])}
           />
           {showGradeSubjectFilter && (
-            <GradeSubjectSections groups={groupedGrades} />
+            <GradeSubjectPicker
+              groups={groupedGrades}
+              selectedSubject={selectedGradeSubject}
+              onSubjectChange={setSelectedGradeSubject}
+            />
           )}
           <CardGrid
             title="Домашние задания"
@@ -3998,6 +4018,60 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
         </>
       )}
     </>
+  );
+}
+
+function GradeSubjectPicker({ groups, selectedSubject, onSubjectChange }) {
+  const selectedGroup = groups.find((group) => group.subject === selectedSubject) ?? groups[0] ?? null;
+
+  return (
+    <section className="table-card grade-subject-picker-card">
+      <div className="table-title">Оценки по предмету</div>
+      {groups.length === 0 ? (
+        <p className="empty-text padded">Оценок пока нет</p>
+      ) : (
+        <>
+          <div className="grade-subject-controls">
+            <label className="field">
+              <span>Предмет</span>
+              <select value={selectedGroup?.subject ?? ""} onChange={(event) => onSubjectChange(event.target.value)}>
+                {groups.map((group) => (
+                  <option key={group.subject} value={group.subject}>
+                    {group.subject} · {group.items.length} оценок
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grade-subject-summary">
+              <span>Средний балл</span>
+              <strong>{formatNumber(calculateAverage((selectedGroup?.items ?? []).map((grade) => grade.value)))}</strong>
+            </div>
+          </div>
+          <div className="table-wrap grade-subject-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Дата</th>
+                  <th>Тема</th>
+                  <th>Учитель</th>
+                  <th>Оценка</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(selectedGroup?.items ?? []).map((grade) => (
+                  <tr key={grade.gradeId}>
+                    <td data-label="Дата">{formatDate(grade.date)}</td>
+                    <td data-label="Тема">{formatLessonTopic(grade.topic)}</td>
+                    <td data-label="Учитель">{grade.teacher || "—"}</td>
+                    <td data-label="Оценка"><GradeBadge value={grade.value} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
