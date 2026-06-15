@@ -9,8 +9,8 @@ services:
       ASPNETCORE_ENVIRONMENT: "Production"
       ASPNETCORE_URLS: "http://+:8080"
       ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=${CLASSBOOK_DB_NAME:-ClassBookDb};User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=true;"
-      Cookie__SameSite: "${CLASSBOOK_COOKIE_SAMESITE:-None}"
-      Cookie__SecurePolicy: "${CLASSBOOK_COOKIE_SECURE_POLICY:-Always}"
+      Cookie__SameSite: "${CLASSBOOK_COOKIE_SAMESITE:-Lax}"
+      Cookie__SecurePolicy: "${CLASSBOOK_COOKIE_SECURE_POLICY:-SameAsRequest}"
     ports:
       - "${CLASSBOOK_HTTP_PORT:-8080}:8080"
     volumes:
