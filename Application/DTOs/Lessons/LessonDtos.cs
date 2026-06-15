@@ -31,6 +31,7 @@ namespace ClassBook.Application.DTOs
         public string SubjectName { get; set; } = string.Empty;
         public int ClassId { get; set; }
         public string ClassName { get; set; } = string.Empty;
+        public int TeacherId { get; set; }
         public string Topic { get; set; } = string.Empty;
         public DateTime Date { get; set; }
         public string? Homework { get; set; }

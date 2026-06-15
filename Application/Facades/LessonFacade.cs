@@ -126,6 +126,7 @@ namespace ClassBook.Application.Facades
                     SubjectName = l.Subject.Name,
                     ClassId = l.ClassId,
                     ClassName = l.Class.Name,
+                    TeacherId = l.TeacherId,
                     Topic = l.Topic,
                     Date = l.Date,
                     Homework = l.Homework

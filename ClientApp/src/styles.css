@@ -1847,6 +1847,67 @@ tbody tr:hover td {
   padding: 11px 9px;
 }
 
+.admin-users-table th:nth-child(6),
+.admin-users-table td:nth-child(6) {
+  width: 1%;
+  min-width: 132px;
+}
+
+.actions-menu {
+  position: relative;
+  width: max-content;
+}
+
+.actions-menu summary {
+  display: inline-grid;
+  place-items: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 800;
+  list-style: none;
+}
+
+.actions-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.actions-menu-list {
+  display: grid;
+  gap: 7px;
+  min-width: 190px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-strong);
+  box-shadow: var(--soft-shadow);
+}
+
+.actions-menu-list .table-action {
+  width: 100%;
+  text-align: center;
+}
+
+.lesson-edit-button {
+  display: inline-grid;
+  place-items: center;
+  margin-top: 8px;
+  border: 1px solid rgba(15, 124, 102, 0.2);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--accent-strong);
+  background: rgba(15, 124, 102, 0.08);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -3211,6 +3272,12 @@ body.schedule-fullscreen-lock {
 
   .admin-page .table-card:not(.learning-week-card):not(.attendance-week-card) .row-actions .table-action {
     width: auto;
+    min-height: 34px;
+    padding: 7px 10px;
+  }
+
+  .admin-users-table.table-card:not(.learning-week-card):not(.attendance-week-card) .actions-menu-list .table-action {
+    width: 100%;
     min-height: 34px;
     padding: 7px 10px;
   }

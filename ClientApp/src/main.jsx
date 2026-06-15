@@ -2444,7 +2444,7 @@ function AdminPage({ role }) {
       </section>
       <DataTable
         title={`Пользователи (${filteredUsers.length})`}
-        className={`admin-section ${adminTab === "users" ? "active" : ""}`}
+        className={`admin-section admin-users-table ${adminTab === "users" ? "active" : ""}`}
         columns={["ФИО", "Логин", "Роль", "Статус", "Пароль", "Действие"]}
         rows={filteredUsers.map((item) => [
           item.fullName,
@@ -2452,14 +2452,17 @@ function AdminPage({ role }) {
           item.roleName,
           item.isActive ? "Активен" : "Отключен",
           item.mustChangePassword ? "Нужно сменить" : "Постоянный",
-          <div className="row-actions">
-            <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редакт.</button>
-            {!item.isActive && <button className="table-action" type="button" onClick={() => activateUser(item)}>Включить</button>}
-            <button className="table-action" type="button" onClick={() => resetUserPassword(item)}>Пароль</button>
-            <button className="table-action" type="button" onClick={() => issueQrLogin(item)}>{item.hasQrLogin ? "Новый QR" : "QR"}</button>
-            {item.hasQrLogin && <button className="table-action danger-action" type="button" onClick={() => revokeQrLogin(item)}>Без QR</button>}
-            <button className="table-action danger-action" type="button" onClick={() => deleteUser(item)}>Удалить</button>
-          </div>
+          <details className="actions-menu">
+            <summary>Действия</summary>
+            <div className="actions-menu-list">
+              <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
+              {!item.isActive && <button className="table-action" type="button" onClick={() => activateUser(item)}>Включить</button>}
+              <button className="table-action" type="button" onClick={() => resetUserPassword(item)}>Временный пароль</button>
+              <button className="table-action" type="button" onClick={() => issueQrLogin(item)}>{item.hasQrLogin ? "Новый QR" : "Создать QR"}</button>
+              {item.hasQrLogin && <button className="table-action danger-action" type="button" onClick={() => revokeQrLogin(item)}>Отключить QR</button>}
+              <button className="table-action danger-action" type="button" onClick={() => deleteUser(item)}>Удалить</button>
+            </div>
+          </details>
         ])}
       />
       <section className={`table-card admin-section ${adminTab === "students" ? "active" : ""}`}>
@@ -2817,6 +2820,8 @@ function TeacherPage({ role, user }) {
   const [journalDateTo, setJournalDateTo] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [editingLesson, setEditingLesson] = useState(null);
+  const [lessonEditForm, setLessonEditForm] = useState({ topic: "", date: "", homework: "" });
   const [lessonForm, setLessonForm] = useState({
     subjectId: "",
     classId: "",
@@ -3076,6 +3081,51 @@ function TeacherPage({ role, user }) {
     }
   }
 
+  function openLessonEditor(lesson) {
+    setEditingLesson(lesson);
+    setLessonEditForm({
+      topic: formatLessonTopic(lesson.topic) === "Тема будет указана позже" ? "" : lesson.topic || "",
+      date: toIsoDate(parseLocalDate(lesson.date)),
+      homework: lesson.homework || ""
+    });
+  }
+
+  async function saveLessonEdit(event) {
+    event.preventDefault();
+    if (!editingLesson) {
+      return;
+    }
+
+    const topic = lessonEditForm.topic.trim();
+    if (!topic || !lessonEditForm.date) {
+      setMessage("Укажите тему и дату урока");
+      return;
+    }
+
+    try {
+      const updatedLesson = await apiRequest(`/teacher/lessons/${editingLesson.lessonId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          subjectId: Number(editingLesson.subjectId),
+          classId: Number(editingLesson.classId),
+          teacherId: Number(editingLesson.teacherId ?? user.id),
+          topic,
+          date: lessonEditForm.date,
+          homework: lessonEditForm.homework.trim()
+        })
+      });
+      setLessons((current) => current.map((lesson) =>
+        Number(lesson.lessonId) === Number(editingLesson.lessonId)
+          ? { ...lesson, ...updatedLesson }
+          : lesson
+      ));
+      setEditingLesson(null);
+      setMessage("Урок обновлен");
+    } catch (error) {
+      setMessage(error.message || "Не удалось обновить урок");
+    }
+  }
+
   if (!allowed) {
     return <AccessWarning title="Кабинет учителя доступен учителю и администратору" />;
   }
@@ -3102,7 +3152,7 @@ function TeacherPage({ role, user }) {
     .filter((lesson) => !selectedLessonId || String(lesson.lessonId) === String(selectedLessonId))
     .filter((lesson) => !journalDateFrom || new Date(lesson.date) >= new Date(journalDateFrom))
     .filter((lesson) => !journalDateTo || new Date(lesson.date) <= new Date(journalDateTo))
-    .sort(sortLessonsFromToday) : [];
+    .sort(sortLessonsForJournal) : [];
   const allVisibleGrades = journalLessons.flatMap((lesson) => gradesByLesson[lesson.lessonId] ?? []);
   const allVisibleAttendance = journalLessons.flatMap((lesson) => attendanceByLesson[lesson.lessonId] ?? []);
   const classAverage = calculateAverage(allVisibleGrades.map((item) => item.value));
@@ -3194,7 +3244,7 @@ function TeacherPage({ role, user }) {
                 {classLessons
                   .filter((lesson) => !selectedSubjectId || String(lesson.subjectId ?? "") === String(selectedSubjectId))
                   .slice()
-                  .sort(sortLessonsFromToday)
+                  .sort(sortLessonsForJournal)
                   .map((lesson) => (
                   <option key={lesson.lessonId} value={lesson.lessonId}>
                     {lesson.subjectName} · {formatLessonTopic(lesson.topic)} · {formatDate(lesson.date)}
@@ -3208,11 +3258,13 @@ function TeacherPage({ role, user }) {
               setJournalDateFrom("");
               setJournalDateTo("");
               setSelectedLessonId("");
+              setGradesByLesson({});
+              setAttendanceByLesson({});
             }}>Сбросить фильтры</button>
           </div>
         </section>
         <DataTable
-          title={selectedClassId ? `Последние уроки: ${selectedClass?.name ?? "выбранный класс"}` : "Последние уроки"}
+          title={selectedClassId ? `Последние уроки: класс ${selectedClass?.name ?? "выбранный класс"}` : "Последние уроки"}
           columns={["Дата", "Предмет", "Класс", "Тема", "ДЗ"]}
           rows={recentLessons.map((lesson) => [
             formatDate(lesson.date),
@@ -3241,6 +3293,11 @@ function TeacherPage({ role, user }) {
                     <th key={lesson.lessonId}>
                       <span>{formatDate(lesson.date)}</span>
                       <small>{formatLessonTopic(lesson.topic)}</small>
+                      {!readOnly && (
+                        <button className="lesson-edit-button" type="button" onClick={() => openLessonEditor(lesson)}>
+                          Изм.
+                        </button>
+                      )}
                     </th>
                   ))}
                   <th>Средняя</th>
@@ -3303,6 +3360,17 @@ function TeacherPage({ role, user }) {
           </div>
         )}
       </section>
+      {editingLesson && (
+        <Modal title="Редактирование урока" onClose={() => setEditingLesson(null)}>
+          <form className="modal-form" onSubmit={saveLessonEdit}>
+            <Field label="Дата" type="date" value={lessonEditForm.date} onChange={(value) => setLessonEditForm({ ...lessonEditForm, date: value })} />
+            <Field label="Тема" value={lessonEditForm.topic} onChange={(value) => setLessonEditForm({ ...lessonEditForm, topic: value })} />
+            <Field label="Домашнее задание" value={lessonEditForm.homework} onChange={(value) => setLessonEditForm({ ...lessonEditForm, homework: value })} />
+            <button className="primary-button">Сохранить урок</button>
+            <button className="ghost-button" type="button" onClick={() => setEditingLesson(null)}>Отмена</button>
+          </form>
+        </Modal>
+      )}
     </section>
   );
 }
@@ -5578,18 +5646,18 @@ function groupGradesBySubject(grades) {
     .sort((left, right) => left.subject.localeCompare(right.subject, "ru"));
 }
 
-function sortLessonsFromToday(left, right) {
+function sortLessonsForJournal(left, right) {
   const today = getTodayStart();
   const leftDate = parseLocalDate(left.date);
   const rightDate = parseLocalDate(right.date);
-  const leftFuture = leftDate >= today;
-  const rightFuture = rightDate >= today;
+  const leftCurrentOrPast = leftDate <= today;
+  const rightCurrentOrPast = rightDate <= today;
 
-  if (leftFuture !== rightFuture) {
-    return leftFuture ? -1 : 1;
+  if (leftCurrentOrPast !== rightCurrentOrPast) {
+    return leftCurrentOrPast ? -1 : 1;
   }
 
-  const direction = leftFuture ? 1 : -1;
+  const direction = leftCurrentOrPast ? -1 : 1;
   return (leftDate - rightDate) * direction;
 }
 
