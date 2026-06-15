@@ -2071,6 +2071,19 @@ tbody tr:hover td {
   min-width: 0;
 }
 
+.schedule-week-picker .field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+}
+
+.schedule-week-picker .field label {
+  white-space: nowrap;
+}
+
 .schedule-week-picker span {
   color: var(--muted);
   font-size: 0.9rem;
@@ -2078,8 +2091,12 @@ tbody tr:hover td {
 }
 
 .schedule-week-picker input {
+  width: 100%;
+  height: auto;
   min-width: 0;
   border: 0;
+  border-radius: 0;
+  padding: 0;
   background: transparent;
   color: var(--ink);
   font: inherit;
@@ -3034,7 +3051,19 @@ body.schedule-fullscreen-lock {
 
   .schedule-week-picker {
     width: 100%;
+    height: auto;
+    min-height: 72px;
     justify-content: space-between;
+    padding: 10px 16px;
+  }
+
+  .schedule-week-picker .field {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .schedule-week-picker .field input {
+    min-height: 36px;
   }
 
   .lesson-editor-grid {
