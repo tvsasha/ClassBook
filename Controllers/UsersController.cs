@@ -2,6 +2,7 @@ using ClassBook.Application.DTOs;
 using ClassBook.Application.Facades;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using QRCoder;
 using System.Security.Claims;
 
 namespace ClassBook.Controllers
@@ -159,6 +160,58 @@ namespace ClassBook.Controllers
                 }
 
                 return Ok(access);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+        }
+
+        [HttpPost("{id}/qr-login")]
+        public async Task<IActionResult> IssueQrLogin(int id)
+        {
+            try
+            {
+                var result = await _userFacade.IssueQrLoginAsync(id);
+                var loginUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/app/#/qr-login?token={Uri.EscapeDataString(result.Token)}";
+                using var qrCodeData = QRCodeGenerator.GenerateQrCode(loginUrl, QRCodeGenerator.ECCLevel.Q);
+                using var qrCode = new PngByteQRCode(qrCodeData);
+                var qrCodeDataUrl = $"data:image/png;base64,{Convert.ToBase64String(qrCode.GetGraphic(10))}";
+
+                var currentUserId = GetCurrentUserId();
+                if (currentUserId > 0)
+                    await _auditFacade.LogActionAsync(currentUserId, "User", id, "IssueQrLogin");
+
+                return Ok(new QrLoginAccessDto
+                {
+                    UserId = result.UserId,
+                    FullName = result.FullName,
+                    LoginUrl = loginUrl,
+                    QrCodeDataUrl = qrCodeDataUrl,
+                    IssuedAt = result.IssuedAt
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFoundError(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequestError(ex.Message);
+            }
+        }
+
+        [HttpDelete("{id}/qr-login")]
+        public async Task<IActionResult> RevokeQrLogin(int id)
+        {
+            try
+            {
+                await _userFacade.RevokeQrLoginAsync(id);
+                var currentUserId = GetCurrentUserId();
+                if (currentUserId > 0)
+                    await _auditFacade.LogActionAsync(currentUserId, "User", id, "RevokeQrLogin");
+
+                return NoContent();
             }
             catch (KeyNotFoundException ex)
             {

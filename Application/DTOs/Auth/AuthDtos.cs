@@ -12,6 +12,11 @@ namespace ClassBook.Application.DTOs
         public string NewPassword { get; set; } = string.Empty;
     }
 
+    public class QrLoginDto
+    {
+        public string Token { get; set; } = string.Empty;
+    }
+
     public class AuthUserDto
     {
         public int Id { get; set; }

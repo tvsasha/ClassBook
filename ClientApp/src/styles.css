@@ -1891,6 +1891,52 @@ tbody tr:hover td {
   line-height: 1.55;
 }
 
+.qr-access-card {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 22px;
+  text-align: center;
+}
+
+.qr-access-card p {
+  max-width: 500px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.qr-access-card img {
+  width: min(320px, 100%);
+  aspect-ratio: 1;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.qr-access-card .qr-security-note {
+  color: #991b1b;
+}
+
+.qr-access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .qr-access-actions {
+    display: grid;
+  }
+
+  .qr-access-actions button {
+    width: 100%;
+  }
+}
+
 .danger-hint {
   color: #991b1b;
 }

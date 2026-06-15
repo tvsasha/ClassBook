@@ -10,8 +10,10 @@ namespace ClassBook.Application.DTOs
         public bool IsActive { get; set; }
         public bool IsOnline { get; set; }
         public bool MustChangePassword { get; set; }
+        public bool HasQrLogin { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? LastSeenAt { get; set; }
+        public DateTime? QrLoginIssuedAt { get; set; }
     }
 
     public class CreateUserDto
@@ -83,5 +85,22 @@ namespace ClassBook.Application.DTOs
         public string TemporaryPassword { get; set; } = string.Empty;
         public bool MustChangePassword { get; set; }
         public string Message { get; set; } = string.Empty;
+    }
+
+    public class QrLoginIssueResultDto
+    {
+        public int UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Token { get; set; } = string.Empty;
+        public DateTime IssuedAt { get; set; }
+    }
+
+    public class QrLoginAccessDto
+    {
+        public int UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string LoginUrl { get; set; } = string.Empty;
+        public string QrCodeDataUrl { get; set; } = string.Empty;
+        public DateTime IssuedAt { get; set; }
     }
 }

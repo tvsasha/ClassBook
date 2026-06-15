@@ -46,7 +46,10 @@ namespace ClassBook.Infrastructure.Data
                 entity.Property(u => u.MustChangePassword).IsRequired();
                 entity.Property(u => u.CreatedAt).IsRequired();
                 entity.Property(u => u.LastSeenAt);
+                entity.Property(u => u.QrLoginTokenHash).HasMaxLength(64);
+                entity.Property(u => u.QrLoginIssuedAt);
                 entity.HasIndex(u => u.Login).IsUnique();
+                entity.HasIndex(u => u.QrLoginTokenHash).IsUnique().HasFilter("[QrLoginTokenHash] IS NOT NULL");
 
                 entity.HasOne(u => u.Role)
                       .WithMany(r => r.Users)

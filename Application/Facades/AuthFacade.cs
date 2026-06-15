@@ -2,6 +2,8 @@ using ClassBook.Domain.Entities;
 using ClassBook.Domain.Interfaces;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace ClassBook.Application.Facades
 {
@@ -41,6 +43,24 @@ namespace ClassBook.Application.Facades
             {
                 user.PasswordHash = _hasher.Hash(password);
             }
+
+            user.LastSeenAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return user;
+        }
+
+        public async Task<User?> LoginWithQrTokenAsync(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token) || token.Length < 40 || token.Length > 100)
+                return null;
+
+            var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token.Trim())));
+            var user = await _db.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.QrLoginTokenHash == tokenHash && u.IsActive);
+
+            if (user == null)
+                return null;
 
             user.LastSeenAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();

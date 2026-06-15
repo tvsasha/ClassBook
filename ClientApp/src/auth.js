@@ -81,6 +81,15 @@ export async function fetchCurrentUser() {
   return user;
 }
 
+export async function loginWithQrToken(token) {
+  const user = await apiRequest("/auth/qr-login", {
+    method: "POST",
+    body: JSON.stringify({ token })
+  });
+  storeUser(user);
+  return user;
+}
+
 export async function heartbeat() {
   await apiRequest("/auth/heartbeat", { method: "POST" });
 }

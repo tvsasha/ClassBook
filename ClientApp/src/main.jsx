@@ -10,6 +10,7 @@ import {
   getTargetForUser,
   heartbeat,
   login,
+  loginWithQrToken,
   logout,
   readStoredUser,
   sendOfflineBeacon
@@ -75,11 +76,19 @@ function App() {
 
   useEffect(() => {
     let ignore = false;
+    const qrToken = getQrLoginToken();
+    if (qrToken) {
+      window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}`);
+    }
 
-    fetchCurrentUser()
+    const authentication = qrToken ? loginWithQrToken(qrToken) : fetchCurrentUser();
+    authentication
       .then((currentUser) => {
         if (!ignore) {
           setUser(currentUser);
+          if (qrToken) {
+            window.location.hash = getTargetForUser(currentUser);
+          }
         }
       })
       .catch(() => {
@@ -170,6 +179,16 @@ function App() {
       <CookieBanner />
     </>
   );
+}
+
+function getQrLoginToken() {
+  const hash = window.location.hash.replace(/^#\/?/, "");
+  const [route, query = ""] = hash.split("?");
+  if (route.toLowerCase() !== "qr-login") {
+    return "";
+  }
+
+  return new URLSearchParams(query).get("token") || "";
 }
 
 function useAppRoute() {
@@ -1070,6 +1089,8 @@ function AdminPage({ role }) {
   const [parentAccessTarget, setParentAccessTarget] = useState(null);
   const [parentAccessForm, setParentAccessForm] = useState({ fullName: "", login: "" });
   const [issuedAccess, setIssuedAccess] = useState(null);
+  const [qrAccess, setQrAccess] = useState(null);
+  const [qrAccessTarget, setQrAccessTarget] = useState(null);
   const [studentAccountLink, setStudentAccountLink] = useState({
     studentId: "",
     userId: ""
@@ -1250,6 +1271,55 @@ function AdminPage({ role }) {
     } catch (error) {
       setMessage(error.message || "Не удалось создать временный пароль");
     }
+  }
+
+  async function issueQrLogin(user) {
+    if (user.hasQrLogin && !window.confirm(`Перевыпустить QR-вход для ${user.fullName}? Старый QR сразу перестанет работать.`)) {
+      return;
+    }
+
+    try {
+      setQrAccessTarget(user);
+      const access = await apiRequest(`/users/${user.id}/qr-login`, { method: "POST" });
+      setQrAccess(access);
+      setMessage("Постоянный QR-вход подготовлен");
+      await loadAdminData();
+    } catch (error) {
+      setQrAccessTarget(null);
+      setMessage(error.message || "Не удалось подготовить QR-вход");
+    }
+  }
+
+  async function revokeQrLogin(user) {
+    if (!window.confirm(`Отключить QR-вход для ${user.fullName}?`)) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/users/${user.id}/qr-login`, { method: "DELETE" });
+      setQrAccess(null);
+      setQrAccessTarget(null);
+      setMessage("QR-вход отключен");
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.message || "Не удалось отключить QR-вход");
+    }
+  }
+
+  async function copyQrLoginLink() {
+    try {
+      await copyTextToClipboard(qrAccess.loginUrl);
+      setMessage("Ссылка QR-входа скопирована");
+    } catch {
+      setMessage("Не удалось скопировать ссылку");
+    }
+  }
+
+  function downloadQrCode() {
+    const link = document.createElement("a");
+    link.href = qrAccess.qrCodeDataUrl;
+    link.download = `ClassBook-QR-${qrAccess.userId}.png`;
+    link.click();
   }
 
   useEffect(() => {
@@ -2009,6 +2079,20 @@ function AdminPage({ role }) {
           </div>
         </Modal>
       )}
+      {qrAccess && qrAccessTarget && (
+        <Modal title="Постоянный QR-вход" onClose={() => { setQrAccess(null); setQrAccessTarget(null); }}>
+          <div className="qr-access-card">
+            <p>QR для <strong>{qrAccess.fullName}</strong> работает многократно, пока администратор не отключит или не перевыпустит его.</p>
+            <img src={qrAccess.qrCodeDataUrl} alt={`QR-код для входа пользователя ${qrAccess.fullName}`} />
+            <p className="qr-security-note">Храните его как пароль: любой человек с копией QR сможет войти в этот аккаунт.</p>
+            <div className="qr-access-actions">
+              <button className="primary-button" type="button" onClick={downloadQrCode}>Скачать QR</button>
+              <button className="ghost-button" type="button" onClick={copyQrLoginLink}>Скопировать ссылку</button>
+              <button className="danger-button" type="button" onClick={() => revokeQrLogin(qrAccessTarget)}>Отключить QR</button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {issuedBatch && (
         <Modal title="Доступы родителей из документа" onClose={() => setIssuedBatch(null)}>
           <div className="access-card">
@@ -2366,6 +2450,8 @@ function AdminPage({ role }) {
             <button className="table-action" type="button" onClick={() => setEditingUser({ ...item, password: "" })}>Редактировать</button>
             {!item.isActive && <button className="table-action" type="button" onClick={() => activateUser(item)}>Активировать</button>}
             <button className="table-action" type="button" onClick={() => resetUserPassword(item)}>Временный пароль</button>
+            <button className="table-action" type="button" onClick={() => issueQrLogin(item)}>{item.hasQrLogin ? "Перевыпустить QR" : "Создать QR"}</button>
+            {item.hasQrLogin && <button className="table-action danger-action" type="button" onClick={() => revokeQrLogin(item)}>Отключить QR</button>}
             <button className="table-action danger-action" type="button" onClick={() => deleteUser(item)}>Удалить</button>
           </div>
         ])}

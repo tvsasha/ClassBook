@@ -5,6 +5,7 @@ using ClassBook.Domain.Constants;
 using ClassBook.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace ClassBook.Application.Facades
@@ -43,8 +44,10 @@ namespace ClassBook.Application.Facades
                     IsActive = u.IsActive,
                     IsOnline = u.LastSeenAt != null && u.LastSeenAt >= onlineSince,
                     MustChangePassword = u.MustChangePassword,
+                    HasQrLogin = u.QrLoginTokenHash != null,
                     CreatedAt = u.CreatedAt,
-                    LastSeenAt = u.LastSeenAt
+                    LastSeenAt = u.LastSeenAt,
+                    QrLoginIssuedAt = u.QrLoginIssuedAt
                 })
                 .ToListAsync();
         }
@@ -83,9 +86,45 @@ namespace ClassBook.Application.Facades
                 IsActive = user.IsActive,
                 IsOnline = user.LastSeenAt != null && user.LastSeenAt >= onlineSince,
                 MustChangePassword = user.MustChangePassword,
+                HasQrLogin = user.QrLoginTokenHash != null,
                 CreatedAt = user.CreatedAt,
-                LastSeenAt = user.LastSeenAt
+                LastSeenAt = user.LastSeenAt,
+                QrLoginIssuedAt = user.QrLoginIssuedAt
             };
+        }
+
+        public async Task<QrLoginIssueResultDto> IssueQrLoginAsync(int id)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null)
+                throw new KeyNotFoundException("Пользователь не найден");
+
+            if (!user.IsActive)
+                throw new InvalidOperationException("Сначала активируйте пользователя");
+
+            var token = CreateQrToken();
+            user.QrLoginTokenHash = HashQrToken(token);
+            user.QrLoginIssuedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            return new QrLoginIssueResultDto
+            {
+                UserId = user.Id,
+                FullName = user.FullName,
+                Token = token,
+                IssuedAt = user.QrLoginIssuedAt.Value
+            };
+        }
+
+        public async Task RevokeQrLoginAsync(int id)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null)
+                throw new KeyNotFoundException("Пользователь не найден");
+
+            user.QrLoginTokenHash = null;
+            user.QrLoginIssuedAt = null;
+            await _db.SaveChangesAsync();
         }
 
         /// <summary>
@@ -375,6 +414,19 @@ namespace ClassBook.Application.Facades
                 throw new KeyNotFoundException("Пользователь не найден");
 
             return user;
+        }
+
+        private static string CreateQrToken()
+        {
+            return Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+        }
+
+        private static string HashQrToken(string token)
+        {
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
         }
 
         private static UserMutationAuditDto BuildUserAuditDto(Domain.Entities.User user, bool passwordReset = false)

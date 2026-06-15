@@ -50,28 +50,18 @@ namespace ClassBook.Controllers
             }
 
             _cache.Remove(loginKey);
-            SetCsrfCookie();
+            return Ok(await SignInUserAsync(user, isQrLogin: false));
+        }
 
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new(ClaimTypes.Name, user.Login),
-                new(ClaimTypes.Role, user.Role.Name)
-            };
+        [AllowAnonymous]
+        [HttpPost("qr-login")]
+        public async Task<IActionResult> QrLogin([FromBody] QrLoginDto dto)
+        {
+            var user = await _authFacade.LoginWithQrTokenAsync(dto.Token);
+            if (user == null)
+                return UnauthorizedError("QR-код недействителен, отозван или пользователь отключен");
 
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(identity);
-
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                principal,
-                new AuthenticationProperties
-                {
-                    IsPersistent = true,
-                    ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7)
-                });
-
-            return Ok(BuildLoginResponse(user));
+            return Ok(await SignInUserAsync(user, isQrLogin: true));
         }
 
         [AllowAnonymous]
@@ -130,7 +120,8 @@ namespace ClassBook.Controllers
                 return UnauthorizedError("Пользователь не найден или отключен");
 
             SetCsrfCookie();
-            return Ok(BuildLoginResponse(user));
+            var isQrLogin = string.Equals(User.FindFirstValue("auth_method"), "qr", StringComparison.Ordinal);
+            return Ok(BuildLoginResponse(user, isQrLogin));
         }
 
         [Authorize]
@@ -208,7 +199,32 @@ namespace ClassBook.Controllers
             return token;
         }
 
-        private static AuthUserDto BuildLoginResponse(User user)
+        private async Task<AuthUserDto> SignInUserAsync(User user, bool isQrLogin)
+        {
+            SetCsrfCookie();
+
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new(ClaimTypes.Name, user.Login),
+                new(ClaimTypes.Role, user.Role.Name),
+                new("auth_method", isQrLogin ? "qr" : "password")
+            };
+
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(identity),
+                new AuthenticationProperties
+                {
+                    IsPersistent = true,
+                    ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7)
+                });
+
+            return BuildLoginResponse(user, isQrLogin);
+        }
+
+        private static AuthUserDto BuildLoginResponse(User user, bool bypassPasswordChange = false)
         {
             return new AuthUserDto
             {
@@ -217,7 +233,7 @@ namespace ClassBook.Controllers
                 FullName = user.FullName,
                 Role = user.Role.Name,
                 IsActive = user.IsActive,
-                MustChangePassword = user.MustChangePassword,
+                MustChangePassword = user.MustChangePassword && !bypassPasswordChange,
                 CreatedAt = user.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
                 LastSeenAt = user.LastSeenAt?.ToString("yyyy-MM-dd HH:mm:ss")
             };
