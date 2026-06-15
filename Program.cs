@@ -53,7 +53,7 @@ namespace ClassBook
             {
                 options.AddPolicy("AdminOnly", policy => policy.RequireRole("Администратор"));
                 options.AddPolicy("ScheduleManagerOnly", policy => policy.RequireRole("Менеджер расписания", "Администратор"));
-                options.AddPolicy("ScheduleViewOnly", policy => policy.RequireRole("Менеджер расписания", "Администратор", "Директор"));
+                options.AddPolicy("ScheduleViewOnly", policy => policy.RequireRole("Менеджер расписания", "Администратор", "Директор", "Учитель"));
                 options.AddPolicy("DirectorOnly", policy => policy.RequireRole("Директор", "Администратор"));
                 options.AddPolicy("TeacherOrAdmin", policy => policy.RequireRole("Учитель", "Администратор"));
                 options.AddPolicy("StudentOrParent", policy => policy.RequireRole("Ученик", "Родитель"));

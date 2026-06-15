@@ -559,12 +559,12 @@ function RouteContent({ route, role, user }) {
       return <ParentPage role={role} />;
     case "schedule":
       if (role === "Учитель") {
-        return <TeacherPersonalSchedule user={user} />;
+        return <SchedulePage role={role} user={user} />;
       }
       if (role === "Ученик") {
         return <StudentPage role={role} view="schedule" />;
       }
-      return <SchedulePage role={role} />;
+      return <SchedulePage role={role} user={user} />;
     default:
       return <DashboardPage user={user} />;
   }
@@ -3710,9 +3710,10 @@ function AttendanceReviewPanel({ attendance, isOpen, filter, sort, onToggle, onF
   );
 }
 
-function SchedulePage({ role }) {
-  const allowed = role === "Менеджер расписания" || role === "Администратор" || role === "Директор";
+function SchedulePage({ role, user }) {
+  const allowed = role === "Менеджер расписания" || role === "Администратор" || role === "Директор" || role === "Учитель";
   const editable = role === "Менеджер расписания" || role === "Администратор";
+  const teacherView = role === "Учитель";
   const [weekStart, setWeekStart] = useState(() => toIsoDate(getMonday(new Date())));
   const [week, setWeek] = useState({ lessons: [] });
   const [metadata, setMetadata] = useState(null);
@@ -3727,6 +3728,8 @@ function SchedulePage({ role }) {
   const [scheduleMenu, setScheduleMenu] = useState(null);
   const [lessonEditorOpen, setLessonEditorOpen] = useState(false);
   const [isScheduleFullscreen, setIsScheduleFullscreen] = useState(false);
+  const [scheduleScope, setScheduleScope] = useState("mine");
+  const [teacherClasses, setTeacherClasses] = useState([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [className, setClassName] = useState("");
@@ -3766,6 +3769,16 @@ function SchedulePage({ role }) {
 
     loadScheduleEditor();
   }, [allowed, weekStart]);
+
+  useEffect(() => {
+    if (!teacherView || !user?.id) {
+      return;
+    }
+
+    apiRequest(`/teacher/classes?teacherId=${user.id}`)
+      .then((items) => setTeacherClasses(items ?? []))
+      .catch(() => setTeacherClasses([]));
+  }, [teacherView, user?.id]);
 
   useEffect(() => {
     setCopyWeekTarget(shiftWeek(weekStart, 7));
@@ -4338,14 +4351,33 @@ function SchedulePage({ role }) {
   }, []);
 
   if (!allowed) {
-    return <AccessWarning title="Расписание доступно менеджеру расписания, директору и администратору" />;
+    return <AccessWarning title="Расписание недоступно для текущей роли" />;
   }
 
-  const classes = sortItems(metadata?.classes ?? [], "name", { name: (item) => classSortValue(item.name) });
+  const allClasses = sortItems(metadata?.classes ?? [], "name", { name: (item) => classSortValue(item.name) });
   const subjects = metadata?.subjects ?? [];
   const teachers = metadata?.teachers ?? [];
   const slots = metadata?.slots ?? [];
-  const lessonMap = buildScheduleLessonMap(week.lessons ?? []);
+  const teacherId = Number(user?.id ?? 0);
+  const teacherClassIds = new Set([
+    ...teacherClasses.map((classItem) => Number(classItem.classId ?? classItem.id)),
+    ...(week.lessons ?? [])
+      .filter((lesson) => Number(lesson.teacherId) === teacherId)
+      .map((lesson) => Number(lesson.classId))
+  ]);
+  const visibleLessons = teacherView && scheduleScope === "mine"
+    ? (week.lessons ?? []).filter((lesson) => Number(lesson.teacherId) === teacherId)
+    : (week.lessons ?? []);
+  const visibleSubjects = teacherView && scheduleScope === "mine"
+    ? subjects.filter((subject) => {
+        const teacherIds = subject.teacherIds?.length ? subject.teacherIds : [subject.teacherId];
+        return teacherIds.some((item) => Number(item) === teacherId);
+      })
+    : subjects;
+  const classes = teacherView && scheduleScope === "mine"
+    ? allClasses.filter((classItem) => teacherClassIds.has(Number(classItem.classId)))
+    : allClasses;
+  const lessonMap = buildScheduleLessonMap(visibleLessons);
   const selectedLessonIdSet = new Set(selectedLessonIds.map(String));
   const groupedSlots = groupSlotsByDay(slots);
   const weekCaption = getWeekCaption(weekStart);
@@ -4371,20 +4403,28 @@ function SchedulePage({ role }) {
   return (
     <section className="page-stack">
       <PageHeader
-        title={editable ? "Редактор расписания" : "Расписание школы"}
+        title={editable ? "Редактор расписания" : teacherView ? "Расписание учителя" : "Расписание школы"}
         subtitle={weekCaption}
         text={editable
           ? "Недельная сетка занятий с назначением предметов, преподавателей, домашних заданий и примечаний."
-          : "Директорский режим просмотра недельной сетки уроков, классов и преподавателей."}
+          : teacherView
+            ? "Недельная сетка ваших уроков с возможностью переключиться на общее расписание школы."
+            : "Директорский режим просмотра недельной сетки уроков, классов и преподавателей."}
       />
       <StatusLine loading={loading} message={message} />
       <div className="metric-grid">
-        <MetricCard label="Уроков недели" value={(week.lessons ?? []).length} />
+        <MetricCard label="Уроков недели" value={visibleLessons.length} />
         <MetricCard label="Классов" value={classes.length} />
-        <MetricCard label="Предметов" value={subjects.length} />
+        <MetricCard label="Предметов" value={visibleSubjects.length} />
         <MetricCard label="Слотов звонков" value={slots.length} />
       </div>
       <div className="schedule-toolbar">
+        {teacherView && (
+          <div className="schedule-scope-switch" role="group" aria-label="Режим просмотра расписания">
+            <button className={scheduleScope === "mine" ? "active" : ""} type="button" onClick={() => setScheduleScope("mine")}>Мое расписание</button>
+            <button className={scheduleScope === "all" ? "active" : ""} type="button" onClick={() => setScheduleScope("all")}>Все расписание</button>
+          </div>
+        )}
         <button className="ghost-button compact" onClick={() => setWeekStart(shiftWeek(weekStart, -7))}>Предыдущая</button>
         <div className="schedule-week-picker">
           <Field label="Неделя" type="date" value={weekStart} onChange={(value) => setWeekStart(toIsoDate(getMonday(new Date(value))))} />

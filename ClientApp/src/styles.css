@@ -1969,6 +1969,35 @@ tbody tr:hover td {
   flex: 0 0 auto;
 }
 
+.schedule-scope-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 0 0 auto;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.schedule-scope-switch button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 13px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.schedule-scope-switch button.active,
+.schedule-scope-switch button:hover {
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 8px 20px rgba(15, 124, 102, 0.18);
+}
+
 .class-create-form,
 .week-copy-form {
   display: grid;
@@ -2945,6 +2974,10 @@ body.schedule-fullscreen-lock {
   .schedule-toolbar {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .schedule-scope-switch {
+    width: 100%;
   }
 
   .class-create-form,
