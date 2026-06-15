@@ -695,13 +695,15 @@ namespace ClassBook.Application.Facades
                 .Where(g => g.StudentId == student.StudentId)
                 .Include(g => g.Lesson)
                 .ThenInclude(l => l.Subject)
-                .ThenInclude(s => s.Teacher)
+                .Include(g => g.Lesson)
+                .ThenInclude(l => l.Teacher)
                 .OrderByDescending(g => g.Lesson.Date)
+                .ThenByDescending(g => g.GradeId)
                 .Select(g => new PortalGradeEntryDto
                 {
                     GradeId = g.GradeId,
                     Subject = g.Lesson.Subject.Name,
-                    Teacher = g.Lesson.Subject.Teacher.FullName,
+                    Teacher = g.Lesson.Teacher.FullName,
                     Value = g.Value,
                     Date = g.Lesson.Date,
                     Topic = g.Lesson.Topic

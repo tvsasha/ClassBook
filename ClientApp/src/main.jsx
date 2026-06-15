@@ -2813,7 +2813,7 @@ function TeacherPage({ role, user }) {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedLessonId, setSelectedLessonId] = useState("");
-  const [journalDateFrom, setJournalDateFrom] = useState("");
+  const [journalDateFrom, setJournalDateFrom] = useState(() => toIsoDate(new Date()));
   const [journalDateTo, setJournalDateTo] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -2944,6 +2944,15 @@ function TeacherPage({ role, user }) {
     }
   }
 
+  async function refreshLessonMarks(lessonId) {
+    const [gradeData, attendanceData] = await Promise.all([
+      apiRequest(`/teacher/grades/${lessonId}`),
+      apiRequest(`/teacher/attendance/${lessonId}`)
+    ]);
+    setGradesByLesson((current) => ({ ...current, [lessonId]: gradeData ?? [] }));
+    setAttendanceByLesson((current) => ({ ...current, [lessonId]: attendanceData ?? [] }));
+  }
+
   async function createLesson(event) {
     event.preventDefault();
     setMessage("");
@@ -3048,7 +3057,18 @@ function TeacherPage({ role, user }) {
           status: normalizedStatus
         })
       });
-      await loadLessonMarks(lessonId);
+      setAttendanceByLesson((current) => {
+        const existing = current[lessonId] ?? [];
+        const withoutStudent = existing.filter((item) => Number(item.studentId) !== Number(studentId));
+        return {
+          ...current,
+          [lessonId]: normalizedStatus === 1
+            ? withoutStudent
+            : [...withoutStudent, { lessonId: Number(lessonId), studentId: Number(studentId), status: normalizedStatus }]
+        };
+      });
+      setMessage("");
+      await refreshLessonMarks(lessonId);
     } catch (error) {
       setMessage(error.message || "Не удалось сохранить посещаемость");
     }
@@ -3181,10 +3201,10 @@ function TeacherPage({ role, user }) {
             <Field label="От" type="date" value={journalDateFrom} onChange={setJournalDateFrom} />
             <Field label="До" type="date" value={journalDateTo} onChange={setJournalDateTo} />
             <button className="ghost-button compact" type="button" onClick={() => {
-              setJournalDateFrom("");
+              setJournalDateFrom(toIsoDate(new Date()));
               setJournalDateTo("");
               setSelectedLessonId("");
-            }}>Сбросить фильтр</button>
+            }}>Сегодня и далее</button>
           </div>
         </section>
         <DataTable
@@ -3336,6 +3356,39 @@ function StudentPage({ role, view = "full" }) {
   }, [allowed, adminMode]);
 
   useEffect(() => {
+    if (!allowed || adminMode) {
+      return undefined;
+    }
+
+    let active = true;
+    async function refreshMarks() {
+      try {
+        const [gradeData, attendanceData] = await Promise.all([
+          apiRequest("/student/me/grades"),
+          apiRequest("/student/me/attendance")
+        ]);
+        if (active) {
+          setGrades(gradeData ?? []);
+          setAttendance(attendanceData ?? []);
+        }
+      } catch {
+        // Фоновое обновление не должно перекрывать уже загруженные данные.
+      }
+    }
+    function refreshWhenVisible() {
+      if (!document.hidden) refreshMarks();
+    }
+
+    const intervalId = window.setInterval(refreshMarks, 10000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [allowed, adminMode]);
+
+  useEffect(() => {
     if (!allowed || !adminMode || !selectedStudentId) {
       return;
     }
@@ -3399,7 +3452,7 @@ function StudentPage({ role, view = "full" }) {
             ))}
           </select>
         </label>
-        <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} view={view} />
+        <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} view={view} showGradeSubjectFilter />
       </section>
     );
   }
@@ -3416,6 +3469,7 @@ function StudentPage({ role, view = "full" }) {
       loading={loading}
       message={message}
       view={view}
+      showGradeSubjectFilter
     />
   );
 }
@@ -3484,24 +3538,58 @@ function ParentPage({ role }) {
 
   useEffect(() => {
     if (!selectedStudentId) {
-      return;
+      return undefined;
     }
 
-    setLoading(true);
-    Promise.all([
-      apiRequest(`/parent/student/${selectedStudentId}/schedule`),
-      apiRequest(`/parent/student/${selectedStudentId}/grades`),
-      apiRequest(`/parent/student/${selectedStudentId}/homework`),
-      apiRequest(`/parent/student/${selectedStudentId}/attendance`)
-    ])
-      .then(([scheduleData, gradeData, homeworkData, attendanceData]) => {
-        setSchedule(scheduleData ?? []);
-        setGrades(gradeData ?? []);
-        setHomework(homeworkData ?? []);
-        setAttendance(attendanceData ?? []);
-      })
-      .catch((error) => setMessage(error.message || "Не удалось загрузить данные ученика"))
-      .finally(() => setLoading(false));
+    let active = true;
+    async function loadStudentData(showLoader = false) {
+      if (showLoader) setLoading(true);
+      try {
+        const [scheduleData, gradeData, homeworkData, attendanceData] = await Promise.all([
+          apiRequest(`/parent/student/${selectedStudentId}/schedule`),
+          apiRequest(`/parent/student/${selectedStudentId}/grades`),
+          apiRequest(`/parent/student/${selectedStudentId}/homework`),
+          apiRequest(`/parent/student/${selectedStudentId}/attendance`)
+        ]);
+        if (active) {
+          setSchedule(scheduleData ?? []);
+          setGrades(gradeData ?? []);
+          setHomework(homeworkData ?? []);
+          setAttendance(attendanceData ?? []);
+          setMessage("");
+        }
+      } catch (error) {
+        if (active && showLoader) setMessage(error.message || "Не удалось загрузить данные ученика");
+      } finally {
+        if (active && showLoader) setLoading(false);
+      }
+    }
+    async function refreshMarks() {
+      try {
+        const [gradeData, attendanceData] = await Promise.all([
+          apiRequest(`/parent/student/${selectedStudentId}/grades`),
+          apiRequest(`/parent/student/${selectedStudentId}/attendance`)
+        ]);
+        if (active) {
+          setGrades(gradeData ?? []);
+          setAttendance(attendanceData ?? []);
+        }
+      } catch {
+        // Оставляем последние доступные данные при кратковременной ошибке сети.
+      }
+    }
+    function refreshWhenVisible() {
+      if (!document.hidden) refreshMarks();
+    }
+
+    loadStudentData(true);
+    const intervalId = window.setInterval(refreshMarks, 10000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [selectedStudentId]);
 
   if (!allowed) {
@@ -3546,7 +3634,7 @@ function ParentPage({ role }) {
           ))}
         </select>
       </label>
-      <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} />
+      <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} showGradeSubjectFilter />
     </section>
   );
 }
@@ -3753,20 +3841,21 @@ function FinalGradesPage({ role }) {
   );
 }
 
-function LearningPage({ title, subtitle, description, schedule, grades, homework, attendance, loading, message, view = "full" }) {
+function LearningPage({ title, subtitle, description, schedule, grades, homework, attendance, loading, message, view = "full", showGradeSubjectFilter = false }) {
   return (
     <section className="page-stack">
       <PageHeader title={title} subtitle={subtitle} text={description} />
       <StatusLine loading={loading} message={message} />
-      <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} view={view} />
+      <LearningSections schedule={schedule} grades={grades} homework={homework} attendance={attendance} view={view} showGradeSubjectFilter={showGradeSubjectFilter} />
     </section>
   );
 }
 
-function LearningSections({ schedule, grades, homework, attendance, view = "full" }) {
+function LearningSections({ schedule, grades, homework, attendance, view = "full", showGradeSubjectFilter = false }) {
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState("problem");
   const [attendanceSort, setAttendanceSort] = useState("date-desc");
+  const [gradeSubject, setGradeSubject] = useState("all");
   const averageGrade = grades.length
     ? grades.reduce((sum, item) => sum + Number(item.value ?? 0), 0) / grades.length
     : 0;
@@ -3780,6 +3869,18 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
 
   const showOnlySchedule = view === "schedule";
   const todaySchedule = getTodaySchedule(schedule);
+  const gradeSubjects = [...new Set(grades.map((grade) => grade.subject || grade.subjectName).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "ru"));
+  const visibleGrades = grades
+    .filter((grade) => gradeSubject === "all" || (grade.subject || grade.subjectName) === gradeSubject)
+    .slice()
+    .sort((a, b) => new Date(b.date) - new Date(a.date) || Number(b.gradeId ?? 0) - Number(a.gradeId ?? 0));
+
+  useEffect(() => {
+    if (gradeSubject !== "all" && !gradeSubjects.includes(gradeSubject)) {
+      setGradeSubject("all");
+    }
+  }, [gradeSubject, gradeSubjects]);
 
   return (
     <>
@@ -3799,13 +3900,25 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
       ) : (
         <>
           <TodaySchedulePanel schedule={todaySchedule} attendance={attendance} />
+          {showGradeSubjectFilter && gradeSubjects.length > 1 && (
+            <section className="table-card grade-subject-filter">
+              <label className="field">
+                <span>Оценки по предмету</span>
+                <select value={gradeSubject} onChange={(event) => setGradeSubject(event.target.value)}>
+                  <option value="all">Все предметы</option>
+                  {gradeSubjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
+                </select>
+              </label>
+            </section>
+          )}
           <DataTable
-            title="Последние оценки"
-            columns={["Дата", "Предмет", "Тема", "Оценка"]}
-            rows={grades.slice(0, 16).map((grade) => [
+            title={gradeSubject === "all" ? "Все оценки" : `Оценки: ${gradeSubject}`}
+            columns={["Дата", "Предмет", "Тема", "Учитель", "Оценка"]}
+            rows={visibleGrades.map((grade) => [
               formatDate(grade.date),
               grade.subject || grade.subjectName || "—",
               formatLessonTopic(grade.topic),
+              grade.teacher || "—",
               <GradeBadge value={grade.value} />
             ])}
           />

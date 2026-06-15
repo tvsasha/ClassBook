@@ -1959,6 +1959,15 @@ tbody tr:hover td {
   margin: 0;
 }
 
+.grade-subject-filter {
+  padding: 18px;
+}
+
+.grade-subject-filter .field {
+  max-width: 420px;
+  margin: 0;
+}
+
 .final-grade-select {
   min-width: 72px;
   min-height: 40px;
