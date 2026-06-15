@@ -139,11 +139,14 @@ namespace ClassBook.Application.Facades
                 throw new UnauthorizedAccessException("Нет доступа к итоговым оценкам класса");
 
             var studentIds = await _db.Students.Where(item => item.ClassId == classId).OrderBy(item => item.LastName).ThenBy(item => item.FirstName).Select(item => item.StudentId).ToListAsync();
+            var isClassTeacher = role == "Учитель" && await _db.ClassTeachers.AnyAsync(item => item.TeacherId == userId && item.ClassId == classId);
             var result = new List<StudentFinalGradesDto>();
             foreach (var studentId in studentIds)
             {
                 var report = await GetStudentReportCoreAsync(studentId, periodId);
                 await ApplyEditPermissionsAsync(report, userId, role);
+                if (role == "Учитель" && !isClassTeacher)
+                    report.Grades = report.Grades.Where(item => item.CanEdit).ToList();
                 result.Add(report);
             }
             return result;

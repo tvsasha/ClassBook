@@ -22,6 +22,7 @@ namespace ClassBook.Controllers
         private string Role => User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
 
         [HttpGet("classes")]
+        [Authorize(Roles = "Администратор,Директор,Учитель")]
         public async Task<IActionResult> GetClasses() => Ok(await _facade.GetAvailableClassesAsync(UserId, Role));
 
         [HttpGet("me")]
