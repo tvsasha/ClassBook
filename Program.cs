@@ -380,7 +380,8 @@ namespace ClassBook
                     || path.Equals("/api/auth/heartbeat", StringComparison.OrdinalIgnoreCase)
                     || path.Equals("/api/auth/offline", StringComparison.OrdinalIgnoreCase);
 
-                if (isApiRequest && !isAllowedApi && context.User.Identity?.IsAuthenticated == true)
+                var isQrLogin = string.Equals(context.User.FindFirst("auth_method")?.Value, "qr", StringComparison.Ordinal);
+                if (isApiRequest && !isAllowedApi && !isQrLogin && context.User.Identity?.IsAuthenticated == true)
                 {
                     var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                     if (int.TryParse(userIdClaim, out var userId))
