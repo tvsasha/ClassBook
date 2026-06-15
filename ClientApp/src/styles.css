@@ -1892,6 +1892,24 @@ tbody tr:hover td {
   line-height: 1.55;
 }
 
+.grade-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  color: #fff;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 7px 16px rgba(24, 32, 38, 0.14);
+}
+
+.grade-badge-empty {
+  color: var(--muted);
+  background: rgba(104, 116, 127, 0.12);
+  box-shadow: none;
+}
+
 .qr-access-card {
   display: grid;
   justify-items: center;
@@ -2723,6 +2741,14 @@ body.schedule-fullscreen-lock {
 }
 
 @media (max-width: 640px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   body {
     background:
       radial-gradient(circle at 20% 8%, rgba(15, 124, 102, 0.2), transparent 18rem),
@@ -2736,6 +2762,9 @@ body.schedule-fullscreen-lock {
   }
 
   .app-shell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     padding: 8px;
   }
 
@@ -2789,10 +2818,16 @@ body.schedule-fullscreen-lock {
   .auth-card,
   .content-panel,
   .side-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     padding: 14px;
   }
 
   .app-layout {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     gap: 10px;
   }
 
@@ -2833,6 +2868,7 @@ body.schedule-fullscreen-lock {
 
   .side-panel {
     gap: 14px;
+    overflow: hidden;
   }
 
   .route-admin .side-panel {
@@ -2856,13 +2892,14 @@ body.schedule-fullscreen-lock {
   }
 
   .app-nav {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    margin: 0 -4px;
-    padding: 2px 4px 8px;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
   }
 
   .app-nav::-webkit-scrollbar {
@@ -2870,10 +2907,12 @@ body.schedule-fullscreen-lock {
   }
 
   .app-nav a {
-    flex: 0 0 auto;
-    padding: 10px 12px;
-    white-space: nowrap;
-    scroll-snap-align: start;
+    justify-content: center;
+    min-width: 0;
+    padding: 10px 8px;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .app-nav a.active::before {
@@ -2923,12 +2962,25 @@ body.schedule-fullscreen-lock {
   }
 
   .page-header {
+    min-width: 0;
     padding: 20px;
     border-radius: 20px;
+    overflow: hidden;
   }
 
   .page-header h2 {
-    font-size: clamp(2rem, 13vw, 3.1rem);
+    max-width: 100%;
+    font-size: 2.15rem;
+    line-height: 1.05;
+    letter-spacing: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .page-header p,
+  .page-header span,
+  .side-brand p {
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 
   .metric-card,

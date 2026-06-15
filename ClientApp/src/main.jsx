@@ -3716,7 +3716,7 @@ function FinalGradesPage({ role }) {
       {reports.map((report) => (
         <DataTable key={report.studentId} title={`${report.studentName} · ${report.className}`} columns={["Предмет", "Учитель", "Оценок", "Средняя", "Итоговая"]} rows={(report.grades ?? []).map((grade) => [
           grade.subjectName, grade.teacherName, grade.currentGradesCount, grade.currentAverage ? formatNumber(grade.currentAverage) : "—",
-          grade.canEdit && !selectedPeriod?.isClosed ? <select className="final-grade-select" value={grade.value ?? ""} onChange={(event) => saveFinalGrade(report, grade, event.target.value)}><option value="">—</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select> : <strong>{grade.value ?? "—"}</strong>
+          grade.canEdit && !selectedPeriod?.isClosed ? <select className="final-grade-select" value={grade.value ?? ""} onChange={(event) => saveFinalGrade(report, grade, event.target.value)}><option value="">—</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select> : <GradeBadge value={grade.value} />
         ])} />
       ))}
       {!loading && reports.length === 0 && <section className="table-card"><p className="empty-text padded">Для выбранного периода данные пока не найдены.</p></section>}
@@ -3806,7 +3806,7 @@ function LearningSections({ schedule, grades, homework, attendance, view = "full
               formatDate(grade.date),
               grade.subject || grade.subjectName || "—",
               formatLessonTopic(grade.topic),
-              grade.value
+              <GradeBadge value={grade.value} />
             ])}
           />
           <CardGrid
@@ -5142,6 +5142,15 @@ function MetricCard({ label, value }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function GradeBadge({ value }) {
+  const grade = Number(value);
+  if (![2, 3, 4, 5].includes(grade)) {
+    return <span className="grade-badge grade-badge-empty">—</span>;
+  }
+
+  return <span className={`grade-badge grade-${grade}`} aria-label={`Оценка ${grade}`}>{grade}</span>;
 }
 
 function SmartDataTable({ title, columns, rows }) {
