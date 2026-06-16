@@ -250,6 +250,16 @@ namespace ClassBook.Application.Facades
                     return slot.ScheduleId;
             }
 
+            foreach (var lessonNumber in orderedNumbers)
+            {
+                if (classNumbers.Contains(lessonNumber))
+                    continue;
+
+                var slot = slots.FirstOrDefault(item => item.LessonNumber == lessonNumber);
+                if (slot != null)
+                    return slot.ScheduleId;
+            }
+
             return null;
         }
 
