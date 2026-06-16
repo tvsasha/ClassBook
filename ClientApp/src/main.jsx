@@ -3126,6 +3126,38 @@ function TeacherPage({ role, user }) {
     }
   }
 
+  async function deleteLessonFromJournal(lesson) {
+    if (role !== "Администратор" || !lesson?.lessonId) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Удалить урок "${lesson.subjectName}" от ${formatDate(lesson.date)}? Оценки и посещаемость этого урока тоже будут удалены.`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/teacher/lessons/${lesson.lessonId}`, { method: "DELETE" });
+      setLessons((current) => current.filter((item) => String(item.lessonId) !== String(lesson.lessonId)));
+      setGradesByLesson((current) => {
+        const next = { ...current };
+        delete next[lesson.lessonId];
+        return next;
+      });
+      setAttendanceByLesson((current) => {
+        const next = { ...current };
+        delete next[lesson.lessonId];
+        return next;
+      });
+      if (String(selectedLessonId) === String(lesson.lessonId)) {
+        setSelectedLessonId("");
+      }
+      setMessage("Урок удален");
+    } catch (error) {
+      setMessage(error.message || "Не удалось удалить урок");
+    }
+  }
+
   if (!allowed) {
     return <AccessWarning title="Кабинет учителя доступен учителю и администратору" />;
   }
@@ -3296,6 +3328,11 @@ function TeacherPage({ role, user }) {
                       {!readOnly && (
                         <button className="lesson-edit-button" type="button" onClick={() => openLessonEditor(lesson)}>
                           Изм.
+                        </button>
+                      )}
+                      {role === "Администратор" && (
+                        <button className="lesson-delete-button" type="button" onClick={() => deleteLessonFromJournal(lesson)}>
+                          Удалить
                         </button>
                       )}
                     </th>

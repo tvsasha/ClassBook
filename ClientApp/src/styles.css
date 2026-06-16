@@ -1935,7 +1935,8 @@ tbody tr:hover td {
   text-align: center;
 }
 
-.lesson-edit-button {
+.lesson-edit-button,
+.lesson-delete-button {
   display: inline-grid;
   place-items: center;
   margin-top: 8px;
@@ -1947,6 +1948,22 @@ tbody tr:hover td {
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.lesson-delete-button {
+  margin-left: 6px;
+  border-color: rgba(153, 27, 27, 0.22);
+  color: #991b1b;
+  background: rgba(153, 27, 27, 0.08);
+}
+
+.lesson-edit-button:hover,
+.lesson-delete-button:hover {
+  transform: translateY(-1px);
+}
+
+.lesson-delete-button:hover {
+  background: rgba(153, 27, 27, 0.12);
 }
 
 .modal-backdrop {
