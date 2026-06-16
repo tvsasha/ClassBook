@@ -123,6 +123,7 @@ namespace ClassBook.Application.DTOs
         public int TeacherId { get; set; }
         public int ScheduleId { get; set; }
         public DateTime Date { get; set; }
+        public string? Topic { get; set; }
         public string? Homework { get; set; }
     }
 

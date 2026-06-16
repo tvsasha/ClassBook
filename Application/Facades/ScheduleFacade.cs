@@ -426,6 +426,8 @@ namespace ClassBook.Application.Facades
                 Homework = string.IsNullOrWhiteSpace(request.Homework) ? null : request.Homework.Trim()
             };
 
+            lesson.Topic = NormalizeScheduleTopic(request.Topic);
+
             _db.Lessons.Add(lesson);
             await _db.SaveChangesAsync();
 
@@ -467,6 +469,7 @@ namespace ClassBook.Application.Facades
             if (string.IsNullOrWhiteSpace(lesson.Topic))
                 lesson.Topic = "Тема будет указана преподавателем";
 
+            lesson.Topic = NormalizeScheduleTopic(request.Topic);
             lesson.Date = lessonDate;
             lesson.Homework = string.IsNullOrWhiteSpace(request.Homework) ? null : request.Homework.Trim();
 
@@ -591,6 +594,13 @@ namespace ClassBook.Application.Facades
 
             await ResolveEditorSubjectAsync(request);
             await EnsureEditorSubjectAssignmentAsync(request.SubjectId, request.ClassId, request.TeacherId);
+        }
+
+        private static string NormalizeScheduleTopic(string? topic)
+        {
+            return string.IsNullOrWhiteSpace(topic)
+                ? "Тема будет указана преподавателем"
+                : topic.Trim();
         }
 
         private async Task ResolveEditorSubjectAsync(ScheduleEditorLessonRequest request)

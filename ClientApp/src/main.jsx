@@ -4324,6 +4324,7 @@ function SchedulePage({ role, user }) {
     subjectInput: "",
     teacherId: "",
     teacherName: "",
+    topic: "",
     homework: ""
   });
 
@@ -4388,6 +4389,7 @@ function SchedulePage({ role, user }) {
       subjectInput: subject ? getScheduleSubjectLabel(subject) : subjectName,
       teacherId,
       teacherName,
+      topic: lesson?.topic ?? "",
       homework: lesson?.homework ?? ""
     });
   }
@@ -4466,6 +4468,7 @@ function SchedulePage({ role, user }) {
       startTime: targetSlot.startTime,
       endTime: targetSlot.endTime,
       date: payload?.date ?? getLessonDateForSlot(weekStart, targetSlot),
+      topic: payload?.topic ?? lesson.topic ?? "",
       homework: payload?.homework ?? lesson.homework ?? ""
     };
   }
@@ -4518,6 +4521,7 @@ function SchedulePage({ role, user }) {
       teacherId: Number(lessonForm.teacherId),
       scheduleId: selectedCell.slot.scheduleId,
       date: getLessonDateForSlot(weekStart, selectedCell.slot),
+      topic: lessonForm.topic.trim(),
       homework: lessonForm.homework.trim()
     };
 
@@ -4592,6 +4596,7 @@ function SchedulePage({ role, user }) {
       teacherId: lesson.teacherId,
       scheduleId: targetSlot.scheduleId,
       date: getLessonDateForSlot(weekStart, targetSlot),
+      topic: lesson.topic ?? "",
       homework: lesson.homework ?? ""
     };
   }
@@ -5116,6 +5121,7 @@ function SchedulePage({ role, user }) {
                           >
                             <strong>{lesson.subjectName}</strong>
                             <span>{lesson.teacherName}</span>
+                            {lesson.topic && <small>{formatLessonTopic(lesson.topic)}</small>}
                             {lesson.homework && <small>ДЗ: {lesson.homework}</small>}
                           </div>
                         ) : "Свободно"}
@@ -5182,6 +5188,10 @@ function SchedulePage({ role, user }) {
                   <datalist id={subjectOptionsId}>
                     {filteredSubjectOptions.map(({ subject, label }) => <option key={subject.subjectId} value={label} />)}
                   </datalist>
+                </label>
+                <label className="field">
+                  <span>Тема урока</span>
+                  <input id="schedule-lesson-topic" name="scheduleLessonTopic" value={lessonForm.topic} onChange={(event) => setLessonForm({ ...lessonForm, topic: event.target.value })} />
                 </label>
               </div>
               <label className="field">
