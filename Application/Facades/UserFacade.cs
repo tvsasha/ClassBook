@@ -127,6 +127,36 @@ namespace ClassBook.Application.Facades
             await _db.SaveChangesAsync();
         }
 
+        public async Task<List<ParentClassLoginLinkDto>> IssueParentClassLoginLinksAsync(int classId)
+        {
+            var parents = await _db.StudentParents
+                .Where(x => x.Student.ClassId == classId && x.Parent.IsActive)
+                .Include(x => x.Student)
+                .Include(x => x.Parent)
+                .ToListAsync();
+
+            var result = new List<ParentClassLoginLinkDto>();
+            foreach (var group in parents.GroupBy(x => x.ParentId))
+            {
+                var parent = group.First().Parent;
+                var token = CreateQrToken();
+                parent.QrLoginTokenHash = HashQrToken(token);
+                parent.QrLoginIssuedAt = DateTime.UtcNow;
+                result.Add(new ParentClassLoginLinkDto
+                {
+                    ParentId = parent.Id,
+                    ParentName = parent.FullName,
+                    Login = parent.Login,
+                    StudentNames = string.Join(", ", group.Select(x => $"{x.Student.LastName} {x.Student.FirstName}").Distinct()),
+                    Token = token,
+                    IssuedAt = parent.QrLoginIssuedAt.Value
+                });
+            }
+
+            await _db.SaveChangesAsync();
+            return result.OrderBy(x => x.ParentName).ToList();
+        }
+
         /// <summary>
         /// Создаёт пользователя общего административного потока.
         /// </summary>

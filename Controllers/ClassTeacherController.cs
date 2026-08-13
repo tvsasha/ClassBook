@@ -3,6 +3,7 @@ using ClassBook.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text;
 
 namespace ClassBook.Controllers
 {
@@ -12,11 +13,43 @@ namespace ClassBook.Controllers
     public class ClassTeacherController : ApiControllerBase
     {
         private readonly ClassTeacherFacade _facade;
+        private readonly UserFacade _userFacade;
+        private readonly SchoolAccessFacade _schoolAccessFacade;
+        private readonly AuditFacade _auditFacade;
 
-        public ClassTeacherController(ClassTeacherFacade facade)
+        public ClassTeacherController(ClassTeacherFacade facade, UserFacade userFacade, SchoolAccessFacade schoolAccessFacade, AuditFacade auditFacade)
         {
             _facade = facade;
+            _userFacade = userFacade;
+            _schoolAccessFacade = schoolAccessFacade;
+            _auditFacade = auditFacade;
         }
+
+        [HttpGet("classes/{classId:int}/parent-login-links.csv")]
+        public async Task<IActionResult> ExportParentLoginLinks(int classId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                await _schoolAccessFacade.EnsureClassTeacherAccessAsync(userId, classId);
+                var links = await _userFacade.IssueParentClassLoginLinksAsync(classId);
+                var csv = new StringBuilder("\uFEFFРодитель;Ученики;Логин;Ссылка;Действует до\r\n");
+                foreach (var item in links)
+                {
+                    var url = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/app/#/qr-login?token={Uri.EscapeDataString(item.Token)}";
+                    csv.Append(Csv(item.ParentName)).Append(';')
+                        .Append(Csv(item.StudentNames)).Append(';')
+                        .Append(Csv(item.Login)).Append(';')
+                        .Append(Csv(url)).Append(';')
+                        .Append(item.IssuedAt.AddDays(30).ToString("yyyy-MM-dd")).Append("\r\n");
+                }
+                await _auditFacade.LogActionAsync(userId, "Class", classId, "ExportParentLinks");
+                return File(Encoding.UTF8.GetBytes(csv.ToString()), "text/csv; charset=utf-8", $"parent-login-links-class-{classId}.csv");
+            }
+            catch (UnauthorizedAccessException ex) { return ForbiddenError(ex.Message); }
+        }
+
+        private static string Csv(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
 
         private int GetCurrentUserId()
         {

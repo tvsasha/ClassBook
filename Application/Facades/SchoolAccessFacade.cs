@@ -57,6 +57,19 @@ public sealed class SchoolAccessFacade
             throw new UnauthorizedAccessException("Нет доступа к расписанию выбранного класса");
     }
 
+    public async Task EnsureClassTeacherAccessAsync(int currentUserId, int classId)
+    {
+        var roleId = await _db.Users
+            .Where(x => x.Id == currentUserId && x.IsActive)
+            .Select(x => (int?)x.RoleId)
+            .SingleOrDefaultAsync();
+        var allowed = roleId == SystemRoleIds.Administrator
+            || roleId == SystemRoleIds.Teacher
+                && await _db.ClassTeachers.AnyAsync(x => x.TeacherId == currentUserId && x.ClassId == classId);
+        if (!allowed)
+            throw new UnauthorizedAccessException("Ссылки может выгружать только классный руководитель");
+    }
+
     public async Task EnsureLessonAccessAsync(int currentUserId, string role, int lessonId, bool writeAccess)
     {
         if (role == "Администратор" || (!writeAccess && role == "Директор")) return;

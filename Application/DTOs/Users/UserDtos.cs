@@ -95,6 +95,16 @@ namespace ClassBook.Application.DTOs
         public DateTime IssuedAt { get; set; }
     }
 
+    public class ParentClassLoginLinkDto
+    {
+        public int ParentId { get; set; }
+        public string ParentName { get; set; } = string.Empty;
+        public string Login { get; set; } = string.Empty;
+        public string StudentNames { get; set; } = string.Empty;
+        public string Token { get; set; } = string.Empty;
+        public DateTime IssuedAt { get; set; }
+    }
+
     public class QrLoginAccessDto
     {
         public int UserId { get; set; }

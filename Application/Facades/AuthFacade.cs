@@ -55,9 +55,12 @@ namespace ClassBook.Application.Facades
                 return null;
 
             var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token.Trim())));
+            var validSince = DateTime.UtcNow.AddDays(-30);
             var user = await _db.Users
                 .Include(u => u.Role)
-                .FirstOrDefaultAsync(u => u.QrLoginTokenHash == tokenHash && u.IsActive);
+                .FirstOrDefaultAsync(u => u.QrLoginTokenHash == tokenHash
+                    && u.QrLoginIssuedAt >= validSince
+                    && u.IsActive);
 
             if (user == null)
                 return null;

@@ -5389,6 +5389,15 @@ function ClassTeacherPage({ role }) {
       ) : classes.map((classItem) => (
         <section className="table-card class-teacher-card" key={classItem.classId}>
           <div className="table-title">{classItem.className}</div>
+          <div className="page-actions">
+            <a
+              className="primary-button compact"
+              href={`/api/class-teacher/classes/${classItem.classId}/parent-login-links.csv`}
+              download
+            >
+              Выгрузить ссылки для родителей
+            </a>
+          </div>
           <div className="metric-grid compact-metrics">
             <MetricCard label="Учеников" value={classItem.studentsCount} />
             <MetricCard label="Уроков" value={classItem.lessonsCount} />
