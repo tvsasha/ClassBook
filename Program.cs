@@ -5,6 +5,7 @@ using ClassBook.Application.Facades;
 using ClassBook.Infrastructure.Security;
 using ClassBook.Domain.Entities;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -36,6 +37,32 @@ namespace ClassBook
                     options.SlidingExpiration = true;
                     options.Cookie.SameSite = builder.Configuration.GetValue("Cookie:SameSite", SameSiteMode.None);
                     options.Cookie.SecurePolicy = builder.Configuration.GetValue("Cookie:SecurePolicy", CookieSecurePolicy.Always);
+                    options.Events.OnValidatePrincipal = async context =>
+                    {
+                        if (!int.TryParse(context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                        {
+                            context.RejectPrincipal();
+                            await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                            return;
+                        }
+
+                        var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                        var currentUser = await db.Users
+                            .AsNoTracking()
+                            .Where(user => user.Id == userId && user.IsActive)
+                            .Select(user => new { user.Login, Role = user.Role.Name })
+                            .SingleOrDefaultAsync();
+                        var claimedLogin = context.Principal?.FindFirstValue(ClaimTypes.Name);
+                        var claimedRole = context.Principal?.FindFirstValue(ClaimTypes.Role);
+
+                        if (currentUser == null ||
+                            !string.Equals(currentUser.Login, claimedLogin, StringComparison.Ordinal) ||
+                            !string.Equals(currentUser.Role, claimedRole, StringComparison.Ordinal))
+                        {
+                            context.RejectPrincipal();
+                            await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        }
+                    };
                 });
 
             builder.Services.AddDataProtection()
