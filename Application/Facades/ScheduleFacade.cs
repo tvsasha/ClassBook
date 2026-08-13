@@ -68,7 +68,8 @@ namespace ClassBook.Application.Facades
         /// </summary>
         public async Task<List<(Schedule Schedule, Lesson? Lesson)>> GetScheduleByClassAsync(int classId, DateTime? date = null)
         {
-            var dayOfWeek = (int)(date?.DayOfWeek ?? DateTime.UtcNow.DayOfWeek);
+            var targetDate = (date ?? DateTime.UtcNow).Date;
+            var dayOfWeek = (int)targetDate.DayOfWeek;
             if (dayOfWeek == 0) dayOfWeek = 4;
             if (dayOfWeek > 5) dayOfWeek -= 1;
 
@@ -83,12 +84,8 @@ namespace ClassBook.Application.Facades
                 .AsNoTracking()
                 .Where(l => l.ClassId == classId && l.ScheduleId.HasValue && scheduleIds.Contains(l.ScheduleId.Value));
 
-            if (date.HasValue)
-            {
-                var targetDate = date.Value.Date;
-                var nextDate = targetDate.AddDays(1);
-                lessonsQuery = lessonsQuery.Where(l => l.Date >= targetDate && l.Date < nextDate);
-            }
+            var nextDate = targetDate.AddDays(1);
+            lessonsQuery = lessonsQuery.Where(l => l.Date >= targetDate && l.Date < nextDate);
 
             var lessonsBySchedule = await lessonsQuery
                 .Include(l => l.Subject)
