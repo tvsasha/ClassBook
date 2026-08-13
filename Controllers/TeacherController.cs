@@ -45,9 +45,13 @@ namespace ClassBook.Controllers
         [HttpGet("subjects")]
         public async Task<IActionResult> GetSubjects(int? teacherId = null)
         {
-            var effectiveTeacherId = teacherId ?? GetCurrentUserId();
-            SchoolAccessFacade.EnsureTeacherIdentity(GetCurrentUserId(), GetCurrentRole(), effectiveTeacherId);
-            return Ok(await _subjectFacade.GetSubjectsForTeacherAsync(effectiveTeacherId));
+            try
+            {
+                var effectiveTeacherId = teacherId ?? GetCurrentUserId();
+                SchoolAccessFacade.EnsureTeacherIdentity(GetCurrentUserId(), GetCurrentRole(), effectiveTeacherId);
+                return Ok(await _subjectFacade.GetSubjectsForTeacherAsync(effectiveTeacherId));
+            }
+            catch (UnauthorizedAccessException ex) { return ForbiddenError(ex.Message); }
         }
 
         /// <summary>
@@ -58,9 +62,13 @@ namespace ClassBook.Controllers
         [HttpGet("classes")]
         public async Task<IActionResult> GetClasses(int? teacherId = null)
         {
-            var effectiveTeacherId = teacherId ?? GetCurrentUserId();
-            SchoolAccessFacade.EnsureTeacherIdentity(GetCurrentUserId(), GetCurrentRole(), effectiveTeacherId);
-            return Ok(await _classFacade.GetClassesForTeacherAsync(effectiveTeacherId));
+            try
+            {
+                var effectiveTeacherId = teacherId ?? GetCurrentUserId();
+                SchoolAccessFacade.EnsureTeacherIdentity(GetCurrentUserId(), GetCurrentRole(), effectiveTeacherId);
+                return Ok(await _classFacade.GetClassesForTeacherAsync(effectiveTeacherId));
+            }
+            catch (UnauthorizedAccessException ex) { return ForbiddenError(ex.Message); }
         }
 
         /// <summary>
@@ -94,9 +102,13 @@ namespace ClassBook.Controllers
         [HttpGet("lessons")]
         public async Task<IActionResult> GetLessons(int? teacherId = null)
         {
-            var effectiveTeacherId = teacherId ?? GetCurrentUserId();
-            SchoolAccessFacade.EnsureTeacherIdentity(GetCurrentUserId(), GetCurrentRole(), effectiveTeacherId);
-            return Ok(await _lessonFacade.GetLessonsForTeacherAsync(effectiveTeacherId));
+            try
+            {
+                var effectiveTeacherId = teacherId ?? GetCurrentUserId();
+                SchoolAccessFacade.EnsureTeacherIdentity(GetCurrentUserId(), GetCurrentRole(), effectiveTeacherId);
+                return Ok(await _lessonFacade.GetLessonsForTeacherAsync(effectiveTeacherId));
+            }
+            catch (UnauthorizedAccessException ex) { return ForbiddenError(ex.Message); }
         }
 
         /// <summary>
