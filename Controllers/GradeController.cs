@@ -14,11 +14,13 @@ namespace ClassBook.Controllers
     {
         private readonly GradeFacade _facade;
         private readonly ILogger<GradeController> _logger;
+        private readonly SchoolAccessFacade _accessFacade;
 
-        public GradeController(GradeFacade facade, ILogger<GradeController> logger)
+        public GradeController(GradeFacade facade, ILogger<GradeController> logger, SchoolAccessFacade accessFacade)
         {
             _facade = facade;
             _logger = logger;
+            _accessFacade = accessFacade;
         }
 
         private int GetUserId()
@@ -40,6 +42,7 @@ namespace ClassBook.Controllers
                     return ForbiddenError("Директору доступен только просмотр журнала");
 
                 var userId = GetUserId();
+                await _accessFacade.EnsureLessonAccessAsync(userId, GetRole(), dto.LessonId, writeAccess: true);
                 var grade = await _facade.AddGradeAsync(dto.LessonId, dto.StudentId, dto.Value, userId > 0 ? userId : null);
                 return CreatedAtAction(nameof(AddGrade), new { id = grade.GradeId }, grade);
             }
@@ -55,6 +58,7 @@ namespace ClassBook.Controllers
             {
                 return BadRequestError(ex.Message);
             }
+            catch (UnauthorizedAccessException ex) { return ForbiddenError(ex.Message); }
         }
 
         /// <summary>
@@ -67,12 +71,14 @@ namespace ClassBook.Controllers
         {
             try
             {
+                await _accessFacade.EnsureLessonAccessAsync(GetUserId(), GetRole(), lessonId, writeAccess: false);
                 return Ok(await _facade.GetGradesForLessonAsync(lessonId));
             }
             catch (KeyNotFoundException ex)
             {
                 return NotFoundError(ex.Message);
             }
+            catch (UnauthorizedAccessException ex) { return ForbiddenError(ex.Message); }
         }
 
         /// <summary>
@@ -85,8 +91,10 @@ namespace ClassBook.Controllers
         {
             try
             {
+                SchoolAccessFacade.EnsureTeacherIdentity(GetUserId(), GetRole(), teacherId);
                 return Ok(await _facade.GetAllGradesByTeacherAsync(teacherId));
             }
+            catch (UnauthorizedAccessException ex) { return ForbiddenError(ex.Message); }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка при загрузке оценок преподавателя {TeacherId}", teacherId);
@@ -102,7 +110,12 @@ namespace ClassBook.Controllers
         [HttpGet("lesson/{lessonId}/students")]
         public async Task<IActionResult> GetStudentsWithGrades(int lessonId)
         {
-            return Ok(await _facade.GetStudentsWithGradesAsync(lessonId));
+            try
+            {
+                await _accessFacade.EnsureLessonAccessAsync(GetUserId(), GetRole(), lessonId, writeAccess: false);
+                return Ok(await _facade.GetStudentsWithGradesAsync(lessonId));
+            }
+            catch (UnauthorizedAccessException ex) { return ForbiddenError(ex.Message); }
         }
 
         /// <summary>
@@ -119,6 +132,7 @@ namespace ClassBook.Controllers
                     return ForbiddenError("Директору доступен только просмотр журнала");
 
                 var userId = GetUserId();
+                await _accessFacade.EnsureGradeWriteAccessAsync(userId, GetRole(), gradeId);
                 await _facade.DeleteGradeAsync(gradeId, userId > 0 ? userId : null);
                 return NoContent();
             }
@@ -126,11 +140,14 @@ namespace ClassBook.Controllers
             {
                 return NotFoundError(ex.Message);
             }
+            catch (UnauthorizedAccessException ex) { return ForbiddenError(ex.Message); }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка при удалении оценки {GradeId}", gradeId);
                 return InternalServerError("Не удалось удалить оценку");
             }
         }
+
+        private string GetRole() => User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
     }
 }

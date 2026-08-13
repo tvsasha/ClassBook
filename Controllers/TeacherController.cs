@@ -17,6 +17,7 @@ namespace ClassBook.Controllers
         private readonly LessonFacade _lessonFacade;
         private readonly GradeFacade _gradeFacade;
         private readonly AttendanceFacade _attendanceFacade;
+        private readonly SchoolAccessFacade _accessFacade;
 
         public TeacherController(
             SubjectFacade subjectFacade,
@@ -24,7 +25,8 @@ namespace ClassBook.Controllers
             StudentFacade studentFacade,
             LessonFacade lessonFacade,
             GradeFacade gradeFacade,
-            AttendanceFacade attendanceFacade)
+            AttendanceFacade attendanceFacade,
+            SchoolAccessFacade accessFacade)
         {
             _subjectFacade = subjectFacade;
             _classFacade = classFacade;
@@ -32,6 +34,7 @@ namespace ClassBook.Controllers
             _lessonFacade = lessonFacade;
             _gradeFacade = gradeFacade;
             _attendanceFacade = attendanceFacade;
+            _accessFacade = accessFacade;
         }
 
         /// <summary>
@@ -43,6 +46,7 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> GetSubjects(int? teacherId = null)
         {
             var effectiveTeacherId = teacherId ?? GetCurrentUserId();
+            SchoolAccessFacade.EnsureTeacherIdentity(GetCurrentUserId(), GetCurrentRole(), effectiveTeacherId);
             return Ok(await _subjectFacade.GetSubjectsForTeacherAsync(effectiveTeacherId));
         }
 
@@ -55,6 +59,7 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> GetClasses(int? teacherId = null)
         {
             var effectiveTeacherId = teacherId ?? GetCurrentUserId();
+            SchoolAccessFacade.EnsureTeacherIdentity(GetCurrentUserId(), GetCurrentRole(), effectiveTeacherId);
             return Ok(await _classFacade.GetClassesForTeacherAsync(effectiveTeacherId));
         }
 
@@ -68,11 +73,16 @@ namespace ClassBook.Controllers
         {
             try
             {
+                await _accessFacade.EnsureClassAccessAsync(GetCurrentUserId(), GetCurrentRole(), classId);
                 return Ok(await _studentFacade.GetStudentsByClassAsync(classId));
             }
             catch (KeyNotFoundException ex)
             {
                 return NotFoundError(ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return ForbiddenError(ex.Message);
             }
         }
 
@@ -85,6 +95,7 @@ namespace ClassBook.Controllers
         public async Task<IActionResult> GetLessons(int? teacherId = null)
         {
             var effectiveTeacherId = teacherId ?? GetCurrentUserId();
+            SchoolAccessFacade.EnsureTeacherIdentity(GetCurrentUserId(), GetCurrentRole(), effectiveTeacherId);
             return Ok(await _lessonFacade.GetLessonsForTeacherAsync(effectiveTeacherId));
         }
 
@@ -205,6 +216,7 @@ namespace ClassBook.Controllers
                 if (User.IsInRole("Директор"))
                     return ForbiddenError("Директору доступен только просмотр журнала");
 
+                await _accessFacade.EnsureLessonAccessAsync(GetCurrentUserId(), GetCurrentRole(), dto.LessonId, writeAccess: true);
                 var grade = await _gradeFacade.AddGradeAsync(dto.LessonId, dto.StudentId, dto.Value);
                 return CreatedAtAction(nameof(AddGrade), new { id = grade.GradeId }, grade);
             }
@@ -219,6 +231,10 @@ namespace ClassBook.Controllers
             catch (InvalidOperationException ex)
             {
                 return BadRequestError(ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return ForbiddenError(ex.Message);
             }
         }
 
@@ -235,6 +251,7 @@ namespace ClassBook.Controllers
                 if (User.IsInRole("Директор"))
                     return ForbiddenError("Директору доступен только просмотр журнала");
 
+                await _accessFacade.EnsureLessonAccessAsync(GetCurrentUserId(), GetCurrentRole(), dto.LessonId, writeAccess: true);
                 await _attendanceFacade.MarkAttendanceAsync(dto.LessonId, dto.StudentId, dto.Status);
                 return Ok("Посещаемость успешно отмечена");
             }
@@ -250,6 +267,10 @@ namespace ClassBook.Controllers
             {
                 return BadRequestError(ex.Message);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return ForbiddenError(ex.Message);
+            }
         }
 
         private int GetCurrentUserId()
@@ -260,5 +281,7 @@ namespace ClassBook.Controllers
 
             return userId;
         }
+
+        private string GetCurrentRole() => User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
     }
 }

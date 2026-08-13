@@ -87,6 +87,7 @@ namespace ClassBook
             });
 
             builder.Services.AddScoped<IPasswordHasher, AspNetIdentityPasswordHasherAdapter>();
+            builder.Services.AddScoped<SchoolAccessFacade>();
             builder.Services.AddMemoryCache();
 
             builder.Services.AddControllers();
