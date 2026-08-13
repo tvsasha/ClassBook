@@ -1,4 +1,5 @@
 using ClassBook.Infrastructure.Data;
+using ClassBook.Domain.Constants;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClassBook.Application.Facades;
@@ -23,6 +24,37 @@ public sealed class SchoolAccessFacade
             || await _db.ClassTeachers.AnyAsync(x => x.TeacherId == currentUserId && x.ClassId == classId)
             || await _db.Lessons.AnyAsync(x => x.TeacherId == currentUserId && x.ClassId == classId);
         if (!allowed) throw new UnauthorizedAccessException("Нет доступа к выбранному классу");
+    }
+
+    public async Task EnsureClassReadAccessAsync(int currentUserId, int classId)
+    {
+        var user = await _db.Users
+            .AsNoTracking()
+            .Where(x => x.Id == currentUserId && x.IsActive)
+            .Select(x => new { x.RoleId })
+            .SingleOrDefaultAsync();
+
+        if (user is null)
+            throw new UnauthorizedAccessException("Учётная запись недоступна");
+
+        if (user.RoleId is SystemRoleIds.Administrator or SystemRoleIds.Director)
+            return;
+
+        var allowed = user.RoleId switch
+        {
+            SystemRoleIds.Teacher =>
+                await _db.SubjectClassAssignments.AnyAsync(x => x.TeacherId == currentUserId && x.ClassId == classId)
+                || await _db.ClassTeachers.AnyAsync(x => x.TeacherId == currentUserId && x.ClassId == classId)
+                || await _db.Lessons.AnyAsync(x => x.TeacherId == currentUserId && x.ClassId == classId),
+            SystemRoleIds.Student =>
+                await _db.Students.AnyAsync(x => x.UserId == currentUserId && x.ClassId == classId),
+            SystemRoleIds.Parent =>
+                await _db.StudentParents.AnyAsync(x => x.ParentId == currentUserId && x.Student.ClassId == classId),
+            _ => false
+        };
+
+        if (!allowed)
+            throw new UnauthorizedAccessException("Нет доступа к расписанию выбранного класса");
     }
 
     public async Task EnsureLessonAccessAsync(int currentUserId, string role, int lessonId, bool writeAccess)

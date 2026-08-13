@@ -12,12 +12,14 @@ namespace ClassBook.Controllers
     public class ScheduleController : ApiControllerBase
     {
         private readonly ScheduleFacade _scheduleFacade;
+        private readonly SchoolAccessFacade _schoolAccessFacade;
         private readonly AuditFacade _auditFacade;
         private readonly ILogger<ScheduleController> _logger;
 
-        public ScheduleController(ScheduleFacade scheduleFacade, AuditFacade auditFacade, ILogger<ScheduleController> logger)
+        public ScheduleController(ScheduleFacade scheduleFacade, SchoolAccessFacade schoolAccessFacade, AuditFacade auditFacade, ILogger<ScheduleController> logger)
         {
             _scheduleFacade = scheduleFacade;
+            _schoolAccessFacade = schoolAccessFacade;
             _auditFacade = auditFacade;
             _logger = logger;
         }
@@ -81,6 +83,7 @@ namespace ClassBook.Controllers
         {
             try
             {
+                await _schoolAccessFacade.EnsureClassReadAccessAsync(GetUserId(), classId);
                 DateTime? parsedDate = null;
                 if (!string.IsNullOrEmpty(date) && DateTime.TryParse(date, out var parsed))
                 {
@@ -88,6 +91,10 @@ namespace ClassBook.Controllers
                 }
 
                 return Ok(await _scheduleFacade.GetScheduleByClassAsync(classId, parsedDate));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return ForbiddenError(ex.Message);
             }
             catch (Exception ex)
             {
